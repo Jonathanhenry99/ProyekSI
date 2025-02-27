@@ -8,28 +8,28 @@ import LogoIF from 'D:/Programming/ProyekSI/ProyekSI/src/assets/LogoIF.jpg';
 import LogoUnpar from 'D:/Programming/ProyekSI/ProyekSI/src/assets/LogoUnpar.png';
 
 export default function HomePage() {
-  {/* Wind Blowing Effect */}
-<div className="absolute inset-0 overflow-hidden">
-  {[...Array(20)].map((_, i) => (
-    <motion.div
-      key={i}
-      className="absolute w-3 h-3 bg-gray-200 rounded-full opacity-50"
-      initial={{
-        x: -50, // Mulai dari kiri layar
-        y: Math.random() * window.innerHeight,
-      }}
-      animate={{
-        x: [null, window.innerWidth + 50], // Bergerak ke kanan
-        y: [null, Math.random() * window.innerHeight],
-      }}
-      transition={{
-        duration: 3 + Math.random() * 2,
-        repeat: Infinity,
-        ease: "linear",
-      }}
-    />
-  ))}
-</div>
+  {/* Wind Blowing Effect */ }
+  <div className="absolute inset-0 overflow-hidden">
+    {[...Array(20)].map((_, i) => (
+      <motion.div
+        key={i}
+        className="absolute w-3 h-3 bg-gray-200 rounded-full opacity-50"
+        initial={{
+          x: -50, // Mulai dari kiri layar
+          y: Math.random() * window.innerHeight,
+        }}
+        animate={{
+          x: [null, window.innerWidth + 50], // Bergerak ke kanan
+          y: [null, Math.random() * window.innerHeight],
+        }}
+        transition={{
+          duration: 3 + Math.random() * 2,
+          repeat: Infinity,
+          ease: "linear",
+        }}
+      />
+    ))}
+  </div>
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -44,7 +44,7 @@ export default function HomePage() {
   return (
     <div className="flex flex-col min-h-screen bg-white text-gray-800 overflow-hidden">
       {isLoading ? (
-        <LoadingAnimation/>
+        <LoadingAnimation />
       ) : (
         <>
           <CustomHeader />
@@ -69,25 +69,24 @@ export default function HomePage() {
   );
 }
 
-// Custom Header Component
+
 const CustomHeader = () => {
   return (
     <motion.header
-      className="bg-white shadow-md py-4 px-6 md:px-12 lg:px-24"
+      className="bg-white shadow-md py-5 px-6 md:px-12 lg:px-24"
       initial={{ y: -100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.5 }}
     >
       <div className="flex items-center justify-between">
+        {/* Logo di kiri */}
         <div className="flex items-center space-x-4">
-          {/* Logo Unpar - Replace with actual import */}
           <img
             src={LogoUnpar}
             alt="Logo Unpar"
             className="h-10 w-auto"
           />
           <div className="h-8 w-px bg-gray-300"></div>
-          {/* Logo IF - Replace with actual import */}
           <img
             src={LogoIF}
             alt="Logo IF"
@@ -95,37 +94,44 @@ const CustomHeader = () => {
           />
         </div>
 
+        {/* Navigasi di tengah - dengan container yang memiliki width tetap */}
+        <div className="flex-1 flex justify-center -ml-27">
+          <nav className="flex items-center space-x-7">
+            {/* Teks navigasi dengan indikator aktif */}
+            {[
+              { name: "Home", path: "/" },
+              { name: "Cari Soal", path: "/search" },
+              { name: "Upload", path: "/upload" },
+              { name: "Buat Soal", path: "/Create" },
+              { name: "History", path: "/history" }
+            ].map((item) => (
+              <div className="relative group" key={item.name}>
+                <motion.a
+                  whileHover={{ y: -2 }}
+                  className="text-gray-600 hover:text-blue-600 font-medium cursor-pointer px-1 py-2 block"
+                  href={item.path}
+                >
+                  {item.name}
+                </motion.a>
+                <motion.div
+                  className="h-0.5 w-0 bg-blue-600 absolute bottom-0 left-0"
+                  initial={{ width: 0 }}
+                  whileHover={{ width: "100%" }}
+                  transition={{ duration: 0.3 }}
+                />
+              </div>
+            ))}
+          </nav>
+        </div>
+        {/* Tombol Login di kanan */}
         <motion.a
-          whileHover={{ scale: 1.05 }}
-          className="text-gray-600 hover:text-blue-600 font-medium cursor-pointer"
-          href="/"
-        >
-          Home
-        </motion.a>
-        
-        <motion.a
-          whileHover={{ scale: 1.05 }}
-          className="text-gray-600 hover:text-blue-600 font-medium cursor-pointer"
-          href="/search"
-        >
-          Cari Soal
-        </motion.a>
-
-        <motion.a
-          whileHover={{ scale: 1.05 }}
-          className="text-gray-600 hover:text-blue-600 font-medium cursor-pointer"
-          href="/upload"
-        >
-          Upload
-        </motion.a>
-
-        <motion.button
+          href="/login" // Tambahkan href ke /login
           className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-300"
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
           Login
-        </motion.button>
+        </motion.a>
       </div>
     </motion.header>
   );
@@ -133,7 +139,7 @@ const CustomHeader = () => {
 
 // Hero Section Component
 const HeroSection = () => {
-  
+
   return (
     <section className="pt-12 pb-16 px-6 md:px-12 lg:px-24 relative overflow-hidden">
       <div className="max-w-6xl mx-auto">
@@ -375,32 +381,32 @@ const GetStartedSection = () => {
 
 //animasi loading
 // Loading animation component
-  const LoadingAnimation = () => (
-    <div className="fixed inset-0 flex items-center justify-center bg-white bg-opacity-90 z-50">
-      <motion.div
-        animate={{
-          scale: [1, 1.2, 1],
-          rotate: [0, 180, 360]
-        }}
-        transition={{
-          duration: 2,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-        className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full"
-      />
-      <motion.p
-        animate={{ opacity: [0.5, 1, 0.5] }}
-        transition={{
-          duration: 1.5,
-          repeat: Infinity
-        }}
-        className="ml-4 text-lg font-medium text-blue-600"
-      >
-        Memuat Bank Soal...
-      </motion.p>
-    </div>
-  );
+const LoadingAnimation = () => (
+  <div className="fixed inset-0 flex items-center justify-center bg-white bg-opacity-90 z-50">
+    <motion.div
+      animate={{
+        scale: [1, 1.2, 1],
+        rotate: [0, 180, 360]
+      }}
+      transition={{
+        duration: 2,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }}
+      className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full"
+    />
+    <motion.p
+      animate={{ opacity: [0.5, 1, 0.5] }}
+      transition={{
+        duration: 1.5,
+        repeat: Infinity
+      }}
+      className="ml-4 text-lg font-medium text-blue-600"
+    >
+      Memuat Bank Soal...
+    </motion.p>
+  </div>
+);
 
 // Background Elements Component
 const BackgroundElements = () => {
