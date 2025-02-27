@@ -2,23 +2,46 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import { Link } from 'react-router-dom';
 import AuthService from '../services/auth.service';
 
 // Note: You'll need to import these images in your actual project
-import LogoIF from '../assets/LogoIF.jpg';  // Updated path
-import LogoUnpar from '../assets/LogoUnpar.png';  // Updated path
-export default function HomePage({ currentUser }) {
-  const [isLoading, setIsLoading] = useState(false); // Ubah nilai awal menjadi false
+import LogoIF from 'D:/Programming/ProyekSI/ProyekSI/src/assets/LogoIF.jpg';
+import LogoUnpar from 'D:/Programming/ProyekSI/ProyekSI/src/assets/LogoUnpar.png';
 
-  // Hapus useEffect untuk loading
-  // useEffect(() => {
-  //   // Simulate loading time
-  //   const timer = setTimeout(() => {
-  //     setIsLoading(false);
-  //   }, 1500);
-  //
-  //   return () => clearTimeout(timer);
-  // }, []);
+export default function HomePage() {
+  {/* Wind Blowing Effect */}
+<div className="absolute inset-0 overflow-hidden">
+  {[...Array(20)].map((_, i) => (
+    <motion.div
+      key={i}
+      className="absolute w-3 h-3 bg-gray-200 rounded-full opacity-50"
+      initial={{
+        x: -50, // Mulai dari kiri layar
+        y: Math.random() * window.innerHeight,
+      }}
+      animate={{
+        x: [null, window.innerWidth + 50], // Bergerak ke kanan
+        y: [null, Math.random() * window.innerHeight],
+      }}
+      transition={{
+        duration: 3 + Math.random() * 2,
+        repeat: Infinity,
+        ease: "linear",
+      }}
+    />
+  ))}
+</div>
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Simulate loading time
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <div className="flex flex-col min-h-screen bg-white text-gray-800 overflow-hidden">
@@ -47,6 +70,68 @@ export default function HomePage({ currentUser }) {
     </div>
   );
 }
+
+// Custom Header Component
+const CustomHeader = () => {
+  return (
+    <motion.header
+      className="bg-white shadow-md py-4 px-6 md:px-12 lg:px-24"
+      initial={{ y: -100 }}
+      animate={{ y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          {/* Logo Unpar - Replace with actual import */}
+          <img
+            src={LogoUnpar}
+            alt="Logo Unpar"
+            className="h-10 w-auto"
+          />
+          <div className="h-8 w-px bg-gray-300"></div>
+          {/* Logo IF - Replace with actual import */}
+          <img
+            src={LogoIF}
+            alt="Logo IF"
+            className="h-10 w-auto rounded"
+          />
+        </div>
+
+        <motion.a
+          whileHover={{ scale: 1.05 }}
+          className="text-gray-600 hover:text-blue-600 font-medium cursor-pointer"
+          href="/"
+        >
+          Home
+        </motion.a>
+        
+        <motion.a
+          whileHover={{ scale: 1.05 }}
+          className="text-gray-600 hover:text-blue-600 font-medium cursor-pointer"
+          href="/search"
+        >
+          Cari Soal
+        </motion.a>
+
+        <motion.a
+          whileHover={{ scale: 1.05 }}
+          className="text-gray-600 hover:text-blue-600 font-medium cursor-pointer"
+          href="/upload"
+        >
+          Upload
+        </motion.a>
+
+        <motion.button
+          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-300"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          Login
+        </motion.button>
+      </div>
+    </motion.header>
+  );
+};
 
 // Hero Section Component
 const HeroSection = () => {

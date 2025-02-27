@@ -2,63 +2,93 @@ import React, { useState } from 'react';
 import { motion } from "framer-motion";
 import { Mail, Lock, LogIn, EyeOff, Eye, AlertCircle } from 'lucide-react';
 import Footer from '../components/Footer';
-import Header from '../components/Header';
-import LogoIF from '../assets/LogoIF.jpg';
-import LogoUnpar from '../assets/LogoUnpar.png';
-import AuthService from '../services/auth.service';
-import { useNavigate } from 'react-router-dom';
+import LogoIF from '/Users/jonathanhenry/Programming/Semester7/ProyekSI/ProyekSI/src/assets/LogoIF.jpg';
+import LogoUnpar from '/Users/jonathanhenry/Programming/Semester7/ProyekSI/ProyekSI/src/assets/LogoUnpar.png';
 
-const LoginPage = ({ setCurrentUser }) => {
+const CustomHeader = () => {
+    return (
+        <motion.header
+            className="bg-white shadow-md py-4 px-6 md:px-12 lg:px-24 relative z-50" // Tambahkan z-50
+            initial={{ y: -100 }}
+            animate={{ y: 0 }}
+            transition={{ duration: 0.5 }}
+        >
+            <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                    {/* Logo Unpar - Replace with actual import */}
+                    <img
+                        src={LogoUnpar}
+                        alt="Logo Unpar"
+                        className="h-10 w-auto"
+                    />
+                    <div className="h-8 w-px bg-gray-300"></div>
+                    {/* Logo IF - Replace with actual import */}
+                    <img
+                        src={LogoIF}
+                        alt="Logo IF"
+                        className="h-10 w-auto rounded"
+                    />
+                </div>
+
+                <motion.a
+                    whileHover={{ scale: 1.05 }}
+                    className="text-gray-600 hover:text-blue-600 font-medium cursor-pointer"
+                    href="/"
+                >
+                    Home
+                </motion.a>
+
+                <motion.a
+                    whileHover={{ scale: 1.05 }}
+                    className="text-gray-600 hover:text-blue-600 font-medium cursor-pointer"
+                    href="/search"
+                >
+                    Cari Soal
+                </motion.a>
+
+                <motion.a
+                    whileHover={{ scale: 1.05 }}
+                    className="text-gray-600 hover:text-blue-600 font-medium cursor-pointer"
+                    href="/upload"
+                >
+                </motion.a>
+
+                <motion.button
+                    className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-300"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                >
+                    Login
+                </motion.button>
+            </div>
+        </motion.header>
+    );
+};
+
+const LoginPage = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const navigate = useNavigate();
 
     const handleLogin = (e) => {
         e.preventDefault();
         setIsLoading(true);
-        setError('');
 
-        // Validate inputs
+        // Simulasi validasi
         if (!email || !password) {
             setError('Email dan password harus diisi');
             setIsLoading(false);
             return;
         }
 
-        // Call the authentication service
-        AuthService.login(email, password)
-            .then((response) => {
-                // Update current user in parent component
-                setCurrentUser(response);
-                
-                // Redirect to home page
-                navigate('/');
-            })
-            .catch(error => {
-                setIsLoading(false);
-                
-                // Handle specific error messages from the server
-                if (error.response) {
-                    switch (error.response.status) {
-                        case 404:
-                            setError('Email tidak ditemukan');
-                            break;
-                        case 401:
-                            setError('Password salah');
-                            break;
-                        case 403:
-                            setError('Akun telah dinonaktifkan, hubungi administrator');
-                            break;
-                        default:
-                            setError('Gagal masuk. Silakan coba lagi.');
-                    }
-                } else {
-                    setError('Terjadi kesalahan. Periksa koneksi jaringan Anda.');
-                }
-            });
+        // Simulasi login (ganti dengan autentikasi sesungguhnya)
+        setTimeout(() => {
+            setIsLoading(false);
+            // Redirect ke halaman utama setelah login berhasil
+            // window.location.href = '/dashboard';
+        }, 1500);
     };
 
     // Dekorasi background
@@ -119,7 +149,7 @@ const LoginPage = ({ setCurrentUser }) => {
                 <rect width="100%" height="100%" fill="url(#tech-pattern)" />
             </svg>
 
-            <Header currentUser={null} />
+            <CustomHeader />
 
             <div className="container mx-auto px-4 py-16 relative z-10">
                 <motion.div

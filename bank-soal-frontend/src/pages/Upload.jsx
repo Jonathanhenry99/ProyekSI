@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { motion } from "framer-motion";
 import { Upload, File, CheckCircle, X, AlertCircle, User, Calendar, Tag, ChevronDown } from 'lucide-react';
-import LogoIF from '../assets/LogoIF.jpg';  // Updated path
-import LogoUnpar from '../assets/LogoUnpar.png';  // Updated path
+import LogoIF from '/Users/jonathanhenry/Programming/Semester7/ProyekSI/ProyekSI/src/assets/LogoIF.jpg';
+import LogoUnpar from '/Users/jonathanhenry/Programming/Semester7/ProyekSI/ProyekSI/src/assets/LogoUnpar.png';
 import Footer from '../components/Footer';
 import Header from '../components/Header';
 
@@ -18,7 +18,7 @@ const UploadPage = ({ currentUser }) => {
     topics: '',
     difficulty: '',
     description: '',
-    lecturer: 'Dr. Ahmad Fauzi' // Ini akan diambil dari akun yang login
+    lecturer: 'Dr. Jonathan' // Ini akan diambil dari akun yang login
   });
 
   const handleFileSelect = (type) => {

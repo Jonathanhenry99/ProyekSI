@@ -1,11 +1,72 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, CheckCircle, ChevronDown, FileText, BarChart2, Plus, Check } from 'lucide-react';
+import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, CheckCircle, ChevronDown, FileText, BarChart2 } from 'lucide-react';
+import LogoIF from '/Users/jonathanhenry/Programming/Semester7/ProyekSI/ProyekSI/src/assets/LogoIF.jpg';
+import LogoUnpar from '/Users/jonathanhenry/Programming/Semester7/ProyekSI/ProyekSI/src/assets/LogoUnpar.png';
 import Footer from '../components/Footer';
-import Header from '../components/Header';
-import { Link } from 'react-router-dom';
 
-const SearchPage = ({ currentUser }) => {
+const CustomHeader = () => {
+  return (
+    <motion.header
+      className="bg-white shadow-md py-4 px-6 md:px-12 lg:px-24 relative z-50" // Tambahkan z-50 disini
+      initial={{ y: -100 }}
+      animate={{ y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          {/* Logo Unpar - Replace with actual import */}
+          <img
+            src={LogoUnpar}
+            alt="Logo Unpar"
+            className="h-10 w-auto"
+          />
+          <div className="h-8 w-px bg-gray-300"></div>
+          {/* Logo IF - Replace with actual import */}
+          <img
+            src={LogoIF}
+            alt="Logo IF"
+            className="h-10 w-auto rounded"
+          />
+        </div>
+
+        <motion.a
+          whileHover={{ scale: 1.05 }}
+          className="text-gray-600 hover:text-blue-600 font-medium cursor-pointer"
+          href="/"
+        >
+          Home
+        </motion.a>
+
+        <motion.a
+          whileHover={{ scale: 1.05 }}
+          className="text-gray-600 hover:text-blue-600 font-medium cursor-pointer"
+          href="/search"
+        >
+          Cari Soal
+        </motion.a>
+
+        <motion.a
+          whileHover={{ scale: 1.05 }}
+          className="text-gray-600 hover:text-blue-600 font-medium cursor-pointer"
+          href="/upload"
+        >
+          Upload
+        </motion.a>
+
+        <motion.button
+          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-300"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          Login
+        </motion.button>
+      </div>
+    </motion.header>
+  );
+};
+
+const SearchPage = () => {
   const [activeTab, setActiveTab] = useState('semua');
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState([]);
@@ -36,7 +97,7 @@ const SearchPage = ({ currentUser }) => {
       fileName: 'UTS_MTK_2023_Ganjil.pdf',
       subject: 'Algoritma Struktur Dasar',
       year: 2023,
-      lecturer: 'Dr. Ahmad Fauzi',
+      lecturer: 'Lionov',
       level: 'Mudah',
       lastUpdated: '2024-02-20',
       topics: ['Kalkulus', 'Integral'],
@@ -47,7 +108,7 @@ const SearchPage = ({ currentUser }) => {
       fileName: 'UAS_Fisika_2023_Genap.pdf',
       subject: 'Fisika',
       year: 2023,
-      lecturer: 'Prof. Siti Aminah',
+      lecturer: 'Joana',
       level: 'Sulit',
       lastUpdated: '2024-01-15',
       topics: ['Mekanika Kuantum', 'Relativitas'],
@@ -58,7 +119,7 @@ const SearchPage = ({ currentUser }) => {
       fileName: 'Quiz_Kimia_Organik.pdf',
       subject: 'Kimia',
       year: 2023,
-      lecturer: 'Dr. Budi Santoso',
+      lecturer: 'Husnul',
       level: 'Sedang',
       lastUpdated: '2024-01-28',
       topics: ['Kimia Organik', 'Alkena'],
@@ -69,7 +130,7 @@ const SearchPage = ({ currentUser }) => {
       fileName: 'Tugas_Algo_Strukdat.pdf',
       subject: 'Ilmu Komputer',
       year: 2023,
-      lecturer: 'Dr. Wijaya Kusuma',
+      lecturer: 'Lionov',
       level: 'Sedang',
       lastUpdated: '2024-02-10',
       topics: ['Algoritma', 'Struktur Data'],
@@ -80,7 +141,7 @@ const SearchPage = ({ currentUser }) => {
       fileName: 'UTS_Database_2023.pdf',
       subject: 'Sistem Database',
       year: 2023,
-      lecturer: 'Dr. Rahmat Hidayat',
+      lecturer: 'Joana',
       level: 'Sulit',
       lastUpdated: '2023-12-05',
       topics: ['SQL', 'Normalisasi'],
@@ -91,7 +152,7 @@ const SearchPage = ({ currentUser }) => {
       fileName: 'UAS_Ekonomi_Makro.pdf',
       subject: 'Ekonomi',
       year: 2023,
-      lecturer: 'Prof. Diana Putri',
+      lecturer: 'Ko Aldo',
       level: 'Mudah',
       lastUpdated: '2024-02-15',
       topics: ['Makroekonomi', 'Inflasi'],
