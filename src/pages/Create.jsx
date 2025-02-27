@@ -9,6 +9,7 @@ import LogoUnpar from 'D:/Programming/ProyekSI/ProyekSI/src/assets/LogoUnpar.png
 import Footer from '../components/Footer';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import EnhancedMarkdownEditor from '../components/EnhancedMarkdownEditor';
+import { Link } from "react-router-dom";
 
 const CustomHeader = () => {
     return (
@@ -383,6 +384,21 @@ const FormCreatorPage = () => {
 
                         {/* Create new question with markdown */}
                         <div className="bg-white rounded-2xl p-6 shadow-lg">
+                            <h2 className="text-xl font-semibold mb-4 text-gray-900 flex items-center gap-2">
+                                <PenTool className="w-5 h-5 text-blue-500" />
+                                Upload Soal Baru
+                            </h2>
+                            <motion.div
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                className="w-full bg-blue-50 text-blue-700 border border-blue-200 py-3 rounded-xl font-medium hover:bg-blue-100 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                                <Link to="/upload" className="flex items-center justify-center gap-2 w-full">
+                                    <Plus className="w-5 h-5" />
+                                    Upload Soal Baru
+                                </Link>
+                            </motion.div>
+
                             <h2 className="text-xl font-semibold mb-4 text-gray-900 flex items-center gap-2">
                                 <PenTool className="w-5 h-5 text-blue-500" />
                                 Buat Soal Baru
