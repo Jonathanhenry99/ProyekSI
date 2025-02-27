@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, CheckCircle, ChevronDown, FileText, BarChart2 } from 'lucide-react';
-import LogoIF from 'D:/Programming/ProyekSI/ProyekSI/src/assets/LogoIF.jpg';
-import LogoUnpar from 'D:/Programming/ProyekSI/ProyekSI/src/assets/LogoUnpar.png';
+import LogoIF from '/Users/jonathanhenry/Programming/Semester7/ProyekSI/ProyekSI/src/assets/LogoIF.jpg';
+import LogoUnpar from '/Users/jonathanhenry/Programming/Semester7/ProyekSI/ProyekSI/src/assets/LogoUnpar.png';
 import Footer from '../components/Footer';
-import Header from '../components/Header';
 
 const CustomHeader = () => {
   return (
     <motion.header
-      className="bg-white shadow-md py-4 px-6 md:px-12 lg:px-24"
+      className="bg-white shadow-md py-4 px-6 md:px-12 lg:px-24 relative z-50" // Tambahkan z-50 disini
       initial={{ y: -100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.5 }}
@@ -83,7 +82,7 @@ const SearchPage = () => {
       fileName: 'UTS_MTK_2023_Ganjil.pdf',
       subject: 'Algoritma Struktur Dasar',
       year: 2023,
-      lecturer: 'Dr. Ahmad Fauzi',
+      lecturer: 'Lionov',
       level: 'Mudah',
       lastUpdated: '2024-02-20',
       topics: ['Kalkulus', 'Integral'],
@@ -94,7 +93,7 @@ const SearchPage = () => {
       fileName: 'UAS_Fisika_2023_Genap.pdf',
       subject: 'Fisika',
       year: 2023,
-      lecturer: 'Prof. Siti Aminah',
+      lecturer: 'Joana',
       level: 'Sulit',
       lastUpdated: '2024-01-15',
       topics: ['Mekanika Kuantum', 'Relativitas'],
@@ -105,7 +104,7 @@ const SearchPage = () => {
       fileName: 'Quiz_Kimia_Organik.pdf',
       subject: 'Kimia',
       year: 2023,
-      lecturer: 'Dr. Budi Santoso',
+      lecturer: 'Husnul',
       level: 'Sedang',
       lastUpdated: '2024-01-28',
       topics: ['Kimia Organik', 'Alkena'],
@@ -116,7 +115,7 @@ const SearchPage = () => {
       fileName: 'Tugas_Algo_Strukdat.pdf',
       subject: 'Ilmu Komputer',
       year: 2023,
-      lecturer: 'Dr. Wijaya Kusuma',
+      lecturer: 'Lionov',
       level: 'Sedang',
       lastUpdated: '2024-02-10',
       topics: ['Algoritma', 'Struktur Data'],
@@ -127,7 +126,7 @@ const SearchPage = () => {
       fileName: 'UTS_Database_2023.pdf',
       subject: 'Sistem Database',
       year: 2023,
-      lecturer: 'Dr. Rahmat Hidayat',
+      lecturer: 'Joana',
       level: 'Sulit',
       lastUpdated: '2023-12-05',
       topics: ['SQL', 'Normalisasi'],
@@ -138,7 +137,7 @@ const SearchPage = () => {
       fileName: 'UAS_Ekonomi_Makro.pdf',
       subject: 'Ekonomi',
       year: 2023,
-      lecturer: 'Prof. Diana Putri',
+      lecturer: 'Ko Aldo',
       level: 'Mudah',
       lastUpdated: '2024-02-15',
       topics: ['Makroekonomi', 'Inflasi'],

@@ -2,34 +2,35 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import { Link } from 'react-router-dom';
 
 // Note: You'll need to import these images in your actual project
-import LogoIF from 'D:/Programming/ProyekSI/ProyekSI/src/assets/LogoIF.jpg';
-import LogoUnpar from 'D:/Programming/ProyekSI/ProyekSI/src/assets/LogoUnpar.png';
+import LogoIF from '/Users/jonathanhenry/Programming/Semester7/ProyekSI/ProyekSI/src/assets/LogoIF.jpg';
+import LogoUnpar from '/Users/jonathanhenry/Programming/Semester7/ProyekSI/ProyekSI/src/assets/LogoUnpar.png';
 
 export default function HomePage() {
-  {/* Wind Blowing Effect */}
-<div className="absolute inset-0 overflow-hidden">
-  {[...Array(20)].map((_, i) => (
-    <motion.div
-      key={i}
-      className="absolute w-3 h-3 bg-gray-200 rounded-full opacity-50"
-      initial={{
-        x: -50, // Mulai dari kiri layar
-        y: Math.random() * window.innerHeight,
-      }}
-      animate={{
-        x: [null, window.innerWidth + 50], // Bergerak ke kanan
-        y: [null, Math.random() * window.innerHeight],
-      }}
-      transition={{
-        duration: 3 + Math.random() * 2,
-        repeat: Infinity,
-        ease: "linear",
-      }}
-    />
-  ))}
-</div>
+  {/* Wind Blowing Effect */ }
+  <div className="absolute inset-0 overflow-hidden">
+    {[...Array(20)].map((_, i) => (
+      <motion.div
+        key={i}
+        className="absolute w-3 h-3 bg-gray-200 rounded-full opacity-50"
+        initial={{
+          x: -50, // Mulai dari kiri layar
+          y: Math.random() * window.innerHeight,
+        }}
+        animate={{
+          x: [null, window.innerWidth + 50], // Bergerak ke kanan
+          y: [null, Math.random() * window.innerHeight],
+        }}
+        transition={{
+          duration: 3 + Math.random() * 2,
+          repeat: Infinity,
+          ease: "linear",
+        }}
+      />
+    ))}
+  </div>
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -44,7 +45,7 @@ export default function HomePage() {
   return (
     <div className="flex flex-col min-h-screen bg-white text-gray-800 overflow-hidden">
       {isLoading ? (
-        <LoadingAnimation/>
+        <LoadingAnimation />
       ) : (
         <>
           <CustomHeader />
@@ -98,11 +99,11 @@ const CustomHeader = () => {
         <motion.a
           whileHover={{ scale: 1.05 }}
           className="text-gray-600 hover:text-blue-600 font-medium cursor-pointer"
-          href="/"
+          href="/login"
         >
           Home
         </motion.a>
-        
+
         <motion.a
           whileHover={{ scale: 1.05 }}
           className="text-gray-600 hover:text-blue-600 font-medium cursor-pointer"
@@ -119,13 +120,17 @@ const CustomHeader = () => {
           Upload
         </motion.a>
 
-        <motion.button
-          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-300"
+        <motion.div
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
-          Login
-        </motion.button>
+          <Link
+            to="/login"
+            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-300 inline-block"
+          >
+            Login
+          </Link>
+        </motion.div>
       </div>
     </motion.header>
   );
@@ -133,7 +138,7 @@ const CustomHeader = () => {
 
 // Hero Section Component
 const HeroSection = () => {
-  
+
   return (
     <section className="pt-12 pb-16 px-6 md:px-12 lg:px-24 relative overflow-hidden">
       <div className="max-w-6xl mx-auto">
@@ -375,32 +380,32 @@ const GetStartedSection = () => {
 
 //animasi loading
 // Loading animation component
-  const LoadingAnimation = () => (
-    <div className="fixed inset-0 flex items-center justify-center bg-white bg-opacity-90 z-50">
-      <motion.div
-        animate={{
-          scale: [1, 1.2, 1],
-          rotate: [0, 180, 360]
-        }}
-        transition={{
-          duration: 2,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-        className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full"
-      />
-      <motion.p
-        animate={{ opacity: [0.5, 1, 0.5] }}
-        transition={{
-          duration: 1.5,
-          repeat: Infinity
-        }}
-        className="ml-4 text-lg font-medium text-blue-600"
-      >
-        Memuat Bank Soal...
-      </motion.p>
-    </div>
-  );
+const LoadingAnimation = () => (
+  <div className="fixed inset-0 flex items-center justify-center bg-white bg-opacity-90 z-50">
+    <motion.div
+      animate={{
+        scale: [1, 1.2, 1],
+        rotate: [0, 180, 360]
+      }}
+      transition={{
+        duration: 2,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }}
+      className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full"
+    />
+    <motion.p
+      animate={{ opacity: [0.5, 1, 0.5] }}
+      transition={{
+        duration: 1.5,
+        repeat: Infinity
+      }}
+      className="ml-4 text-lg font-medium text-blue-600"
+    >
+      Memuat Bank Soal...
+    </motion.p>
+  </div>
+);
 
 // Background Elements Component
 const BackgroundElements = () => {
