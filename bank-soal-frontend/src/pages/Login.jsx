@@ -2,96 +2,21 @@ import React, { useState } from 'react';
 import { motion } from "framer-motion";
 import { Mail, Lock, LogIn, EyeOff, Eye, AlertCircle } from 'lucide-react';
 import Footer from '../components/Footer';
-import LogoIF from '../assets/LogoIF.jpg';  // Updated path
-import LogoUnpar from '../assets/LogoUnpar.png';  // Updated path
+import Header from '../components/Header';
+import LogoIF from '../assets/LogoIF.jpg';
+import LogoUnpar from '../assets/LogoUnpar.png';
 import AuthService from '../services/auth.service';
 import { useNavigate } from 'react-router-dom';
 
-const CustomHeader = () => {
-  return (
-    <motion.header
-      className="bg-white shadow-md py-5 px-6 md:px-12 lg:px-24"
-      initial={{ y: -100 }}
-      animate={{ y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
-        {/* Logo di kiri */}
-        <div className="flex items-center space-x-4">
-          <motion.img
-            src={LogoUnpar}
-            alt="Logo Unpar"
-            className="h-10 w-auto"
-            whileHover={{ rotate: 5 }}
-            transition={{ duration: 0.3 }}
-          />
-          <div className="h-8 w-px bg-gray-300"></div>
-          <motion.img
-            src={LogoIF}
-            alt="Logo IF"
-            className="h-10 w-auto rounded"
-            whileHover={{ rotate: -5 }}
-            transition={{ duration: 0.3 }}
-          />
-        </div>
-
-        {/* Navigasi di tengah - dengan container yang memiliki width tetap */}
-        <div className="flex-1 flex justify-center -ml-16">
-          <nav className="flex items-center space-x-7">
-            {/* Teks navigasi dengan indikator aktif */}
-            {[
-              { name: "Home", path: "/" },
-              { name: "Cari Soal", path: "/search" },
-              { name: "Upload", path: "/upload" },
-              { name: "Buat Soal", path: "/Create" },
-              { name: "History", path: "/history" }
-            ].map((item) => (
-              <div className="relative group" key={item.name}>
-                <motion.a
-                  whileHover={{ y: -2 }}
-                  className={`text-gray-600 hover:text-blue-600 font-medium cursor-pointer px-1 py-2 block ${
-                    item.name === "History" ? "text-blue-600" : ""
-                  }`}
-                  href={item.path}
-                >
-                  {item.name}
-                </motion.a>
-                <motion.div 
-                  className={`h-0.5 bg-blue-600 absolute bottom-0 left-0 ${
-                    item.name === "History" ? "w-full" : "w-0"
-                  }`}
-                  initial={{ width: item.name === "History" ? "100%" : 0 }}
-                  whileHover={{ width: "100%" }}
-                  transition={{ duration: 0.3 }}
-                />
-              </div>
-            ))}
-          </nav>
-        </div>
-        {/* Tombol Login di kanan */}
-        <motion.a
-          href="/login" // Tambahkan href ke /login
-          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-300"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          Login
-        </motion.a>
-      </div>
-    </motion.header>
-  );
-};
-
-
-const LoginPage = () => {
+const LoginPage = ({ setCurrentUser }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const navigate = useNavigate();
 
     const handleLogin = (e) => {
-        
         e.preventDefault();
         setIsLoading(true);
         setError('');
@@ -105,16 +30,12 @@ const LoginPage = () => {
 
         // Call the authentication service
         AuthService.login(email, password)
-            .then(() => {
-                // Get the current user
-                const user = AuthService.getCurrentUser();
+            .then((response) => {
+                // Update current user in parent component
+                setCurrentUser(response);
                 
-                // Check if user is admin
-                if (user && user.roles && user.roles.includes("ROLE_ADMIN")) {
-                    navigate('/admin/dashboard');
-                } else {
-                    navigate('/dashboard');
-                }
+                // Redirect to home page
+                navigate('/');
             })
             .catch(error => {
                 setIsLoading(false);
@@ -198,7 +119,7 @@ const LoginPage = () => {
                 <rect width="100%" height="100%" fill="url(#tech-pattern)" />
             </svg>
 
-            <CustomHeader />
+            <Header currentUser={null} />
 
             <div className="container mx-auto px-4 py-16 relative z-10">
                 <motion.div

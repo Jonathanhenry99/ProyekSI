@@ -4,75 +4,9 @@ import { Upload, File, CheckCircle, X, AlertCircle, User, Calendar, Tag, Chevron
 import LogoIF from '../assets/LogoIF.jpg';  // Updated path
 import LogoUnpar from '../assets/LogoUnpar.png';  // Updated path
 import Footer from '../components/Footer';
+import Header from '../components/Header';
 
-const CustomHeader = () => {
-  return (
-    <motion.header
-      className="bg-white shadow-md py-5 px-6 md:px-12 lg:px-24"
-      initial={{ y: -100 }}
-      animate={{ y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <div className="flex items-center justify-between">
-        {/* Logo di kiri */}
-        <div className="flex items-center space-x-4">
-          <img
-            src={LogoUnpar}
-            alt="Logo Unpar"
-            className="h-10 w-auto"
-          />
-          <div className="h-8 w-px bg-gray-300"></div>
-          <img
-            src={LogoIF}
-            alt="Logo IF"
-            className="h-10 w-auto rounded"
-          />
-        </div>
-
-        {/* Navigasi di tengah - dengan container yang memiliki width tetap */}
-        <div className="flex-1 flex justify-center -ml-27">
-          <nav className="flex items-center space-x-7">
-            {/* Teks navigasi dengan indikator aktif */}
-            {[
-              { name: "Home", path: "/" },
-              { name: "Cari Soal", path: "/search" },
-              { name: "Upload", path: "/upload" },
-              { name: "Buat Soal", path: "/Create" },
-              { name: "History", path: "/history" }
-            ].map((item) => (
-              <div className="relative group" key={item.name}>
-                <motion.a
-                  whileHover={{ y: -2 }}
-                  className="text-gray-600 hover:text-blue-600 font-medium cursor-pointer px-1 py-2 block"
-                  href={item.path}
-                >
-                  {item.name}
-                </motion.a>
-                <motion.div
-                  className="h-0.5 w-0 bg-blue-600 absolute bottom-0 left-0"
-                  initial={{ width: 0 }}
-                  whileHover={{ width: "100%" }}
-                  transition={{ duration: 0.3 }}
-                />
-              </div>
-            ))}
-          </nav>
-        </div>
-        {/* Tombol Login di kanan */}
-        <motion.a
-          href="/login" // Tambahkan href ke /login
-          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-300"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          Login
-        </motion.a>
-      </div>
-    </motion.header>
-  );
-};
-
-const UploadPage = () => {
+const UploadPage = ({ currentUser }) => {
   const [uploadSteps, setUploadSteps] = useState({
     questions: null,
     answers: null,
@@ -97,7 +31,7 @@ const UploadPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-blue-50">
-      <CustomHeader />
+      <Header currentUser={currentUser} />
       <div className="container mx-auto px-4 py-8">
         <motion.div
           initial={{ opacity: 0, y: -20 }}

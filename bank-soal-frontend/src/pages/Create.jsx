@@ -4,79 +4,11 @@ import {
     Upload, File, Search, Trash2, Edit, Download, Plus,
     Move, ChevronDown, ChevronUp, Check, Database, PenTool
 } from 'lucide-react';
-import LogoIF from '../assets/LogoIF.jpg';  // Updated path
-import LogoUnpar from '../assets/LogoUnpar.png';  // Updated path
 import Footer from '../components/Footer';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import EnhancedMarkdownEditor from '../components/EnhancedMarkdownEditor';
 import { Link } from "react-router-dom";
-
-const CustomHeader = () => {
-    return (
-        <motion.header
-            className="bg-white shadow-md py-5 px-6 md:px-12 lg:px-24"
-            initial={{ y: -100 }}
-            animate={{ y: 0 }}
-            transition={{ duration: 0.5 }}
-        >
-            <div className="flex items-center justify-between">
-                {/* Logo di kiri */}
-                <div className="flex items-center space-x-4">
-                    <img
-                        src={LogoUnpar}
-                        alt="Logo Unpar"
-                        className="h-10 w-auto"
-                    />
-                    <div className="h-8 w-px bg-gray-300"></div>
-                    <img
-                        src={LogoIF}
-                        alt="Logo IF"
-                        className="h-10 w-auto rounded"
-                    />
-                </div>
-
-                {/* Navigasi di tengah - dengan container yang memiliki width tetap */}
-                <div className="flex-1 flex justify-center -ml-27">
-                    <nav className="flex items-center space-x-7">
-                        {/* Teks navigasi dengan indikator aktif */}
-                        {[
-                            { name: "Home", path: "/" },
-                            { name: "Cari Soal", path: "/search" },
-                            { name: "Upload", path: "/upload" },
-                            { name: "Buat Soal", path: "/Create" },
-                            { name: "History", path: "/history" }
-                        ].map((item) => (
-                            <div className="relative group" key={item.name}>
-                                <motion.a
-                                    whileHover={{ y: -2 }}
-                                    className="text-gray-600 hover:text-blue-600 font-medium cursor-pointer px-1 py-2 block"
-                                    href={item.path}
-                                >
-                                    {item.name}
-                                </motion.a>
-                                <motion.div
-                                    className="h-0.5 w-0 bg-blue-600 absolute bottom-0 left-0"
-                                    initial={{ width: 0 }}
-                                    whileHover={{ width: "100%" }}
-                                    transition={{ duration: 0.3 }}
-                                />
-                            </div>
-                        ))}
-                    </nav>
-                </div>
-                {/* Tombol Login di kanan */}
-                <motion.a
-                    href="/login" // Tambahkan href ke /login
-                    className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-300"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                >
-                    Login
-                </motion.a>
-            </div>
-        </motion.header>
-    );
-};
+import Header from '../components/Header';
 
 // Sample data for question bank
 const sampleQuestions = [
@@ -114,7 +46,7 @@ const sampleQuestions = [
     },
 ];
 
-const FormCreatorPage = () => {
+const FormCreatorPage = ({ currentUser }) => {
     const [formTitle, setFormTitle] = useState("Untitled Form");
     const [formDescription, setFormDescription] = useState("");
     const [selectedQuestions, setSelectedQuestions] = useState([]);
@@ -124,18 +56,86 @@ const FormCreatorPage = () => {
     const [markdownContent, setMarkdownContent] = useState("");
     const [filteredQuestions, setFilteredQuestions] = useState(sampleQuestions);
     const markdownEditorRef = useRef(null);
+    
+    // State untuk tag mata kuliah
+    const [selectedCourseTags, setSelectedCourseTags] = useState([]);
+    const [courseTagSearch, setCourseTagSearch] = useState("");
+    const [showCourseTagDropdown, setShowCourseTagDropdown] = useState(false);
+    const courseTagOptions = ["Desain Analisis Algoritma", "Pemrograman Berorientasi Objek", "Struktur Data", "Basis Data", "Jaringan Komputer"];
+    
+    // State untuk tag materi
+    const [selectedMaterialTags, setSelectedMaterialTags] = useState([]);
+    const [materialTagSearch, setMaterialTagSearch] = useState("");
+    const [showMaterialTagDropdown, setShowMaterialTagDropdown] = useState(false);
+    const materialTagOptions = ["Linked List", "Greedy", "Graph", "Binary Search Tree", "Array 1D", "Generic", "Inheritance"];
+    
+    // Fungsi untuk menambah tag mata kuliah
+    const addSelectedCourseTag = (tag) => {
+        if (!selectedCourseTags.includes(tag)) {
+            setSelectedCourseTags([...selectedCourseTags, tag]);
+        }
+        setCourseTagSearch("");
+    };
+    
+    // Fungsi untuk menghapus tag mata kuliah
+    const removeSelectedCourseTag = (index) => {
+        const newTags = [...selectedCourseTags];
+        newTags.splice(index, 1);
+        setSelectedCourseTags(newTags);
+    };
+    
+    // Fungsi untuk menambah tag materi
+    const addSelectedMaterialTag = (tag) => {
+        if (!selectedMaterialTags.includes(tag)) {
+            setSelectedMaterialTags([...selectedMaterialTags, tag]);
+        }
+        setMaterialTagSearch("");
+    };
+    
+    // Fungsi untuk menghapus tag materi
+    const removeSelectedMaterialTag = (index) => {
+        const newTags = [...selectedMaterialTags];
+        newTags.splice(index, 1);
+        setSelectedMaterialTags(newTags);
+    };
+    
+    // Tambahkan juga import untuk ikon X
+    // import { X } from 'lucide-react';
+
+
+    // State for drag and drop
+    const [draggedItemIndex, setDraggedItemIndex] = useState(null);
+    const [dragOverItemIndex, setDragOverItemIndex] = useState(null);
 
     // Handle drag and drop functionality
-    const handleDragEnd = (result) => {
-        if (!result.destination) return;
-
-        const items = Array.from(selectedQuestions);
-        const [reorderedItem] = items.splice(result.source.index, 1);
-        items.splice(result.destination.index, 0, reorderedItem);
-
-        setSelectedQuestions(items);
+    const handleDragStart = (index) => {
+        setDraggedItemIndex(index);
     };
 
+    const handleDragOver = (e, index) => {
+        e.preventDefault();
+        setDragOverItemIndex(index);
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        if (draggedItemIndex !== null && dragOverItemIndex !== null) {
+            const items = Array.from(selectedQuestions);
+            const draggedItem = items[draggedItemIndex];
+
+            // Remove the dragged item from its position
+            items.splice(draggedItemIndex, 1);
+
+            // Insert it at the new position
+            items.splice(dragOverItemIndex, 0, draggedItem);
+
+            setSelectedQuestions(items);
+        }
+
+        // Reset drag states
+        setDraggedItemIndex(null);
+        setDragOverItemIndex(null);
+    };
     // Handle question selection from bank
     const handleAddQuestion = (question) => {
         setSelectedQuestions([...selectedQuestions, question]);
@@ -215,9 +215,9 @@ const FormCreatorPage = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-b from-gray-50 to-blue-50">
-            <CustomHeader />
-
+        <div className="min-h-screen bg-white text-gray-800">
+            <Header currentUser={currentUser} />
+            
             <div className="container mx-auto px-4 py-8">
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}
@@ -233,7 +233,7 @@ const FormCreatorPage = () => {
                     <motion.div
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        className="lg:col-span-8 bg-white rounded-2xl p-8 shadow-lg"
+                        className="lg:col-span-6 bg-white rounded-2xl p-8 shadow-lg"
                     >
                         {/* Form title and description */}
                         <div className="mb-8 border-b pb-6">
@@ -254,77 +254,46 @@ const FormCreatorPage = () => {
                         </div>
 
                         {/* Questions list - draggable */}
-                        <DragDropContext onDragEnd={handleDragEnd}>
-                            <Droppable droppableId="questions">
-                                {(provided) => (
-                                    <div
-                                        {...provided.droppableProps}
-                                        ref={provided.innerRef}
-                                        className="space-y-4"
-                                    >
-                                        {selectedQuestions.length === 0 ? (
-                                            <motion.div
-                                                className="text-center py-16 border-2 border-dashed border-gray-300 rounded-xl"
-                                                initial={{ opacity: 0 }}
-                                                animate={{ opacity: 1 }}
-                                                transition={{ delay: 0.3 }}
-                                            >
-                                                <p className="text-gray-500 mb-4">Belum ada soal yang dipilih</p>
-                                                <p className="text-gray-400">Pilih soal dari bank soal atau buat soal baru</p>
-                                            </motion.div>
-                                        ) : (
-                                            selectedQuestions.map((question, index) => (
-                                                <Draggable key={index} draggableId={`question-${index}`} index={index}>
-                                                    {(provided) => (
-                                                        <motion.div
-                                                            ref={provided.innerRef}
-                                                            {...provided.draggableProps}
-                                                            {...provided.dragHandleProps}
-                                                            initial={{ opacity: 0, y: 20 }}
-                                                            animate={{ opacity: 1, y: 0 }}
-                                                            transition={{ delay: index * 0.05 }}
-                                                            className="bg-white border rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow"
-                                                        >
-                                                            <div className="flex justify-between items-start mb-3">
-                                                                <div className="flex items-center">
-                                                                    <div className="bg-blue-100 text-blue-800 w-8 h-8 rounded-full flex items-center justify-center font-semibold mr-3">
-                                                                        {index + 1}
-                                                                    </div>
-                                                                    <span className="text-sm font-medium text-gray-600">
-                                                                        {question.subject} • {question.difficulty}
-                                                                    </span>
-                                                                </div>
-                                                                <div className="flex gap-2">
-                                                                    <div {...provided.dragHandleProps} className="cursor-move p-1">
-                                                                        <Move className="w-5 h-5 text-gray-400 hover:text-gray-700" />
-                                                                    </div>
-                                                                    <button
-                                                                        onClick={() => handleRemoveQuestion(index)}
-                                                                        className="p-1"
-                                                                    >
-                                                                        <Trash2 className="w-5 h-5 text-gray-400 hover:text-red-500" />
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                            <div className="pl-11">
-                                                                <p className="text-gray-800">{question.question}</p>
-                                                                <div className="mt-2 flex items-center text-xs text-gray-500">
-                                                                    <span>{question.lecturer}</span>
-                                                                    <span className="mx-2">•</span>
-                                                                    <span>{question.type}</span>
-                                                                </div>
-                                                            </div>
-                                                        </motion.div>
-                                                    )}
-                                                </Draggable>
-                                            ))
-                                        )}
-                                        {provided.placeholder}
+                        <div className="space-y-4">
+                            {selectedQuestions.map((question, index) => (
+                                <div
+                                    key={index}
+                                    draggable
+                                    onDragStart={() => handleDragStart(index)}
+                                    onDragOver={(e) => handleDragOver(e, index)}
+                                    onDrop={handleDrop}
+                                    className={`bg-white border border-gray-200 rounded-lg p-4 flex items-start cursor-move ${dragOverItemIndex === index ? "border-2 border-blue-500" : ""
+                                        }`}
+                                >
+                                    <div className="flex-shrink-0 w-8 text-center font-medium mr-2">
+                                        {index + 1}
                                     </div>
-                                )}
-                            </Droppable>
-                        </DragDropContext>
-
+                                    <div className="flex-grow">
+                                        <div className="flex justify-between">
+                                            <h3 className="font-medium">{question.question}</h3>
+                                            <div className="text-xs bg-gray-100 px-2 py-1 rounded">• {question.difficulty}</div>
+                                        </div>
+                                        <div className="text-sm text-gray-600 mt-1">
+                                            {question.subject}
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-2">
+                                            {question.lecturer} • {question.type}
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-shrink-0 ml-2 space-x-1">
+                                        <button className="p-1">
+                                            <Move className="w-4 h-4 text-gray-400" />
+                                        </button>
+                                        <button
+                                            onClick={() => handleRemoveQuestion(index)}
+                                            className="p-1"
+                                        >
+                                            <Trash2 className="w-4 h-4 text-gray-400" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                         {/* Download button */}
                         {selectedQuestions.length > 0 && (
                             <motion.button
@@ -343,14 +312,20 @@ const FormCreatorPage = () => {
                     <motion.div
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        className="lg:col-span-4 space-y-6"
+                        className="lg:col-span-6 space-y-6"
                     >
                         {/* Search in question bank */}
                         <div className="bg-white rounded-2xl p-6 shadow-lg">
-                            <h2 className="text-xl font-semibold mb-4 text-gray-900 flex items-center gap-2">
-                                <Database className="w-5 h-5 text-blue-500" />
-                                Bank Soal
-                            </h2>
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                                    <Database className="w-5 h-5 text-blue-500" />
+                                    Bank Soal
+                                </h2>
+                                <button className="flex items-center gap-1 px-3 py-1 bg-gray-900 text-white rounded-lg text-sm">
+                                    <ChevronDown className="w-4 h-4" />
+                                    Filter Lanjutan
+                                </button>
+                            </div>
 
                             <div className="relative mb-4">
                                 <input
@@ -364,84 +339,335 @@ const FormCreatorPage = () => {
                                 <Search className="w-5 h-5 text-gray-400 absolute left-3 top-3.5" />
                             </div>
 
-                            <motion.button
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
-                                className="w-full bg-gray-100 text-gray-800 border border-gray-300 py-2 rounded-lg font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 mb-4"
-                                onClick={handleSearch}
-                            >
-                                <Search className="w-4 h-4" />
-                                Cari
-                            </motion.button>
+                            {/* Question Grid Layout */}
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                                {/* Watering Grass */}
+                                <motion.div 
+                                    className="border border-gray-200 rounded-lg p-4"
+                                    whileHover={{ scale: 1.02, boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)" }}
+                                    transition={{ duration: 0.2 }}
+                                >
+                                    <div className="flex justify-between items-start mb-1">
+                                        <h3 className="font-medium text-gray-900 text-base">Watering Grass</h3>
+                                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Mudah</span>
+                                    </div>
+                                    <div className="text-sm text-gray-700 mb-1">Greedy</div>
+                                    <div className="text-xs text-gray-500 mb-2">Dosen 1</div>
+                                    <motion.button 
+                                        className="w-full bg-blue-600 text-white py-1.5 px-3 rounded text-sm font-medium"
+                                        whileHover={{ scale: 1.02, backgroundColor: "#2563EB" }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => handleAddQuestion({
+                                            id: 101,
+                                            question: "Watering Grass",
+                                            subject: "Greedy",
+                                            difficulty: "Mudah",
+                                            type: "Essay",
+                                            lecturer: "Dosen 1"
+                                        })}
+                                    >
+                                        Tambah
+                                    </motion.button>
+                                </motion.div>
 
-                            <div className="max-h-80 overflow-y-auto pr-2">
-                                <AnimatedQuestionList
-                                    questions={filteredQuestions}
-                                    onAddQuestion={handleAddQuestion}
-                                />
+                                {/* Balanced Tree */}
+                                <motion.div 
+                                    className="border border-gray-200 rounded-lg p-4"
+                                    whileHover={{ scale: 1.02, boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)" }}
+                                    transition={{ duration: 0.2 }}
+                                >
+                                    <div className="flex justify-between items-start mb-1">
+                                        <h3 className="font-medium text-gray-900 text-base">Balanced Tree</h3>
+                                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Mudah</span>
+                                    </div>
+                                    <div className="text-sm text-gray-700 mb-1">Binary Search Tree</div>
+                                    <div className="text-xs text-gray-500 mb-2">Dosen 4</div>
+                                    <motion.button 
+                                        className="w-full bg-blue-600 text-white py-1.5 px-3 rounded text-sm font-medium"
+                                        whileHover={{ scale: 1.02, backgroundColor: "#2563EB" }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => handleAddQuestion({
+                                            id: 102,
+                                            question: "Balanced Tree",
+                                            subject: "Binary Search Tree",
+                                            difficulty: "Mudah",
+                                            type: "Essay",
+                                            lecturer: "Dosen 4"
+                                        })}
+                                    >
+                                        Tambah
+                                    </motion.button>
+                                </motion.div>
+
+                                {/* Minites Minggu 6 */}
+                                <motion.div 
+                                    className="border border-gray-200 rounded-lg p-4"
+                                    whileHover={{ scale: 1.02, boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)" }}
+                                    transition={{ duration: 0.2 }}
+                                >
+                                    <div className="flex justify-between items-start mb-1">
+                                        <h3 className="font-medium text-gray-900 text-base">Minites Minggu 6</h3>
+                                        <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Sulit</span>
+                                    </div>
+                                    <div className="text-sm text-gray-700 mb-1">Generic</div>
+                                    <div className="text-xs text-gray-500 mb-2">Dosen 2</div>
+                                    <motion.button 
+                                        className="w-full bg-blue-600 text-white py-1.5 px-3 rounded text-sm font-medium"
+                                        whileHover={{ scale: 1.02, backgroundColor: "#2563EB" }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => handleAddQuestion({
+                                            id: 103,
+                                            question: "Minites Minggu 6",
+                                            subject: "Generic",
+                                            difficulty: "Sulit",
+                                            type: "Essay",
+                                            lecturer: "Dosen 2"
+                                        })}
+                                    >
+                                        Tambah
+                                    </motion.button>
+                                </motion.div>
+
+                                {/* Minites Minggu 7 */}
+                                <motion.div 
+                                    className="border border-gray-200 rounded-lg p-4"
+                                    whileHover={{ scale: 1.02, boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)" }}
+                                    transition={{ duration: 0.2 }}
+                                >
+                                    <div className="flex justify-between items-start mb-1">
+                                        <h3 className="font-medium text-gray-900 text-base">Minites Minggu 7</h3>
+                                        <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Sulit</span>
+                                    </div>
+                                    <div className="text-sm text-gray-700 mb-1">Inheritance</div>
+                                    <div className="text-xs text-gray-500 mb-2">Dosen 2</div>
+                                    <motion.button 
+                                        className="w-full bg-blue-600 text-white py-1.5 px-3 rounded text-sm font-medium"
+                                        whileHover={{ scale: 1.02, backgroundColor: "#2563EB" }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => handleAddQuestion({
+                                            id: 104,
+                                            question: "Minites Minggu 7",
+                                            subject: "Inheritance",
+                                            difficulty: "Sulit",
+                                            type: "Essay",
+                                            lecturer: "Dosen 2"
+                                        })}
+                                    >
+                                        Tambah
+                                    </motion.button>
+                                </motion.div>
+
+                                {/* Memory Maze Game */}
+                                <motion.div 
+                                    className="border border-gray-200 rounded-lg p-4"
+                                    whileHover={{ scale: 1.02, boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)" }}
+                                    transition={{ duration: 0.2 }}
+                                >
+                                    <div className="flex justify-between items-start mb-1">
+                                        <h3 className="font-medium text-gray-900 text-base">Memory Maze Game</h3>
+                                        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Sedang</span>
+                                    </div>
+                                    <div className="text-sm text-gray-700 mb-1">Array 1D</div>
+                                    <div className="text-xs text-gray-500 mb-2">Dosen 3</div>
+                                    <motion.button 
+                                        className="w-full bg-blue-600 text-white py-1.5 px-3 rounded text-sm font-medium"
+                                        whileHover={{ scale: 1.02, backgroundColor: "#2563EB" }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => handleAddQuestion({
+                                            id: 105,
+                                            question: "Memory Maze Game",
+                                            subject: "Array 1D",
+                                            difficulty: "Sedang",
+                                            type: "Essay",
+                                            lecturer: "Dosen 3"
+                                        })}
+                                    >
+                                        Tambah
+                                    </motion.button>
+                                </motion.div>
+
+                                {/* Jadwal Bentrok */}
+                                <motion.div 
+                                    className="border border-gray-200 rounded-lg p-4"
+                                    whileHover={{ scale: 1.02, boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)" }}
+                                    transition={{ duration: 0.2 }}
+                                >
+                                    <div className="flex justify-between items-start mb-1">
+                                        <h3 className="font-medium text-gray-900 text-base">Jadwal Bentrok</h3>
+                                        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Sedang</span>
+                                    </div>
+                                    <div className="text-sm text-gray-700 mb-1">Array 1D</div>
+                                    <div className="text-xs text-gray-500 mb-2">Dosen 3</div>
+                                    <motion.button 
+                                        className="w-full bg-blue-600 text-white py-1.5 px-3 rounded text-sm font-medium"
+                                        whileHover={{ scale: 1.02, backgroundColor: "#2563EB" }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => handleAddQuestion({
+                                            id: 106,
+                                            question: "Jadwal Bentrok",
+                                            subject: "Array 1D",
+                                            difficulty: "Sedang",
+                                            type: "Essay",
+                                            lecturer: "Dosen 3"
+                                        })}
+                                    >
+                                        Tambah
+                                    </motion.button>
+                                </motion.div>
                             </div>
                         </div>
 
-                        {/* Create new question with markdown */}
-                        <div className="bg-white rounded-2xl p-6 shadow-lg">
-                            <h2 className="text-xl font-semibold mb-4 text-gray-900 flex items-center gap-2">
-                                <PenTool className="w-5 h-5 text-blue-500" />
-                                Upload Soal Baru
-                            </h2>
-                            <motion.div
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
-                                className="w-full bg-blue-50 text-blue-700 border border-blue-200 py-3 rounded-xl font-medium hover:bg-blue-100 transition-colors flex items-center justify-center gap-2 cursor-pointer"
-                            >
-                                <Link to="/upload" className="flex items-center justify-center gap-2 w-full">
-                                    <Plus className="w-5 h-5" />
-                                    Upload Soal Baru
-                                </Link>
-                            </motion.div>
+                        {/* Tag Selection Section */}
+                        <div className="grid grid-cols-2 gap-4">
+                            {/* Tag Mata Kuliah */}
+                            <div className="bg-white rounded-2xl p-6 shadow-lg">
+                                <h3 className="text-lg font-medium mb-3">Pilih Tag Mata Kuliah</h3>
+                                
+                                {/* Selected Tags */}
+                                <div className="flex flex-wrap gap-2 mb-3">
+                                    {selectedCourseTags.map((tag, index) => (
+                                        <div key={index} className="bg-blue-600 text-white text-sm px-3 py-1 rounded-full flex items-center">
+                                            {tag}
+                                            <button 
+                                                className="ml-2 focus:outline-none" 
+                                                onClick={() => removeSelectedCourseTag(index)}
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                                
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        className="w-full pl-10 pr-4 py-2 bg-gray-50 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                        placeholder="Cari Tag Soal"
+                                        value={courseTagSearch}
+                                        onChange={(e) => setCourseTagSearch(e.target.value)}
+                                        onFocus={() => setShowCourseTagDropdown(true)}
+                                    />
+                                    <Search className="w-5 h-5 text-gray-400 absolute left-3 top-2" />
+                                </div>
+                                
+                                {showCourseTagDropdown && (
+                                    <div className="mt-2 p-2 border border-gray-200 rounded-lg max-h-40 overflow-y-auto bg-white shadow-md absolute z-10 w-[calc(100%-3rem)]">
+                                        {courseTagOptions.filter(tag => 
+                                            tag.toLowerCase().includes(courseTagSearch.toLowerCase())
+                                        ).map((tag, index) => (
+                                            <div 
+                                                key={index} 
+                                                className="p-2 hover:bg-gray-100 rounded cursor-pointer"
+                                                onClick={() => {
+                                                    addSelectedCourseTag(tag);
+                                                    setShowCourseTagDropdown(false);
+                                                }}
+                                            >
+                                                {tag}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
 
+                            {/* Tag Materi */}
+                            <div className="bg-white rounded-2xl p-6 shadow-lg">
+                                <h3 className="text-lg font-medium mb-3">Pilih Tag Materi</h3>
+                                
+                                {/* Selected Tags */}
+                                <div className="flex flex-wrap gap-2 mb-3">
+                                    {selectedMaterialTags.map((tag, index) => (
+                                        <div key={index} className="bg-blue-600 text-white text-sm px-3 py-1 rounded-full flex items-center">
+                                            {tag}
+                                            <button 
+                                                className="ml-2 focus:outline-none" 
+                                                onClick={() => removeSelectedMaterialTag(index)}
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                                
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        className="w-full pl-10 pr-4 py-2 bg-gray-50 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                        placeholder="Cari Tag Materi"
+                                        value={materialTagSearch}
+                                        onChange={(e) => setMaterialTagSearch(e.target.value)}
+                                        onFocus={() => setShowMaterialTagDropdown(true)}
+                                    />
+                                    <Search className="w-5 h-5 text-gray-400 absolute left-3 top-2" />
+                                </div>
+                                
+                                {showMaterialTagDropdown && (
+                                    <div className="mt-2 p-2 border border-gray-200 rounded-lg max-h-40 overflow-y-auto bg-white shadow-md">
+                                        {materialTagOptions.filter(tag => 
+                                            tag.toLowerCase().includes(materialTagSearch.toLowerCase())
+                                        ).map((tag, index) => (
+                                            <div 
+                                                key={index} 
+                                                className="p-2 hover:bg-gray-100 rounded cursor-pointer"
+                                                onClick={() => {
+                                                    addSelectedMaterialTag(tag);
+                                                    setShowMaterialTagDropdown(false);
+                                                }}
+                                            >
+                                                {tag}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Create New Question Section */}
+                        <div className="bg-white rounded-2xl p-6 shadow-lg">
                             <h2 className="text-xl font-semibold mb-4 text-gray-900 flex items-center gap-2">
                                 <PenTool className="w-5 h-5 text-blue-500" />
                                 Buat Soal Baru
                             </h2>
-
-                            {showMarkdownEditor ? (
-                                <div>
-                                    <EnhancedMarkdownEditor
-                                        initialValue={markdownContent}
-                                        onSave={(content) => {
-                                            const newQuestion = {
-                                                id: Date.now(),
-                                                question: content,
-                                                subject: "Custom Question",
-                                                difficulty: "Custom",
-                                                type: "Markdown",
-                                                lecturer: "User Created"
-                                            };
-
-                                            setSelectedQuestions([...selectedQuestions, newQuestion]);
-                                            setMarkdownContent("");
-                                            setShowMarkdownEditor(false);
-                                        }}
-                                        onCancel={() => setShowMarkdownEditor(false)}
-                                    />
-                                </div>
-                            ) : (
-                                <motion.button
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
-                                    className="w-full bg-blue-50 text-blue-700 border border-blue-200 py-3 rounded-xl font-medium hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
-                                    onClick={() => setShowMarkdownEditor(true)}
-                                >
-                                    <Plus className="w-5 h-5" />
-                                    Buat Soal Baru
-                                </motion.button>
-                            )}
+                            <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                                onClick={() => setShowMarkdownEditor(true)}
+                            >
+                                <Plus className="w-4 h-4" />
+                                Buat Soal Baru
+                            </motion.button>
                         </div>
                     </motion.div>
                 </div>
             </div>
-
             <Footer />
+
+            {/* Markdown Editor Modal */}
+            {showMarkdownEditor && (
+                <EnhancedMarkdownEditor
+                    initialValue={markdownContent}
+                    onSave={(content) => {
+                        const newQuestion = {
+                            id: Date.now(),
+                            question: content,
+                            subject: "Custom Question",
+                            difficulty: "Custom",
+                            type: "Markdown",
+                            lecturer: "User Created"
+                        };
+
+                        setSelectedQuestions([...selectedQuestions, newQuestion]);
+                        setMarkdownContent("");
+                        setShowMarkdownEditor(false);
+                    }}
+                    onCancel={() => setShowMarkdownEditor(false)}
+                />
+            )}
         </div>
     );
 };

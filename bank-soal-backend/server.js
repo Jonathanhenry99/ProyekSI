@@ -32,9 +32,11 @@ app.get("/", (req, res) => {
 // Routes
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
+const courseTagRoutes = require('./routes/courseTag.routes');
 
 authRoutes(app);
 userRoutes(app);
+courseTagRoutes(app);
 
 // Set port and start server
 const PORT = process.env.PORT || 8080;
@@ -46,11 +48,11 @@ app.listen(PORT, () => {
 function initial() {
   Role.findOrCreate({
     where: { id: 1 },
-    defaults: { name: "user" }
+    defaults: { name: "admin" }
   });
  
   Role.findOrCreate({
     where: { id: 2 },
-    defaults: { name: "admin" }
+    defaults: { name: "dosen" }
   });
 }

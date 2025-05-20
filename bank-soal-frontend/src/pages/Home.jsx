@@ -2,34 +2,14 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import AuthService from '../services/auth.service';
 
 // Note: You'll need to import these images in your actual project
 import LogoIF from '../assets/LogoIF.jpg';  // Updated path
 import LogoUnpar from '../assets/LogoUnpar.png';  // Updated path
-export default function HomePage() {
-  {/* Wind Blowing Effect */ }
-  <div className="absolute inset-0 overflow-hidden">
-    {[...Array(20)].map((_, i) => (
-      <motion.div
-        key={i}
-        className="absolute w-3 h-3 bg-gray-200 rounded-full opacity-50"
-        initial={{
-          x: -50, // Mulai dari kiri layar
-          y: Math.random() * window.innerHeight,
-        }}
-        animate={{
-          x: [null, window.innerWidth + 50], // Bergerak ke kanan
-          y: [null, Math.random() * window.innerHeight],
-        }}
-        transition={{
-          duration: 3 + Math.random() * 2,
-          repeat: Infinity,
-          ease: "linear",
-        }}
-      />
-    ))}
-  </div>
+export default function HomePage({ currentUser }) {
   const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState('grid');
 
   useEffect(() => {
     // Simulate loading time
@@ -46,13 +26,35 @@ export default function HomePage() {
         <LoadingAnimation />
       ) : (
         <>
-          <CustomHeader />
+          <Header currentUser={currentUser} />
           <main className="flex-grow">
             {/* Hero Section */}
             <HeroSection />
 
+            {/* View Mode Toggle */}
+            <div className="container mx-auto px-4 py-4 flex justify-end">
+              <div className="flex items-center space-x-2 bg-gray-100 p-1 rounded-lg">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded-md ${viewMode === 'grid' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-600'}`}
+                >
+                  <Grid size={18} />
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded-md ${viewMode === 'list' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-600'}`}
+                >
+                  <List size={18} />
+                </motion.button>
+              </div>
+            </div>
+
             {/* Study Concept Section */}
-            <StudyConceptSection />
+            <StudyConceptSection viewMode={viewMode} />
 
             {/* Get Started Section */}
             {/* fitur tambahan jika ada update */}
@@ -68,8 +70,7 @@ export default function HomePage() {
   );
 }
 
-
-const CustomHeader = () => {
+const CustomHeader = ({ currentUser }) => {
   return (
     <motion.header
       className="bg-white shadow-md py-5 px-6 md:px-12 lg:px-24"
@@ -122,15 +123,40 @@ const CustomHeader = () => {
             ))}
           </nav>
         </div>
-        {/* Tombol Login di kanan */}
-        <motion.a
-          href="/login" // Tambahkan href ke /login
-          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-300"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          Login
-        </motion.a>
+        
+        {/* Tombol Login atau Nama User */}
+        {currentUser ? (
+          <div className="flex items-center space-x-2">
+            <motion.div
+              className="px-6 py-2 bg-blue-100 text-blue-800 rounded-lg font-medium"
+              whileHover={{ scale: 1.05 }}
+            >
+              {currentUser.username || currentUser.email}
+            </motion.div>
+            <motion.a
+              href="/"
+              onClick={(e) => {
+                e.preventDefault();
+                AuthService.logout();
+                window.location.reload();
+              }}
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium transition-all duration-300"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Logout
+            </motion.a>
+          </div>
+        ) : (
+          <motion.a
+            href="/login"
+            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-300"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            Login
+          </motion.a>
+        )}
       </div>
     </motion.header>
   );
