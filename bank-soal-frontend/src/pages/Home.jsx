@@ -8,17 +8,17 @@ import AuthService from '../services/auth.service';
 import LogoIF from '../assets/LogoIF.jpg';  // Updated path
 import LogoUnpar from '../assets/LogoUnpar.png';  // Updated path
 export default function HomePage({ currentUser }) {
-  const [isLoading, setIsLoading] = useState(true);
-  const [viewMode, setViewMode] = useState('grid');
+  const [isLoading, setIsLoading] = useState(false); // Ubah nilai awal menjadi false
 
-  useEffect(() => {
-    // Simulate loading time
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1500);
-
-    return () => clearTimeout(timer);
-  }, []);
+  // Hapus useEffect untuk loading
+  // useEffect(() => {
+  //   // Simulate loading time
+  //   const timer = setTimeout(() => {
+  //     setIsLoading(false);
+  //   }, 1500);
+  //
+  //   return () => clearTimeout(timer);
+  // }, []);
 
   return (
     <div className="flex flex-col min-h-screen bg-white text-gray-800 overflow-hidden">
@@ -31,30 +31,8 @@ export default function HomePage({ currentUser }) {
             {/* Hero Section */}
             <HeroSection />
 
-            {/* View Mode Toggle */}
-            <div className="container mx-auto px-4 py-4 flex justify-end">
-              <div className="flex items-center space-x-2 bg-gray-100 p-1 rounded-lg">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setViewMode('grid')}
-                  className={`p-2 rounded-md ${viewMode === 'grid' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-600'}`}
-                >
-                  <Grid size={18} />
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setViewMode('list')}
-                  className={`p-2 rounded-md ${viewMode === 'list' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-600'}`}
-                >
-                  <List size={18} />
-                </motion.button>
-              </div>
-            </div>
-
             {/* Study Concept Section */}
-            <StudyConceptSection viewMode={viewMode} />
+            <StudyConceptSection />
 
             {/* Get Started Section */}
             {/* fitur tambahan jika ada update */}
@@ -69,98 +47,6 @@ export default function HomePage({ currentUser }) {
     </div>
   );
 }
-
-const CustomHeader = ({ currentUser }) => {
-  return (
-    <motion.header
-      className="bg-white shadow-md py-5 px-6 md:px-12 lg:px-24"
-      initial={{ y: -100 }}
-      animate={{ y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <div className="flex items-center justify-between">
-        {/* Logo di kiri */}
-        <div className="flex items-center space-x-4">
-          <img
-            src={LogoUnpar}
-            alt="Logo Unpar"
-            className="h-10 w-auto"
-          />
-          <div className="h-8 w-px bg-gray-300"></div>
-          <img
-            src={LogoIF}
-            alt="Logo IF"
-            className="h-10 w-auto rounded"
-          />
-        </div>
-
-        {/* Navigasi di tengah - dengan container yang memiliki width tetap */}
-        <div className="flex-1 flex justify-center -ml-27">
-          <nav className="flex items-center space-x-7">
-            {/* Teks navigasi dengan indikator aktif */}
-            {[
-              { name: "Home", path: "/" },
-              { name: "Cari Soal", path: "/search" },
-              { name: "Upload", path: "/upload" },
-              { name: "Buat Soal", path: "/Create" },
-              { name: "History", path: "/history" }
-            ].map((item) => (
-              <div className="relative group" key={item.name}>
-                <motion.a
-                  whileHover={{ y: -2 }}
-                  className="text-gray-600 hover:text-blue-600 font-medium cursor-pointer px-1 py-2 block"
-                  href={item.path}
-                >
-                  {item.name}
-                </motion.a>
-                <motion.div
-                  className="h-0.5 w-0 bg-blue-600 absolute bottom-0 left-0"
-                  initial={{ width: 0 }}
-                  whileHover={{ width: "100%" }}
-                  transition={{ duration: 0.3 }}
-                />
-              </div>
-            ))}
-          </nav>
-        </div>
-        
-        {/* Tombol Login atau Nama User */}
-        {currentUser ? (
-          <div className="flex items-center space-x-2">
-            <motion.div
-              className="px-6 py-2 bg-blue-100 text-blue-800 rounded-lg font-medium"
-              whileHover={{ scale: 1.05 }}
-            >
-              {currentUser.username || currentUser.email}
-            </motion.div>
-            <motion.a
-              href="/"
-              onClick={(e) => {
-                e.preventDefault();
-                AuthService.logout();
-                window.location.reload();
-              }}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium transition-all duration-300"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Logout
-            </motion.a>
-          </div>
-        ) : (
-          <motion.a
-            href="/login"
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-300"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            Login
-          </motion.a>
-        )}
-      </div>
-    </motion.header>
-  );
-};
 
 // Hero Section Component
 const HeroSection = () => {

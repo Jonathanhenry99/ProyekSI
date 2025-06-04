@@ -10,10 +10,10 @@ const bcrypt = require("bcryptjs");
 
 exports.signin = async (req, res) => {
   try {
-    // Cari user berdasarkan email
+    // Cari user berdasarkan email (case insensitive)
     const user = await User.findOne({
       where: {
-        email: req.body.email
+        email: { [Op.iLike]: req.body.email }
       }
     });
 
@@ -28,6 +28,7 @@ exports.signin = async (req, res) => {
       });
     }
 
+    // Dalam fungsi signin
     // Tambahkan log sebelum verifikasi password
     console.log("User found:", {
       id: user.id,
