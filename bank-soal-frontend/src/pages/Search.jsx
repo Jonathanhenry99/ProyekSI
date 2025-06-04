@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, CheckCircle, ChevronDown, FileText, BarChart2 } from 'lucide-react';
+import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, CheckCircle, ChevronDown, FileText, BarChart2, Plus, Check } from 'lucide-react';
 import Footer from '../components/Footer';
 import Header from '../components/Header';
+import { Link } from 'react-router-dom';
 
 const SearchPage = ({ currentUser }) => {
   const [activeTab, setActiveTab] = useState('semua');
@@ -10,8 +11,23 @@ const SearchPage = ({ currentUser }) => {
   const [selectedLevel, setSelectedLevel] = useState([]);
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [viewMode, setViewMode] = useState('grid');
-  const [isLoading, setIsLoading] = useState(false); // Ubah nilai awal menjadi false
+  const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // State untuk dropdown
+  const [showLevelDropdown, setShowLevelDropdown] = useState(false);
+  const [showCourseTagDropdown, setShowCourseTagDropdown] = useState(false);
+  const [showMaterialTagDropdown, setShowMaterialTagDropdown] = useState(false);
+  const [levelSearch, setLevelSearch] = useState('');
+  const [courseTagSearch, setCourseTagSearch] = useState('');
+  const [materialTagSearch, setMaterialTagSearch] = useState('');
+  const [selectedCourseTags, setSelectedCourseTags] = useState([]);
+  const [selectedMaterialTags, setSelectedMaterialTags] = useState([]);
+
+  // Data untuk dropdown
+  const difficultyLevels = ['Mudah', 'Sedang', 'Sulit'];
+  const courseTags = ['Algoritma Struktur Dasar', 'Fisika', 'Kimia', 'Ilmu Komputer', 'Sistem Database', 'Ekonomi'];
+  const materialTags = ['Kalkulus', 'Integral', 'Mekanika Kuantum', 'Relativitas', 'Kimia Organik', 'Alkena', 'Algoritma', 'Struktur Data', 'SQL', 'Normalisasi', 'Makroekonomi', 'Inflasi'];
 
   // Generate more comprehensive mock data
   const mockData = [
@@ -110,6 +126,18 @@ const SearchPage = ({ currentUser }) => {
       const matchesLevel =
         selectedLevel.length === 0 ||
         selectedLevel.includes(item.level);
+        
+      // Filter by course tags
+      const matchesCourseTags =
+        selectedCourseTags.length === 0 ||
+        selectedCourseTags.some(tag => item.subject.toLowerCase().includes(tag.toLowerCase()));
+        
+      // Filter by material tags
+      const matchesMaterialTags =
+        selectedMaterialTags.length === 0 ||
+        selectedMaterialTags.some(tag => 
+          item.topics.some(topic => topic.toLowerCase().includes(tag.toLowerCase()))
+        );
 
       // Filter by date
       const itemDate = new Date(item.lastUpdated);
@@ -117,11 +145,51 @@ const SearchPage = ({ currentUser }) => {
         (dateRange.start === '' || new Date(dateRange.start) <= itemDate) &&
         (dateRange.end === '' || new Date(dateRange.end) >= itemDate);
 
-      return matchesSearch && matchesLevel && matchesDate;
+      return matchesSearch && matchesLevel && matchesCourseTags && matchesMaterialTags && matchesDate;
     });
   };
 
   const filteredData = filterData();
+  
+  // Filter dropdown data berdasarkan input pencarian
+  const filteredLevels = difficultyLevels.filter(level => 
+    level.toLowerCase().includes(levelSearch.toLowerCase())
+  );
+  
+  const filteredCourseTags = courseTags.filter(tag => 
+    tag.toLowerCase().includes(courseTagSearch.toLowerCase())
+  );
+  
+  const filteredMaterialTags = materialTags.filter(tag => 
+    tag.toLowerCase().includes(materialTagSearch.toLowerCase())
+  );
+  
+  // Fungsi untuk menambah/menghapus level
+  const toggleLevel = (level) => {
+    if (selectedLevel.includes(level)) {
+      setSelectedLevel(prev => prev.filter(l => l !== level));
+    } else {
+      setSelectedLevel(prev => [...prev, level]);
+    }
+  }
+
+  // Fungsi untuk menambah/menghapus course tag
+  const toggleCourseTag = (tag) => {
+    if (selectedCourseTags.includes(tag)) {
+      setSelectedCourseTags(prev => prev.filter(t => t !== tag));
+    } else {
+      setSelectedCourseTags(prev => [...prev, tag]);
+    }
+  }
+
+  // Fungsi untuk menambah/menghapus material tag
+  const toggleMaterialTag = (tag) => {
+    if (selectedMaterialTags.includes(tag)) {
+      setSelectedMaterialTags(prev => prev.filter(t => t !== tag));
+    } else {
+      setSelectedMaterialTags(prev => [...prev, tag]);
+    }
+  }
 
   // Animation variants
   const containerVariants = {
@@ -164,6 +232,12 @@ const SearchPage = ({ currentUser }) => {
       </motion.p>
     </div>
   );
+
+  // Dropdown animation variants
+  const dropdownVariants = {
+    hidden: { opacity: 0, y: -10, height: 0 },
+    visible: { opacity: 1, y: 0, height: 'auto' }
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -250,15 +324,177 @@ const SearchPage = ({ currentUser }) => {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="px-6 py-3 bg-blue-600 text-white rounded-xl flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors shadow-sm"
-                onClick={() => setShowFilterModal(true)}
+                onClick={() => filterData()}
               >
-                <Filter className="w-5 h-5" />
-                Filter Lanjutan
+                <Search className="w-5 h-5" />
+                Cari
               </motion.button>
+            </div>
+            
+            {/* Dropdown Filters */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              {/* Tingkat Kesulitan Dropdown */}
+              <div className="relative">
+                <label className="block text-sm font-medium mb-2 text-gray-700">Pilih Tingkat Kesulitan</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Cari Tingkat Kesulitan"
+                    className="w-full pl-4 pr-10 py-2 border border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    value={levelSearch}
+                    onChange={(e) => setLevelSearch(e.target.value)}
+                    onClick={() => setShowLevelDropdown(true)}
+                  />
+                  <button 
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                    onClick={() => setShowLevelDropdown(!showLevelDropdown)}
+                  >
+                    <ChevronDown className="w-5 h-5 text-gray-400" />
+                  </button>
+                </div>
+                
+                {/* Dropdown Menu */}
+                <AnimatePresence>
+                  {showLevelDropdown && (
+                    <motion.div
+                      className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                      variants={dropdownVariants}
+                      initial="hidden"
+                      animate="visible"
+                      exit="hidden"
+                    >
+                      {filteredLevels.length > 0 ? (
+                        filteredLevels.map((level) => (
+                          <div
+                            key={level}
+                            className="flex items-center px-4 py-2 hover:bg-blue-50 cursor-pointer"
+                            onClick={() => {
+                              toggleLevel(level);
+                            }}
+                          >
+                            <div className={`w-5 h-5 border rounded mr-2 flex items-center justify-center ${selectedLevel.includes(level) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}`}>
+                              {selectedLevel.includes(level) && <Check className="w-4 h-4 text-white" />}
+                            </div>
+                            <span>{level}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="px-4 py-2 text-gray-500">Tidak ada hasil</div>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+              
+              {/* Tag Mata Kuliah Dropdown */}
+              <div className="relative">
+                <label className="block text-sm font-medium mb-2 text-gray-700">Pilih Tag Mata Kuliah</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Cari Tag Mata Kuliah"
+                    className="w-full pl-4 pr-10 py-2 border border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    value={courseTagSearch}
+                    onChange={(e) => setCourseTagSearch(e.target.value)}
+                    onClick={() => setShowCourseTagDropdown(true)}
+                  />
+                  <button 
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                    onClick={() => setShowCourseTagDropdown(!showCourseTagDropdown)}
+                  >
+                    <ChevronDown className="w-5 h-5 text-gray-400" />
+                  </button>
+                </div>
+                
+                {/* Dropdown Menu */}
+                <AnimatePresence>
+                  {showCourseTagDropdown && (
+                    <motion.div
+                      className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                      variants={dropdownVariants}
+                      initial="hidden"
+                      animate="visible"
+                      exit="hidden"
+                    >
+                      {filteredCourseTags.length > 0 ? (
+                        filteredCourseTags.map((tag) => (
+                          <div
+                            key={tag}
+                            className="flex items-center px-4 py-2 hover:bg-blue-50 cursor-pointer"
+                            onClick={() => {
+                              toggleCourseTag(tag);
+                            }}
+                          >
+                            <div className={`w-5 h-5 border rounded mr-2 flex items-center justify-center ${selectedCourseTags.includes(tag) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}`}>
+                              {selectedCourseTags.includes(tag) && <Check className="w-4 h-4 text-white" />}
+                            </div>
+                            <span>{tag}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="px-4 py-2 text-gray-500">Tidak ada hasil</div>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+              
+              {/* Tag Materi Dropdown */}
+              <div className="relative">
+                <label className="block text-sm font-medium mb-2 text-gray-700">Pilih Tag Materi</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Cari Tag Materi"
+                    className="w-full pl-4 pr-10 py-2 border border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    value={materialTagSearch}
+                    onChange={(e) => setMaterialTagSearch(e.target.value)}
+                    onClick={() => setShowMaterialTagDropdown(true)}
+                  />
+                  <button 
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                    onClick={() => setShowMaterialTagDropdown(!showMaterialTagDropdown)}
+                  >
+                    <ChevronDown className="w-5 h-5 text-gray-400" />
+                  </button>
+                </div>
+                
+                {/* Dropdown Menu */}
+                <AnimatePresence>
+                  {showMaterialTagDropdown && (
+                    <motion.div
+                      className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                      variants={dropdownVariants}
+                      initial="hidden"
+                      animate="visible"
+                      exit="hidden"
+                    >
+                      {filteredMaterialTags.length > 0 ? (
+                        filteredMaterialTags.map((tag) => (
+                          <div
+                            key={tag}
+                            className="flex items-center px-4 py-2 hover:bg-blue-50 cursor-pointer"
+                            onClick={() => {
+                              toggleMaterialTag(tag);
+                            }}
+                          >
+                            <div className={`w-5 h-5 border rounded mr-2 flex items-center justify-center ${selectedMaterialTags.includes(tag) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}`}>
+                              {selectedMaterialTags.includes(tag) && <Check className="w-4 h-4 text-white" />}
+                            </div>
+                            <span>{tag}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="px-4 py-2 text-gray-500">Tidak ada hasil</div>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
 
             {/* Applied Filters Display */}
-            {(selectedLevel.length > 0 || dateRange.start || dateRange.end) && (
+            {(selectedLevel.length > 0 || selectedCourseTags.length > 0 || selectedMaterialTags.length > 0 || dateRange.start || dateRange.end) && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
@@ -275,7 +511,37 @@ const SearchPage = ({ currentUser }) => {
                   >
                     <CheckCircle className="w-3 h-3" />
                     {level}
-                    <button onClick={() => setSelectedLevel(prev => prev.filter(l => l !== level))}>
+                    <button onClick={() => toggleLevel(level)}>
+                      <X className="w-3 h-3 ml-1" />
+                    </button>
+                  </motion.span>
+                ))}
+
+                {selectedCourseTags.map(tag => (
+                  <motion.span
+                    key={tag}
+                    initial={{ scale: 0.8 }}
+                    animate={{ scale: 1 }}
+                    className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm flex items-center gap-1"
+                  >
+                    <CheckCircle className="w-3 h-3" />
+                    {tag}
+                    <button onClick={() => toggleCourseTag(tag)}>
+                      <X className="w-3 h-3 ml-1" />
+                    </button>
+                  </motion.span>
+                ))}
+
+                {selectedMaterialTags.map(tag => (
+                  <motion.span
+                    key={tag}
+                    initial={{ scale: 0.8 }}
+                    animate={{ scale: 1 }}
+                    className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm flex items-center gap-1"
+                  >
+                    <CheckCircle className="w-3 h-3" />
+                    {tag}
+                    <button onClick={() => toggleMaterialTag(tag)}>
                       <X className="w-3 h-3 ml-1" />
                     </button>
                   </motion.span>
@@ -302,6 +568,8 @@ const SearchPage = ({ currentUser }) => {
                   className="px-3 py-1 text-red-600 text-sm flex items-center gap-1 hover:bg-red-50 rounded-full"
                   onClick={() => {
                     setSelectedLevel([]);
+                    setSelectedCourseTags([]);
+                    setSelectedMaterialTags([]);
                     setDateRange({ start: '', end: '' });
                   }}
                 >
@@ -311,23 +579,7 @@ const SearchPage = ({ currentUser }) => {
               </motion.div>
             )}
 
-            {/* Filter Tags */}
-            <div className="flex flex-wrap gap-3 mt-6">
-              {['Semua', 'Soal UTS', 'Soal UAS', 'Quiz', 'Tugas'].map((tab) => (
-                <motion.button
-                  key={tab}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className={`px-4 py-2 rounded-full transition-colors ${activeTab === tab.toLowerCase()
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  onClick={() => setActiveTab(tab.toLowerCase())}
-                >
-                  {tab}
-                </motion.button>
-              ))}
-            </div>
+            {/* Filter Tags - Menghapus bagian ini sesuai permintaan */}
 
             {/* View Toggle and Results Count */}
             <div className="flex justify-between items-center mt-6">
@@ -503,6 +755,16 @@ const SearchPage = ({ currentUser }) => {
               </motion.div>
             )}
           </AnimatePresence>
+
+          <Link to="/upload">
+            <motion.button
+              className="fixed bottom-8 right-8 w-16 h-16 bg-blue-600 hover:bg-blue-700 rounded-full flex items-center justify-center shadow-lg z-50"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+            >
+              <Plus className="text-white w-8 h-8" />
+            </motion.button>
+          </Link>
 
           {/* No Results Message */}
           {filteredData.length === 0 && (

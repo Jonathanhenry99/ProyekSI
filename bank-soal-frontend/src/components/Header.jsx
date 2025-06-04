@@ -33,9 +33,7 @@ export default function Header({ currentUser }) {
           {[
             { name: "Home", path: "/" },
             { name: "Cari Soal", path: "/search" },
-            { name: "Upload", path: "/upload" },
-            { name: "Buat Soal", path: "/create" },
-            { name: "History", path: "/history" }
+            { name: "Paket Soal", path: "/question-sets" }
           ].map((item) => (
             <div className="relative group" key={item.name}>
               <Link to={item.path}>

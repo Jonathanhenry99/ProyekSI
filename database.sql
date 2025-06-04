@@ -1,8 +1,4 @@
--- Membuat database
-CREATE DATABASE bank_soal_db;
 
--- Menggunakan database
-\c bank_soal_db
 
 -- Tabel untuk menyimpan peran pengguna (admin, dosen)
 CREATE TABLE roles (
@@ -133,3 +129,9 @@ VALUES ('admin', 'admin@example.com', 'admin123', 'Administrator', TRUE);
 -- Menetapkan peran admin
 INSERT INTO user_roles (user_id, role_id) 
 VALUES (1, 1);
+
+select * 
+from users
+
+-- Gunakan password yang sudah di-hash dengan bcrypt
+UPDATE users SET password = 'admin123' WHERE email = 'admin@example.com';

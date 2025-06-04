@@ -7,6 +7,7 @@ import Create from './pages/Create';
 import History from './pages/History';
 import Login from './pages/Login';
 import AuthService from './services/auth.service';
+import QuestionSets from './pages/QuestionSets';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(undefined);
@@ -46,11 +47,12 @@ export default function App() {
             <Create currentUser={currentUser} />
           </ProtectedRoute>
         } />
-        <Route path="/history" element={
+        <Route path="/question-sets" element={
           <ProtectedRoute>
-            <History currentUser={currentUser} />
+            <QuestionSets currentUser={currentUser} />
           </ProtectedRoute>
         } />
+        {/* Hapus rute /history */}
       </Routes>
     </Router>
   );
