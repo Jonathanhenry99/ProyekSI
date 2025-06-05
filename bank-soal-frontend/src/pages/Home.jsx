@@ -6,70 +6,60 @@ import { Link } from 'react-router-dom';
 import AuthService from '../services/auth.service';
 
 // Note: You'll need to import these images in your actual project
-import LogoIF from 'D:/Programming/ProyekSI/ProyekSI/src/assets/LogoIF.jpg';
-import LogoUnpar from 'D:/Programming/ProyekSI/ProyekSI/src/assets/LogoUnpar.png';
 
 export default function HomePage() {
-  {/* Wind Blowing Effect */}
-<div className="absolute inset-0 overflow-hidden">
-  {[...Array(20)].map((_, i) => (
-    <motion.div
-      key={i}
-      className="absolute w-3 h-3 bg-gray-200 rounded-full opacity-50"
-      initial={{
-        x: -50, // Mulai dari kiri layar
-        y: Math.random() * window.innerHeight,
-      }}
-      animate={{
-        x: [null, window.innerWidth + 50], // Bergerak ke kanan
-        y: [null, Math.random() * window.innerHeight],
-      }}
-      transition={{
-        duration: 3 + Math.random() * 2,
-        repeat: Infinity,
-        ease: "linear",
-      }}
-    />
-  ))}
-</div>
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate loading time
     const timer = setTimeout(() => {
       setIsLoading(false);
     }, 1500);
-
     return () => clearTimeout(timer);
   }, []);
 
   return (
     <div className="flex flex-col min-h-screen bg-white text-gray-800 overflow-hidden">
+      {/* Wind Blowing Effect */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">
+        {[...Array(20)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-3 h-3 bg-gray-200 rounded-full opacity-50"
+            initial={{
+              x: -50,
+              y: Math.random() * window.innerHeight,
+            }}
+            animate={{
+              x: window.innerWidth + 50,
+              y: Math.random() * window.innerHeight,
+            }}
+            transition={{
+              duration: 3 + Math.random() * 2,
+              repeat: Infinity,
+              ease: "linear",
+            }}
+          />
+        ))}
+      </div>
+
       {isLoading ? (
         <LoadingAnimation />
       ) : (
         <>
-          <Header currentUser={currentUser} />
+          <Header />
           <main className="flex-grow">
-            {/* Hero Section */}
             <HeroSection />
-
-            {/* Study Concept Section */}
             <StudyConceptSection />
-
-            {/* Get Started Section */}
-            {/* fitur tambahan jika ada update */}
             {/* <GetStartedSection /> */}
           </main>
           <Footer />
-
-          {/* Animated Background Elements */}
           <BackgroundElements />
         </>
       )}
     </div>
   );
 }
+
 
 // Custom Header Component
 const CustomHeader = () => {
