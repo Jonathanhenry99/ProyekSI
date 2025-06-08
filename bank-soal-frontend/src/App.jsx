@@ -4,11 +4,12 @@ import Home from './pages/Home';
 import Search from './pages/Search';
 import Upload from './pages/Upload';
 import Create from './pages/Create';
-import History from './pages/History';
+import History from './pages/History'; // Hapus jika tidak digunakan
 import Login from './pages/Login';
 import AuthService from './services/auth.service';
 import QuestionSets from './pages/QuestionSets';
-
+import MataKuliahAdmin from './pages/admin/MataKuliahAdmin'; // Tambahkan import ini
+import DosenPage from './pages/admin/DosenPage';
 export default function App() {
   const [currentUser, setCurrentUser] = useState(undefined);
   
@@ -52,7 +53,17 @@ export default function App() {
             <QuestionSets currentUser={currentUser} />
           </ProtectedRoute>
         } />
-        {/* Hapus rute /history */}
+        <Route path="/matakuliah-admin" element={
+         
+            <MataKuliahAdmin currentUser={currentUser} />
+          
+        } />
+        
+        <Route path="/dosen-admin" element={
+         
+         <DosenPage currentUser={currentUser} />
+       
+     } />
       </Routes>
     </Router>
   );
