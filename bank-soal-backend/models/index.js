@@ -31,6 +31,7 @@ db.materialTag = require("./materialTag.model.js")(sequelize, Sequelize);
 db.question = require("./question.model.js")(sequelize, Sequelize);
 db.questionSet = require("./questionSet.model.js")(sequelize, Sequelize);
 db.questionHistory = require("./questionHistory.model.js")(sequelize, Sequelize);
+db.file = require("./file.model.js")(sequelize, Sequelize);
 
 // Define relationships
 
@@ -95,6 +96,10 @@ db.user.hasMany(db.questionHistory, { foreignKey: "userId" });
 db.questionHistory.belongsTo(db.user, { foreignKey: "userId" });
 db.question.hasMany(db.questionHistory, { foreignKey: "questionId" });
 db.questionHistory.belongsTo(db.question, { foreignKey: "questionId" });
+
+// File relationships
+db.questionSet.hasMany(db.file, { as: "files", foreignKey: "questionSetId" });
+db.file.belongsTo(db.questionSet, { foreignKey: "questionSetId" });
 
 module.exports = db;
 

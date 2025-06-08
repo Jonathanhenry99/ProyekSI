@@ -92,10 +92,18 @@ CREATE TABLE answers (
 );
 
 -- Tabel untuk menyimpan kumpulan soal
+-- Tabel untuk menyimpan kumpulan soal
 CREATE TABLE question_sets (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     description TEXT,
+    subject VARCHAR(255) NOT NULL,
+    year INTEGER,
+    level VARCHAR(50),
+    lecturer VARCHAR(255),
+    topics TEXT,
+    downloads INTEGER DEFAULT 0,
+    lastUpdated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by INTEGER REFERENCES users(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -135,3 +143,18 @@ from users
 
 -- Gunakan password yang sudah di-hash dengan bcrypt
 UPDATE users SET password = 'admin123' WHERE email = 'admin@example.com';
+
+
+-- Tabel untuk menyimpan file
+CREATE TABLE files (
+    id SERIAL PRIMARY KEY,
+    originalname VARCHAR(255) NOT NULL,
+    filename VARCHAR(255) NOT NULL,
+    filepath VARCHAR(255) NOT NULL,
+    filetype VARCHAR(50) NOT NULL,
+    filesize INTEGER NOT NULL,
+    filecategory VARCHAR(50) NOT NULL,
+    question_set_id INTEGER REFERENCES question_sets(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
