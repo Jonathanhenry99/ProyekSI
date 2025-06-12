@@ -37,12 +37,18 @@ db.file = require("./file.model.js")(sequelize, Sequelize);
 
 // User and Role (Many-to-Many)
 db.role.belongsToMany(db.user, {
-  through: "user_roles",
+  through: {
+    model: "user_roles",
+    timestamps: false
+  },
   foreignKey: "roleId",
   otherKey: "userId"
 });
 db.user.belongsToMany(db.role, {
-  through: "user_roles",
+  through: {
+    model: "user_roles",
+    timestamps: false
+  },
   foreignKey: "userId",
   otherKey: "roleId"
 });
@@ -98,8 +104,8 @@ db.question.hasMany(db.questionHistory, { foreignKey: "questionId" });
 db.questionHistory.belongsTo(db.question, { foreignKey: "questionId" });
 
 // File relationships
-db.questionSet.hasMany(db.file, { as: "files", foreignKey: "questionSetId" });
-db.file.belongsTo(db.questionSet, { foreignKey: "questionSetId" });
+db.questionSet.hasMany(db.file, { as: "files", foreignKey: "question_set_id" });
+db.file.belongsTo(db.questionSet, { foreignKey: "question_set_id" });
 
 module.exports = db;
 

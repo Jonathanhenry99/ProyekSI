@@ -34,8 +34,12 @@ const LoginPage = ({ setCurrentUser }) => {
                 // Update current user in parent component
                 setCurrentUser(response);
                 
-                // Redirect to home page
-                navigate('/');
+                // Redirect based on role
+                if (response.roles && response.roles.includes('ROLE_ADMIN')) {
+                    navigate('/admin');
+                } else {
+                    navigate('/');
+                }
             })
             .catch(error => {
                 setIsLoading(false);

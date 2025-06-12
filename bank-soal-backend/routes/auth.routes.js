@@ -1,5 +1,6 @@
 const { verifySignup } = require("../middlewares");
 const controller = require("../controllers/auth.controller");
+const { authJwt } = require("../middlewares");
 
 module.exports = function(app) {
   app.use(function(req, res, next) {
@@ -17,4 +18,10 @@ module.exports = function(app) {
 
   // Endpoint untuk reset password admin (hanya untuk testing)
   app.post("/api/auth/reset-admin", controller.resetAdminPassword);
+
+  // Debug endpoint
+  app.get("/api/auth/debug/check-database", controller.checkDatabase);
+
+  // Add route for resetting admin password (temporary for development)
+  app.post("/api/auth/reset-admin-password", controller.resetAdminPassword);
 };

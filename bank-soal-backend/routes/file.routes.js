@@ -30,4 +30,10 @@ module.exports = function(app) {
 
   // Preview file (publik)
   app.get("/api/files/preview/:id", controller.previewFile);
+
+  // Get file as BLOB (publik)
+  app.get("/api/files/blob/:id", controller.getFileAsBlob);
+
+  // Route untuk menggabungkan file dari satu question set
+  app.get("/api/files/combine-preview/:id", controller.combineFilesForPreview);
 };

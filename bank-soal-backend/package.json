@@ -16,10 +16,12 @@
     "bank-soal-backend": "file:",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
+    "docx-pdf": "^0.0.1",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.1",
+    "pdf-lib": "^1.17.1",
     "pg": "^8.14.0",
     "pg-hstore": "^2.3.4",
     "sequelize": "^6.37.6"

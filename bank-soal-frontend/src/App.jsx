@@ -9,6 +9,7 @@ import Login from './pages/Login';
 import AuthService from './services/auth.service';
 import QuestionSets from './pages/QuestionSets';
 import MataKuliahAdmin from './pages/admin/MataKuliahAdmin';
+import TaggingAdmin from './pages/admin/TaggingAdmin';
 import QuestionPreview from './pages/QuestionPreview';
 
 export default function App() {
@@ -94,11 +95,7 @@ export default function App() {
         } />
         <Route path="/admin/tagging" element={
           <AdminRoute>
-            {/* Komponen TaggingAdmin akan dibuat nanti */}
-            <div className="p-8 text-center">
-              <h1 className="text-2xl font-bold">Halaman Tagging Admin</h1>
-              <p className="text-gray-600 mt-2">Coming Soon...</p>
-            </div>
+            <TaggingAdmin currentUser={currentUser} />
           </AdminRoute>
         } />
         

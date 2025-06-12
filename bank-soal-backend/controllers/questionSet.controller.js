@@ -2,6 +2,7 @@ const db = require("../models");
 const QuestionSet = db.questionSet;
 const File = db.file;
 const User = db.user;
+const fs = require("fs");
 
 // Membuat question set baru
 exports.createQuestionSet = async (req, res) => {
@@ -20,7 +21,7 @@ exports.createQuestionSet = async (req, res) => {
       level: req.body.difficulty, // Pastikan ini konsisten dengan frontend
       lecturer: req.body.lecturer,
       topics: req.body.topics,
-      lastupdated: req.body.lastupdated || new Date(), // Gunakan huruf kecil
+      last_updated: req.body.last_updated || new Date(), // Gunakan snake_case untuk konsistensi
       created_by: req.userId // Gunakan snake_case untuk konsistensi
     });
 
@@ -116,7 +117,7 @@ exports.updateQuestionSet = async (req, res) => {
       level: req.body.difficulty || questionSet.level,
       lecturer: req.body.lecturer || questionSet.lecturer,
       topics: req.body.topics || questionSet.topics,
-      lastupdated: new Date()
+      last_updated: new Date()
     });
 
     res.status(200).send({ message: "Question set berhasil diperbarui!" });
@@ -140,10 +141,10 @@ exports.deleteQuestionSet = async (req, res) => {
     }
 
     // Hapus file terkait
-    const files = await File.findAll({ where: { questionSetId: req.params.id } });
+    const files = await File.findAll({ where: { question_set_id: req.params.id } });
     for (const file of files) {
       // Hapus file fisik
-      const filePath = file.filePath;
+      const filePath = file.filepath;
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }

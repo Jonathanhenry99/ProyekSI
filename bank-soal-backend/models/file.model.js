@@ -28,6 +28,14 @@ module.exports = (sequelize, Sequelize) => {
     filecategory: {  // Ubah dari fileCategory
       type: Sequelize.STRING, // questions, answers, testCases
       allowNull: false
+    },
+    question_set_id: {  // Tambahkan field ini
+      type: Sequelize.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'question_sets',
+        key: 'id'
+      }
     }
   }, {
     // Tambahkan opsi ini untuk menggunakan nama kolom yang sama persis dengan definisi

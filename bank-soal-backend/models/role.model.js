@@ -9,8 +9,7 @@ module.exports = (sequelize, Sequelize) => {
     }
   }, {
     underscored: true, // Menggunakan snake_case untuk nama kolom
-    createdAt: 'created_at',
-    updatedAt: 'updated_at'
+    timestamps: false // Disable timestamps since we don't need them for roles
   });
 
   return Role;

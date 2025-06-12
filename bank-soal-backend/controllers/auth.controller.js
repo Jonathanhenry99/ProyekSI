@@ -101,28 +101,81 @@ exports.signin = async (req, res) => {
 // Tambahkan fungsi ini untuk testing
 exports.resetAdminPassword = async (req, res) => {
   try {
-    // Cari user admin
-    const admin = await User.findOne({
+    // Cari atau buat user admin2
+    let admin = await User.findOne({
       where: {
-        email: "admin@example.com" // Sesuaikan dengan email admin Anda
+        email: "admin2@example.com"
       }
     });
 
     if (!admin) {
-      return res.status(404).send({ message: "Admin tidak ditemukan." });
+      // Buat user baru jika belum ada
+      admin = await User.create({
+        username: "admin2",
+        email: "admin2@example.com",
+        password: bcrypt.hashSync("admin123", 8),
+        fullName: "Admin 2",
+        isActive: true
+      });
+
+      // Set role admin
+      const adminRole = await Role.findOne({ where: { name: "admin" } });
+      if (adminRole) {
+        await admin.setRoles([adminRole]);
+      }
+    } else {
+      // Reset password jika user sudah ada
+      admin.password = bcrypt.hashSync("admin123", 8);
+      await admin.save();
+
+      // Pastikan user memiliki role admin
+      const adminRole = await Role.findOne({ where: { name: "admin" } });
+      if (adminRole) {
+        await admin.setRoles([adminRole]);
+      }
     }
 
-    // Reset password ke "admin123" dengan bcrypt
-    const hashedPassword = bcrypt.hashSync("admin123", 8);
-    admin.password = hashedPassword;
-    await admin.save();
-
     res.status(200).send({ 
-      message: "Password admin berhasil direset!",
-      // Tampilkan hash untuk verifikasi (hanya untuk debugging)
-      hash: hashedPassword
+      message: "Admin2 berhasil dibuat/direset!",
+      user: {
+        id: admin.id,
+        username: admin.username,
+        email: admin.email,
+        roles: (await admin.getRoles()).map(role => role.name)
+      }
     });
   } catch (error) {
+    console.error("Error in resetAdminPassword:", error);
+    res.status(500).send({ message: error.message });
+  }
+};
+
+// Debug endpoint to check database status
+exports.checkDatabase = async (req, res) => {
+  try {
+    // Check users table
+    const users = await User.findAll({
+      attributes: ['id', 'username', 'email', 'password', 'is_active'],
+      include: [{
+        model: Role,
+        attributes: ['id', 'name'],
+        through: { attributes: [] }
+      }]
+    });
+
+    res.status(200).send({
+      message: "Database check successful",
+      users: users.map(user => ({
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        password: user.password.substring(0, 10) + "...", // Only show part of password
+        is_active: user.is_active,
+        roles: user.roles.map(role => role.name)
+      }))
+    });
+  } catch (error) {
+    console.error("Error checking database:", error);
     res.status(500).send({ message: error.message });
   }
 };

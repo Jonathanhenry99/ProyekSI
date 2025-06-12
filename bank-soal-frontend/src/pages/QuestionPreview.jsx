@@ -2,11 +2,143 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from "framer-motion";
 import { ArrowLeft, Download, FileText, File, BookOpen } from 'lucide-react';
-import Header from '../components/Footer';
+import Header from '../components/Header';
 import Footer from '../components/Footer';
 import axios from 'axios';
 
 const API_URL = "http://localhost:8080/api";
+
+// PDF Viewer Component
+const PDFViewer = ({ fileId }) => {
+  const [pdfUrl, setPdfUrl] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchPDF = async () => {
+      try {
+        setLoading(true);
+        const response = await axios.get(`${API_URL}/files/blob/${fileId}`, {
+          responseType: 'blob'
+        });
+        
+        // Create blob URL
+        const blob = new Blob([response.data], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        setPdfUrl(url);
+        setError(null);
+      } catch (err) {
+        console.error("Error loading PDF:", err);
+        setError("Gagal memuat PDF");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPDF();
+
+    // Cleanup blob URL when component unmounts
+    return () => {
+      if (pdfUrl) {
+        URL.revokeObjectURL(pdfUrl);
+      }
+    };
+  }, [fileId]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[600px] bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[600px] bg-gray-50">
+        <FileText className="w-16 h-16 text-red-500 mb-4" />
+        <p className="text-red-600">{error}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full h-[600px] border border-gray-300 rounded-lg overflow-hidden">
+      <iframe 
+        src={pdfUrl}
+        className="w-full h-full"
+        title="PDF Viewer"
+      />
+    </div>
+  );
+};
+
+// Combined PDF Viewer Component
+const CombinedPDFViewer = ({ questionSetId, type = 'questions' }) => {
+  const [pdfUrl, setPdfUrl] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchCombinedPDF = async () => {
+      try {
+        setLoading(true);
+        const response = await axios.get(`${API_URL}/files/combine-preview/${questionSetId}?type=${type}`, {
+          responseType: 'blob'
+        });
+        
+        // Create blob URL
+        const blob = new Blob([response.data], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        setPdfUrl(url);
+        setError(null);
+      } catch (err) {
+        console.error(`Error loading ${type} PDF:`, err);
+        setError(`Gagal memuat ${type === 'questions' ? 'soal dan test cases' : 'kunci jawaban'}`);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (questionSetId) {
+      fetchCombinedPDF();
+    }
+
+    // Cleanup blob URL when component unmounts
+    return () => {
+      if (pdfUrl) {
+        URL.revokeObjectURL(pdfUrl);
+      }
+    };
+  }, [questionSetId, type]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[600px] bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[600px] bg-gray-50">
+        <FileText className="w-16 h-16 text-red-500 mb-4" />
+        <p className="text-red-600">{error}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full h-[600px] border border-gray-300 rounded-lg overflow-hidden">
+      <iframe 
+        src={pdfUrl}
+        className="w-full h-full"
+        title={`${type === 'questions' ? 'Soal dan Test Cases' : 'Kunci Jawaban'} Viewer`}
+      />
+    </div>
+  );
+};
 
 const QuestionPreview = ({ currentUser }) => {
   const { id } = useParams();
@@ -15,10 +147,18 @@ const QuestionPreview = ({ currentUser }) => {
   const [files, setFiles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('questions'); // questions, answers, testCases
+  const [combinedPdfUrl, setCombinedPdfUrl] = useState(null); // Move this hook here
 
   useEffect(() => {
     fetchQuestionSetDetails();
   }, [id]);
+
+  // Move this useEffect here, before any conditional returns
+  useEffect(() => {
+    if (questionSet && questionSet.id) {
+      setCombinedPdfUrl(`${API_URL}/files/combine-preview/${questionSet.id}`);
+    }
+  }, [questionSet]);
 
   const fetchQuestionSetDetails = async () => {
     try {
@@ -56,15 +196,7 @@ const QuestionPreview = ({ currentUser }) => {
     const fileExtension = file.filetype.toLowerCase();
     
     if (fileExtension === 'pdf') {
-      return (
-        <div className="w-full h-[600px] border border-gray-300 rounded-lg overflow-hidden">
-          <iframe 
-            src={`${API_URL}/files/download/${file.id}`} 
-            className="w-full h-full"
-            title={file.originalname}
-          />
-        </div>
-      );
+      return <PDFViewer fileId={file.id} />;
     } else if (fileExtension === 'docx' || fileExtension === 'doc') {
       // DOCX tidak dapat di-preview langsung di browser
       return (
@@ -153,7 +285,8 @@ const QuestionPreview = ({ currentUser }) => {
       </div>
     );
   }
-
+  
+  // Modifikasi bagian render untuk menampilkan PDF gabungan
   return (
     <div className="min-h-screen bg-gray-50">
       <Header currentUser={currentUser} />
@@ -181,11 +314,13 @@ const QuestionPreview = ({ currentUser }) => {
             </div>
             <div className="flex items-center text-gray-700">
               <span className="font-medium mr-2">Tingkat Kesulitan:</span>
-              <span className={`px-2 py-1 text-xs rounded-full ${{
-                'Mudah': 'bg-green-100 text-green-700',
-                'Sedang': 'bg-yellow-100 text-yellow-700',
-                'Sulit': 'bg-red-100 text-red-700'
-              }[questionSet.level] || 'bg-gray-100 text-gray-700'}`}>
+              <span className={`px-2 py-1 text-xs rounded-full ${
+                {
+                  'Mudah': 'bg-green-100 text-green-700',
+                  'Sedang': 'bg-yellow-100 text-yellow-700',
+                  'Sulit': 'bg-red-100 text-red-700'
+                }[questionSet.level] || 'bg-gray-100 text-gray-700'
+              }`}>
                 {questionSet.level}
               </span>
             </div>
@@ -201,6 +336,41 @@ const QuestionPreview = ({ currentUser }) => {
               <p className="text-gray-700">{questionSet.description}</p>
             </div>
           )}
+        </div>
+        
+        {/* PDF Gabungan */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Soal dan Test Cases */}
+          <div className="bg-white rounded-xl shadow-md overflow-hidden">
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">Soal dan Test Cases</h3>
+            </div>
+            <div className="p-4">
+              {questionSet && questionSet.id ? (
+                <CombinedPDFViewer questionSetId={questionSet.id} type="questions" />
+              ) : (
+                <div className="flex items-center justify-center p-10">
+                  <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Kunci Jawaban */}
+          <div className="bg-white rounded-xl shadow-md overflow-hidden">
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">Kunci Jawaban</h3>
+            </div>
+            <div className="p-4">
+              {questionSet && questionSet.id ? (
+                <CombinedPDFViewer questionSetId={questionSet.id} type="answers" />
+              ) : (
+                <div className="flex items-center justify-center p-10">
+                  <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
         
         {/* Tab untuk navigasi antar kategori file */}
