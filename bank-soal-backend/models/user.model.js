@@ -24,13 +24,8 @@ module.exports = (sequelize, Sequelize) => {
       allowNull: false
     },
     fullName: {
-      type: Sequelize.STRING
-    },
-    department: {
-      type: Sequelize.STRING
-    },
-    profilePicture: {
-      type: Sequelize.STRING
+      type: Sequelize.STRING,
+      allowNull: false
     },
     isActive: {
       type: Sequelize.BOOLEAN,

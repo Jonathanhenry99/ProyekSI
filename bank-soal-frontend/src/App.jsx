@@ -8,8 +8,15 @@ import History from './pages/History'; // Hapus jika tidak digunakan
 import Login from './pages/Login';
 import AuthService from './services/auth.service';
 import QuestionSets from './pages/QuestionSets';
+
 import MataKuliahAdmin from './pages/admin/MataKuliahAdmin'; // Tambahkan import ini
 import DosenPage from './pages/admin/DosenPage';
+
+import MataKuliahAdmin from './pages/admin/MataKuliahAdmin';
+import TaggingAdmin from './pages/admin/TaggingAdmin';
+import QuestionPreview from './pages/QuestionPreview';
+
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState(undefined);
   
@@ -20,7 +27,7 @@ export default function App() {
     }
   }, []);
 
-  // Protected Route component
+  // Protected Route component for regular users
   const ProtectedRoute = ({ children }) => {
     if (!currentUser) {
       return <Navigate to="/login" />;
@@ -28,11 +35,28 @@ export default function App() {
     return children;
   };
 
+  // Protected Route component for admin users
+  const AdminRoute = ({ children }) => {
+    if (!currentUser) {
+      return <Navigate to="/login" />;
+    }
+    
+    // Check if user has admin role
+    if (!currentUser.roles || !currentUser.roles.includes('ROLE_ADMIN')) {
+      return <Navigate to="/" />;
+    }
+    
+    return children;
+  };
+
   return (
     <Router>
       <Routes>
+        {/* Public Routes */}
         <Route path="/" element={<Home currentUser={currentUser} />} />
         <Route path="/login" element={<Login setCurrentUser={setCurrentUser} />} />
+        
+        {/* User Protected Routes */}
         <Route path="/search" element={
           <ProtectedRoute>
             <Search currentUser={currentUser} />

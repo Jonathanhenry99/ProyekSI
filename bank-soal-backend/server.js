@@ -33,10 +33,14 @@ app.get("/", (req, res) => {
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const courseTagRoutes = require('./routes/courseTag.routes');
+const questionSetRoutes = require('./routes/questionSet.routes');
+const fileRoutes = require('./routes/file.routes');
 
 authRoutes(app);
 userRoutes(app);
 courseTagRoutes(app);
+questionSetRoutes(app);
+fileRoutes(app);
 
 // Set port and start server
 const PORT = process.env.PORT || 8080;

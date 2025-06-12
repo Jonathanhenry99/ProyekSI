@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, CheckCircle, ChevronDown, FileText, BarChart2, Plus, Check } from 'lucide-react';
+import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, CheckCircle, ChevronDown, FileText, BarChart2, Plus, Check, BookOpen } from 'lucide-react';
 import Footer from '../components/Footer';
 import Header from '../components/Header';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
+
+const API_URL = "http://localhost:8080/api";
 
 const SearchPage = ({ currentUser }) => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('semua');
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState([]);
@@ -13,7 +17,9 @@ const SearchPage = ({ currentUser }) => {
   const [viewMode, setViewMode] = useState('grid');
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  
+  const [questionSets, setQuestionSets] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
+
   // State untuk dropdown
   const [showLevelDropdown, setShowLevelDropdown] = useState(false);
   const [showCourseTagDropdown, setShowCourseTagDropdown] = useState(false);
@@ -99,71 +105,104 @@ const SearchPage = ({ currentUser }) => {
     },
   ];
 
-  // Simulate loading
-  // Hapus useEffect untuk loading
-  // useEffect(() => {
-  //   const timer = setTimeout(() => {
-  //     setIsLoading(false);
-  //   }, 1500);
-  //
-  //   return () => clearTimeout(timer);
-  // }, []);
+  // Fungsi untuk mendownload file
+  const handleDownload = async (id) => {
+    try {
+      // Ambil detail question set
+      const response = await axios.get(`${API_URL}/questionsets/${id}?download=true`);
+      
+      // Ambil file soal (asumsi file pertama dengan kategori 'questions')
+      const questionFile = response.data.files.find(file => file.filecategory === 'questions');
+      
+      if (questionFile) {
+        // Buka link download di tab baru
+        window.open(`${API_URL}/files/download/${questionFile.id}`, '_blank');
+      } else {
+        alert('File soal tidak ditemukan');
+      }
+    } catch (error) {
+      console.error("Error downloading file:", error);
+      alert('Gagal mendownload file');
+    }
+  };
+  
+  // Fungsi untuk navigasi ke halaman preview
+  const handleCardClick = (id) => {
+    navigate(`/preview/${id}`);
+  };
+
 
 
 
   // Filter function
   const filterData = () => {
-    return mockData.filter(item => {
-      // Filter by search query
-      const matchesSearch =
-        searchQuery === '' ||
-        item.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.lecturer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.fileName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.topics.some(topic => topic.toLowerCase().includes(searchQuery.toLowerCase()));
-
-      // Filter by level
-      const matchesLevel =
-        selectedLevel.length === 0 ||
-        selectedLevel.includes(item.level);
-        
-      // Filter by course tags
-      const matchesCourseTags =
-        selectedCourseTags.length === 0 ||
-        selectedCourseTags.some(tag => item.subject.toLowerCase().includes(tag.toLowerCase()));
-        
-      // Filter by material tags
-      const matchesMaterialTags =
-        selectedMaterialTags.length === 0 ||
-        selectedMaterialTags.some(tag => 
+    setIsLoading(true);
+    
+    let filtered = [...questionSets];
+    
+    // Filter berdasarkan search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(item => {
+        return (
+          item.fileName.toLowerCase().includes(query) ||
+          item.subject.toLowerCase().includes(query) ||
+          item.lecturer.toLowerCase().includes(query) ||
+          (item.topics && item.topics.some(topic => topic.toLowerCase().includes(query)))
+        );
+      });
+    }
+    
+    // Filter berdasarkan level
+    if (selectedLevel.length > 0) {
+      filtered = filtered.filter(item => selectedLevel.includes(item.level));
+    }
+    
+    // Filter berdasarkan tag mata kuliah
+    if (selectedCourseTags.length > 0) {
+      filtered = filtered.filter(item => {
+        return selectedCourseTags.some(tag => item.subject.toLowerCase().includes(tag.toLowerCase()));
+      });
+    }
+    
+    // Filter berdasarkan material tags
+    if (selectedMaterialTags.length > 0) {
+      filtered = filtered.filter(item => {
+        return selectedMaterialTags.some(tag =>
           item.topics.some(topic => topic.toLowerCase().includes(tag.toLowerCase()))
         );
-
-      // Filter by date
-      const itemDate = new Date(item.lastUpdated);
-      const matchesDate =
-        (dateRange.start === '' || new Date(dateRange.start) <= itemDate) &&
-        (dateRange.end === '' || new Date(dateRange.end) >= itemDate);
-
-      return matchesSearch && matchesLevel && matchesCourseTags && matchesMaterialTags && matchesDate;
-    });
+      });
+    }
+    
+    // Filter berdasarkan tanggal
+    if (dateRange.start && dateRange.end) {
+      const startDate = new Date(dateRange.start);
+      const endDate = new Date(dateRange.end);
+      
+      filtered = filtered.filter(item => {
+        const itemDate = new Date(item.lastUpdated);
+        return itemDate >= startDate && itemDate <= endDate;
+      });
+    }
+    
+    setFilteredData(filtered);
+    setIsLoading(false);
+    return filtered;
   };
 
-  const filteredData = filterData();
-  
   // Filter dropdown data berdasarkan input pencarian
-  const filteredLevels = difficultyLevels.filter(level => 
+  const filteredLevels = difficultyLevels.filter(level =>
     level.toLowerCase().includes(levelSearch.toLowerCase())
   );
-  
-  const filteredCourseTags = courseTags.filter(tag => 
+
+  const filteredCourseTags = courseTags.filter(tag =>
     tag.toLowerCase().includes(courseTagSearch.toLowerCase())
   );
-  
-  const filteredMaterialTags = materialTags.filter(tag => 
+
+  const filteredMaterialTags = materialTags.filter(tag =>
     tag.toLowerCase().includes(materialTagSearch.toLowerCase())
   );
-  
+
   // Fungsi untuk menambah/menghapus level
   const toggleLevel = (level) => {
     if (selectedLevel.includes(level)) {
@@ -199,6 +238,133 @@ const SearchPage = ({ currentUser }) => {
       transition: { staggerChildren: 0.1 }
     }
   };
+
+
+  // Helper function to format date
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('id-ID', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+  
+  // Helper function to get level color
+  const getLevelColor = (level) => {
+    switch(level) {
+      case 'Mudah':
+        return 'bg-green-100 text-green-700';
+      case 'Sedang':
+        return 'bg-yellow-100 text-yellow-700';
+      case 'Sulit':
+        return 'bg-red-100 text-red-700';
+      default:
+        return 'bg-gray-100 text-gray-700';
+    }
+  };
+
+   // Fungsi untuk mengambil data dari API
+  const fetchQuestionSets = async () => {
+    setIsLoading(true);
+    try {
+      const response = await axios.get(`${API_URL}/questionsets`);
+      console.log("API Response:", response.data); // Tambahkan log untuk melihat struktur data
+      
+      // Transform data untuk sesuai dengan format yang digunakan di frontend
+      const transformedData = response.data.map(item => ({
+        id: item.id,
+        fileName: item.title,
+        subject: item.subject,
+        year: item.year,
+        lecturer: item.lecturer || (item.creator ? (item.creator.fullName || item.creator.username) : 'Unknown'),
+        level: item.level,
+        lastUpdated: new Date(item.lastupdated || item.updated_at).toISOString(),
+        topics: item.topics ? item.topics.split(',').map(topic => topic.trim()) : [],
+        downloads: item.downloads || 0,
+        description: item.description || ''
+      }));
+      
+      console.log("Transformed Data:", transformedData); // Tambahkan log untuk melihat hasil transformasi
+      setQuestionSets(transformedData);
+      setFilteredData(transformedData);
+    } catch (error) {
+      console.error("Error fetching question sets:", error);
+      console.error("Error details:", error.response ? error.response.data : "No response data"); // Tambahkan detail error
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Panggil fetchQuestionSets saat komponen dimount
+  useEffect(() => {
+    fetchQuestionSets();
+  }, []);
+  
+
+  const renderCard = (item) => (
+    <motion.div
+      variants={itemVariants}
+      className={`bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow cursor-pointer ${viewMode === 'grid' ? 'h-full' : ''}`}
+      onClick={() => handleCardClick(item.id)}
+    >
+      <div className="p-6">
+        <div className="flex justify-between items-start mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">{item.fileName}</h3>
+          <span className={`px-2 py-1 text-xs rounded-full ${getLevelColor(item.level)}`}>
+            {item.level}
+          </span>
+        </div>
+        
+        <div className="space-y-2 mb-4">
+          <div className="flex items-center text-sm text-gray-600">
+            <BookOpen className="w-4 h-4 mr-2" />
+            <span>{item.subject}</span>
+          </div>
+          <div className="flex items-center text-sm text-gray-600">
+            <User className="w-4 h-4 mr-2" />
+            <span>{item.lecturer}</span>
+          </div>
+          <div className="flex items-center text-sm text-gray-600">
+            <Calendar className="w-4 h-4 mr-2" />
+            <span>{formatDate(item.lastUpdated)}</span>
+          </div>
+        </div>
+        
+        {item.topics && item.topics.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-4">
+            {item.topics.map((topic, index) => (
+              <span 
+                key={index} 
+                className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
+              >
+                {topic}
+              </span>
+            ))}
+          </div>
+        )}
+        
+        <div className="flex justify-between items-center mt-4">
+          <div className="flex items-center text-sm text-gray-500">
+            <Download className="w-4 h-4 mr-1" />
+            <span>{item.downloads} unduhan</span>
+          </div>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation(); // Mencegah event bubbling ke parent div
+              handleDownload(item.id);
+            }}
+          >
+            Unduh
+          </motion.button>
+        </div>
+      </div>
+    </motion.div>
+  );
+
 
   const itemVariants = {
     hidden: { y: 20, opacity: 0 },
@@ -242,7 +408,7 @@ const SearchPage = ({ currentUser }) => {
   return (
     <div className="min-h-screen bg-white">
       <Header currentUser={currentUser} />
-      
+
       {isLoading ? (
         <LoadingAnimation />
       ) : (
@@ -330,7 +496,7 @@ const SearchPage = ({ currentUser }) => {
                 Cari
               </motion.button>
             </div>
-            
+
             {/* Dropdown Filters */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
               {/* Tingkat Kesulitan Dropdown */}
@@ -345,14 +511,14 @@ const SearchPage = ({ currentUser }) => {
                     onChange={(e) => setLevelSearch(e.target.value)}
                     onClick={() => setShowLevelDropdown(true)}
                   />
-                  <button 
+                  <button
                     className="absolute right-2 top-1/2 transform -translate-y-1/2"
                     onClick={() => setShowLevelDropdown(!showLevelDropdown)}
                   >
                     <ChevronDown className="w-5 h-5 text-gray-400" />
                   </button>
                 </div>
-                
+
                 {/* Dropdown Menu */}
                 <AnimatePresence>
                   {showLevelDropdown && (
@@ -385,7 +551,7 @@ const SearchPage = ({ currentUser }) => {
                   )}
                 </AnimatePresence>
               </div>
-              
+
               {/* Tag Mata Kuliah Dropdown */}
               <div className="relative">
                 <label className="block text-sm font-medium mb-2 text-gray-700">Pilih Tag Mata Kuliah</label>
@@ -398,14 +564,14 @@ const SearchPage = ({ currentUser }) => {
                     onChange={(e) => setCourseTagSearch(e.target.value)}
                     onClick={() => setShowCourseTagDropdown(true)}
                   />
-                  <button 
+                  <button
                     className="absolute right-2 top-1/2 transform -translate-y-1/2"
                     onClick={() => setShowCourseTagDropdown(!showCourseTagDropdown)}
                   >
                     <ChevronDown className="w-5 h-5 text-gray-400" />
                   </button>
                 </div>
-                
+
                 {/* Dropdown Menu */}
                 <AnimatePresence>
                   {showCourseTagDropdown && (
@@ -438,7 +604,7 @@ const SearchPage = ({ currentUser }) => {
                   )}
                 </AnimatePresence>
               </div>
-              
+
               {/* Tag Materi Dropdown */}
               <div className="relative">
                 <label className="block text-sm font-medium mb-2 text-gray-700">Pilih Tag Materi</label>
@@ -451,14 +617,14 @@ const SearchPage = ({ currentUser }) => {
                     onChange={(e) => setMaterialTagSearch(e.target.value)}
                     onClick={() => setShowMaterialTagDropdown(true)}
                   />
-                  <button 
+                  <button
                     className="absolute right-2 top-1/2 transform -translate-y-1/2"
                     onClick={() => setShowMaterialTagDropdown(!showMaterialTagDropdown)}
                   >
                     <ChevronDown className="w-5 h-5 text-gray-400" />
                   </button>
                 </div>
-                
+
                 {/* Dropdown Menu */}
                 <AnimatePresence>
                   {showMaterialTagDropdown && (
@@ -618,56 +784,7 @@ const SearchPage = ({ currentUser }) => {
                 key="grid-view"
               >
                 {filteredData.map((item, index) => (
-                  <motion.div
-                    key={item.id}
-                    variants={itemVariants}
-                    whileHover={{ y: -5, boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)' }}
-                    className="bg-white rounded-xl p-6 shadow-md border border-gray-100 transition-all"
-                  >
-                    <div className="flex justify-between items-start mb-4">
-                      <h3 className="text-xl font-semibold text-gray-900">{item.subject}</h3>
-                      <span className={`px-3 py-1 rounded-full text-sm ${item.level === 'Mudah' ? 'bg-green-100 text-green-700' :
-                        item.level === 'Sedang' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-red-100 text-red-700'
-                        }`}>
-                        {item.level}
-                      </span>
-                    </div>
-
-                    <p className="text-sm text-gray-500 mb-4 border-b pb-3">
-                      {item.fileName}
-                    </p>
-
-                    <div className="space-y-3 text-gray-600">
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-blue-500" />
-                        <span>{item.lecturer}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-blue-500" />
-                        <span>Updated: {item.lastUpdated}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Tag className="w-4 h-4 text-blue-500" />
-                        <div className="flex gap-2 flex-wrap">
-                          {item.topics.map(topic => (
-                            <span key={topic} className="text-sm bg-gray-100 px-2 py-1 rounded">
-                              {topic}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      className="w-full mt-6 flex items-center justify-center gap-2 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-                    >
-                      <Download className="w-4 h-4" />
-                      Download ({item.downloads})
-                    </motion.button>
-                  </motion.div>
+                  renderCard(item)
                 ))}
               </motion.div>
             ) : (
@@ -736,13 +853,14 @@ const SearchPage = ({ currentUser }) => {
                           {item.lecturer}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                          {item.lastUpdated}
+                          {formatDate(item.lastUpdated)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center">
                           <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                             className="inline-flex items-center px-3 py-1 rounded-lg text-sm text-white bg-blue-600 hover:bg-blue-700"
+                            onClick={() => handleDownload(item.id)}
                           >
                             <Download className="w-3 h-3 mr-1" />
                             Download

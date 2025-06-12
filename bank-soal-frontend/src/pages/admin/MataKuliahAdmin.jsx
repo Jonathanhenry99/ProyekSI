@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, User, LogOut, Edit, Trash2, Save, X, BookOpen, Code, GraduationCap, Filter, SortAsc, AlertCircle, CheckCircle } from 'lucide-react';
 
@@ -9,10 +10,20 @@ const MataKuliahAdmin = ({ currentUser }) => {
   const [sortOrder, setSortOrder] = useState('asc');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
   const [notification, setNotification] = useState(null);
+
+import React, { useState } from 'react';
+import { Search, Plus, User, LogOut } from 'lucide-react';
+
+const MataKuliahAdmin = ({ currentUser }) => {
+  const [currentView, setCurrentView] = useState('daftar'); // 'daftar', 'tambah', atau 'edit'
+  const [searchTerm, setSearchTerm] = useState('');
+  const [editingId, setEditingId] = useState(null);
+
   const [formData, setFormData] = useState({
     namaMataKuliah: '',
     kodeMataKuliah: ''
   });
+
   const [formErrors, setFormErrors] = useState({});
 
   const [mataKuliahList, setMataKuliahList] = useState([
@@ -106,6 +117,60 @@ const MataKuliahAdmin = ({ currentUser }) => {
   const resetForm = () => {
     setFormData({ namaMataKuliah: '', kodeMataKuliah: '' });
     setFormErrors({});
+  
+  // Data dummy mata kuliah
+  const [mataKuliahList, setMataKuliahList] = useState([
+    { id: 1, nama: 'Algoritma Struktur Data', kode: 'ASD001' },
+    { id: 2, nama: 'Desain Analisis Algoritma', kode: 'DAA002' },
+    { id: 3, nama: 'Algoritma Pemrograman', kode: 'AP003' },
+    { id: 4, nama: 'Dasar Pemrograman', kode: 'DP004' },
+    { id: 5, nama: 'Pemrograman Berbasis Objek', kode: 'PBO005' },
+    { id: 6, nama: 'Desain Analisis Algoritma', kode: 'DAA006' }
+  ]);
+
+  // Filter mata kuliah berdasarkan pencarian
+  const filteredMataKuliah = mataKuliahList.filter(mk =>
+    mk.nama.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = () => {
+    if (formData.namaMataKuliah && formData.kodeMataKuliah) {
+      if (currentView === 'edit' && editingId) {
+        // Update mata kuliah yang sudah ada
+        setMataKuliahList(prev => 
+          prev.map(mk => 
+            mk.id === editingId 
+              ? { ...mk, nama: formData.namaMataKuliah, kode: formData.kodeMataKuliah }
+              : mk
+          )
+        );
+      } else {
+        // Tambah mata kuliah baru
+        const newMataKuliah = {
+          id: mataKuliahList.length + 1,
+          nama: formData.namaMataKuliah,
+          kode: formData.kodeMataKuliah
+        };
+        setMataKuliahList(prev => [...prev, newMataKuliah]);
+      }
+      
+      setFormData({ namaMataKuliah: '', kodeMataKuliah: '' });
+      setEditingId(null);
+      setCurrentView('daftar');
+    }
+  };
+
+  const handleCancel = () => {
+    setFormData({ namaMataKuliah: '', kodeMataKuliah: '' });
+
     setEditingId(null);
     setCurrentView('daftar');
   };
@@ -124,6 +189,7 @@ const MataKuliahAdmin = ({ currentUser }) => {
 
   const handleDelete = (id) => {
     setMataKuliahList(prev => prev.filter(mk => mk.id !== id));
+
     setShowDeleteConfirm(null);
     showNotification('Mata kuliah berhasil dihapus');
   };
@@ -199,6 +265,15 @@ const MataKuliahAdmin = ({ currentUser }) => {
         </div>
       </div>
     );
+
+  };
+
+  const handleLogout = () => {
+    // Implementasi logout - sesuaikan dengan AuthService
+    // AuthService.logout();
+    // window.location.href = '/login';
+    console.log('Logout clicked');
+
   };
 
   // Header Component
@@ -531,5 +606,6 @@ const MataKuliahAdmin = ({ currentUser }) => {
     </>
   );
 };
+
 
 export default MataKuliahAdmin;
