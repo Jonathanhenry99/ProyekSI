@@ -1,33 +1,36 @@
 import React, { useState } from 'react';
-import { Search, Plus, User, LogOut, Edit, Trash2, Save, X, BookOpen, Code, GraduationCap, Filter, AlertCircle, CheckCircle } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, User, Mail, Eye, EyeOff, X, LogOut, Save, AlertCircle, CheckCircle, Users, UserCheck, Filter } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import AuthService from '../../services/auth.service';
 
-const MataKuliahAdmin = ({ currentUser }) => {
+const AdminPage = ({ currentUser }) => {
   const navigate = useNavigate();
   const [currentView, setCurrentView] = useState('daftar');
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState(null);
-  const [sortBy, setSortBy] = useState('nama');
-  const [sortOrder, setSortOrder] = useState('asc');
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showRePassword, setShowRePassword] = useState(false);
   const [notification, setNotification] = useState(null);
-
-  const [formData, setFormData] = useState({
-    namaMataKuliah: '',
-    kodeMataKuliah: '',
-    sks: ''
-  });
-
+  
+  // Separate state for form fields
+  const [namaDosen, setNamaDosen] = useState('');
+  const [emailDosen, setEmailDosen] = useState('');
+  const [passwordDosen, setPasswordDosen] = useState('');
+  const [rePasswordDosen, setRePasswordDosen] = useState('');
   const [formErrors, setFormErrors] = useState({});
 
-  const [mataKuliahList, setMataKuliahList] = useState([
-    { id: 1, nama: 'Algoritma Struktur Data', kode: 'AIF233101', sks: 4, createdAt: '2024-01-15', status: 'active' },
-    { id: 2, nama: 'Desain Analisis Algoritma', kode: 'AIF233102', sks: 3, createdAt: '2024-01-16', status: 'active' },
-    { id: 3, nama: 'Algoritma Pemrograman', kode: 'AIF233103', sks: 4, createdAt: '2024-01-17', status: 'active' },
-    { id: 4, nama: 'Dasar Pemrograman', kode: 'AIF233104', sks: 3, createdAt: '2024-01-18', status: 'active' },
-    { id: 5, nama: 'Pemrograman Berbasis Objek', kode: 'AIF233105', sks: 4, createdAt: '2024-01-19', status: 'active' },
-    { id: 6, nama: 'Basis Data', kode: 'AIF233106', sks: 3, createdAt: '2024-01-20', status: 'active' }
+  // Data dummy dosen
+  const [dosenList, setDosenList] = useState([
+    { id: 1, nama: 'Dr. Ahmad Susanto', email: 'ahmad.susanto@unpar.ac.id', status: 'Aktif' },
+    { id: 2, nama: 'Dr. Siti Rahayu', email: 'siti.rahayu@unpar.ac.id', status: 'Aktif' },
+    { id: 3, nama: 'Prof. Budi Santoso', email: 'budi.santoso@unpar.ac.id', status: 'Aktif' },
+    { id: 4, nama: 'Dr. Maria Fernanda', email: 'maria.fernanda@unpar.ac.id', status: 'Nonaktif' },
+    { id: 5, nama: 'Dr. Rizki Pratama', email: 'rizki.pratama@unpar.ac.id', status: 'Aktif' },
+    { id: 6, nama: 'Prof. Dewi Lestari', email: 'dewi.lestari@unpar.ac.id', status: 'Aktif' },
+    { id: 7, nama: 'Dr. Andi Wijaya', email: 'andi.wijaya@unpar.ac.id', status: 'Aktif' },
+    { id: 8, nama: 'Dr. Linda Sari', email: 'linda.sari@unpar.ac.id', status: 'Nonaktif' },
+    { id: 9, nama: 'Prof. Hendra Kurniawan', email: 'hendra.kurniawan@unpar.ac.id', status: 'Aktif' },
+    { id: 10, nama: 'Dr. Fitri Handayani', email: 'fitri.handayani@unpar.ac.id', status: 'Aktif' }
   ]);
 
   // Show notification
@@ -40,120 +43,102 @@ const MataKuliahAdmin = ({ currentUser }) => {
   const validateForm = () => {
     const errors = {};
     
-    if (!formData.namaMataKuliah.trim()) {
-      errors.namaMataKuliah = 'Nama mata kuliah harus diisi';
+    if (!namaDosen.trim()) {
+      errors.nama = 'Nama dosen harus diisi';
     }
     
-    if (!formData.kodeMataKuliah.trim()) {
-      errors.kodeMataKuliah = 'Kode mata kuliah harus diisi';
-    } else if (!/^[A-Z]{3}\d{6}$/.test(formData.kodeMataKuliah)) {
-      errors.kodeMataKuliah = 'Format kode: 3 huruf kapital + 6 angka (contoh: AIF233101)';
+    if (!emailDosen.trim()) {
+      errors.email = 'Email harus diisi';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailDosen)) {
+      errors.email = 'Format email tidak valid';
     }
     
-    if (!formData.sks.trim()) {
-      errors.sks = 'Jumlah SKS harus diisi';
-    } else if (!/^[1-6]$/.test(formData.sks)) {
-      errors.sks = 'SKS harus berupa angka 1-6';
-    }
-    
-    // Check for duplicate code
-    const isDuplicate = mataKuliahList.some(mk => 
-      mk.kode === formData.kodeMataKuliah && mk.id !== editingId
+    // Check for duplicate email
+    const isDuplicateEmail = dosenList.some(dosen => 
+      dosen.email === emailDosen && dosen.id !== editingId
     );
-    if (isDuplicate) {
-      errors.kodeMataKuliah = 'Kode mata kuliah sudah digunakan';
+    if (isDuplicateEmail) {
+      errors.email = 'Email sudah digunakan';
+    }
+
+    // Password validation only for tambah or if password is being changed
+    if (currentView === 'tambah' || passwordDosen) {
+      if (!passwordDosen.trim()) {
+        errors.password = 'Password harus diisi';
+      } else if (passwordDosen.length < 6) {
+        errors.password = 'Password minimal 6 karakter';
+      }
+      
+      if (passwordDosen !== rePasswordDosen) {
+        errors.rePassword = 'Konfirmasi password tidak cocok';
+      }
     }
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  // Filter and sort mata kuliah
-  const filteredAndSortedMataKuliah = mataKuliahList
-    .filter(mk =>
-      mk.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      mk.kode.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .sort((a, b) => {
-      const aValue = a[sortBy];
-      const bValue = b[sortBy];
-      const comparison = aValue.toString().localeCompare(bValue.toString());
-      return sortOrder === 'asc' ? comparison : -comparison;
-    });
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    
-    // Clear error when user starts typing
-    if (formErrors[name]) {
-      setFormErrors(prev => ({ ...prev, [name]: '' }));
-    }
-  };
-
   const handleSubmit = () => {
     if (!validateForm()) return;
 
     if (currentView === 'edit' && editingId) {
-      setMataKuliahList(prev => 
-        prev.map(mk => 
-          mk.id === editingId 
-            ? { 
-                ...mk, 
-                nama: formData.namaMataKuliah, 
-                kode: formData.kodeMataKuliah,
-                sks: parseInt(formData.sks)
-              }
-            : mk
+      setDosenList(prev => 
+        prev.map(dosen => 
+          dosen.id === editingId 
+            ? { ...dosen, nama: namaDosen, email: emailDosen }
+            : dosen
         )
       );
-      showNotification('Mata kuliah berhasil diperbarui');
+      showNotification('Data dosen berhasil diperbarui');
     } else {
-      const newMataKuliah = {
-        id: Math.max(...mataKuliahList.map(mk => mk.id)) + 1,
-        nama: formData.namaMataKuliah,
-        kode: formData.kodeMataKuliah,
-        sks: parseInt(formData.sks),
-        createdAt: new Date().toISOString().split('T')[0],
-        status: 'active'
+      const newDosen = {
+        id: Math.max(...dosenList.map(d => d.id)) + 1,
+        nama: namaDosen,
+        email: emailDosen,
+        status: 'Aktif'
       };
-      setMataKuliahList(prev => [...prev, newMataKuliah]);
-      showNotification('Mata kuliah berhasil ditambahkan');
+      setDosenList(prev => [...prev, newDosen]);
+      showNotification('Dosen berhasil ditambahkan');
     }
     
     resetForm();
   };
 
   const resetForm = () => {
-    setFormData({ namaMataKuliah: '', kodeMataKuliah: '', sks: '' });
+    setNamaDosen('');
+    setEmailDosen('');
+    setPasswordDosen('');
+    setRePasswordDosen('');
     setFormErrors({});
     setEditingId(null);
     setCurrentView('daftar');
+    setShowPassword(false);
+    setShowRePassword(false);
   };
 
   const handleEdit = (id) => {
-    const mataKuliah = mataKuliahList.find(mk => mk.id === id);
-    if (mataKuliah) {
-      setFormData({
-        namaMataKuliah: mataKuliah.nama,
-        kodeMataKuliah: mataKuliah.kode,
-        sks: mataKuliah.sks.toString()
-      });
+    const dosen = dosenList.find(d => d.id === id);
+    if (dosen) {
+      setNamaDosen(dosen.nama);
+      setEmailDosen(dosen.email);
+      setPasswordDosen('');
+      setRePasswordDosen('');
       setEditingId(id);
       setCurrentView('edit');
     }
   };
 
   const handleDelete = (id) => {
-    setMataKuliahList(prev => prev.filter(mk => mk.id !== id));
-    setShowDeleteConfirm(null);
-    showNotification('Mata kuliah berhasil dihapus');
+    if (window.confirm('Apakah Anda yakin ingin menghapus dosen ini?')) {
+      setDosenList(dosenList.filter(dosen => dosen.id !== id));
+      showNotification('Dosen berhasil dihapus');
+    }
   };
 
-  const handleLogout = () => {
-    AuthService.logout();
-    navigate('/login');
-  };
+  const filteredDosen = dosenList.filter(dosen =>
+    dosen.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    dosen.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   // Notification Component
   const Notification = () => {
@@ -177,49 +162,7 @@ const MataKuliahAdmin = ({ currentUser }) => {
     );
   };
 
-  // Delete Confirmation Modal
-  const DeleteConfirmModal = () => {
-    if (!showDeleteConfirm) return null;
-    
-    const mataKuliah = mataKuliahList.find(mk => mk.id === showDeleteConfirm);
-    
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-              <Trash2 className="w-5 h-5 text-red-600" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Hapus Mata Kuliah</h3>
-              <p className="text-sm text-gray-500">Aksi ini tidak dapat dibatalkan</p>
-            </div>
-          </div>
-          
-          <p className="text-gray-700 mb-6">
-            Apakah Anda yakin ingin menghapus mata kuliah <strong>"{mataKuliah?.nama}"</strong>?
-          </p>
-          
-          <div className="flex gap-3">
-            <button
-              onClick={() => setShowDeleteConfirm(null)}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Batal
-            </button>
-            <button
-              onClick={() => handleDelete(showDeleteConfirm)}
-              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Hapus
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Header Component - Updated to match DosenPage
+  // Header Component
   const Header = () => (
     <header className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-6 py-4">
@@ -230,21 +173,22 @@ const MataKuliahAdmin = ({ currentUser }) => {
               alt="Logo Informatika UNPAR" 
               className="h-10 w-auto"
             />
+         
           </div>
           
           <nav className="flex justify-center space-x-8">
             <Link 
               to="/admin/dosen" 
-              className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-2 py-1"
+              className="text-blue-600 font-semibold relative px-2 py-1"
             >
               Dosen
+              <div className="absolute -bottom-4 left-0 right-0 h-0.5 bg-blue-600 rounded-full"></div>
             </Link>
             <Link 
               to="/admin/mata-kuliah" 
-              className="text-blue-600 font-semibold relative px-2 py-1"
+              className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-2 py-1"
             >
               Mata Kuliah
-              <div className="absolute -bottom-4 left-0 right-0 h-0.5 bg-blue-600 rounded-full"></div>
             </Link>
             <Link 
               to="/admin/tagging" 
@@ -274,17 +218,17 @@ const MataKuliahAdmin = ({ currentUser }) => {
     </header>
   );
 
-  // Stats Cards
+  // Stats Cards Component
   const StatsCards = () => (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
       <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl border border-blue-200">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-blue-600 text-sm font-medium">Total Mata Kuliah</p>
-            <p className="text-2xl font-bold text-blue-900">{mataKuliahList.length}</p>
+            <p className="text-blue-600 text-sm font-medium">Total Dosen</p>
+            <p className="text-2xl font-bold text-blue-900">{dosenList.length}</p>
           </div>
           <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
-            <BookOpen className="w-6 h-6 text-white" />
+            <Users className="w-6 h-6 text-white" />
           </div>
         </div>
       </div>
@@ -292,11 +236,11 @@ const MataKuliahAdmin = ({ currentUser }) => {
       <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-xl border border-green-200">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-green-600 text-sm font-medium">Active Courses</p>
-            <p className="text-2xl font-bold text-green-900">{mataKuliahList.filter(mk => mk.status === 'active').length}</p>
+            <p className="text-green-600 text-sm font-medium">Dosen Aktif</p>
+            <p className="text-2xl font-bold text-green-900">{dosenList.filter(dosen => dosen.status === 'Aktif').length}</p>
           </div>
           <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center">
-            <CheckCircle className="w-6 h-6 text-white" />
+            <UserCheck className="w-6 h-6 text-white" />
           </div>
         </div>
       </div>
@@ -305,7 +249,7 @@ const MataKuliahAdmin = ({ currentUser }) => {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-purple-600 text-sm font-medium">Hasil Pencarian</p>
-            <p className="text-2xl font-bold text-purple-900">{filteredAndSortedMataKuliah.length}</p>
+            <p className="text-2xl font-bold text-purple-900">{filteredDosen.length}</p>
           </div>
           <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center">
             <Filter className="w-6 h-6 text-white" />
@@ -315,26 +259,30 @@ const MataKuliahAdmin = ({ currentUser }) => {
     </div>
   );
 
-  // Daftar Mata Kuliah View
+  const handleLogout = () => {
+    AuthService.logout();
+    navigate('/login');
+  };
+
   if (currentView === 'daftar') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
         <Header />
-        
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Manajemen Mata Kuliah</h2>
-            <p className="text-gray-600">Kelola data mata kuliah dalam sistem</p>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Manajemen Dosen</h2>
+            <p className="text-gray-600">Kelola data dosen dan akun akses sistem</p>
           </div>
-          
+
           <StatsCards />
-          
+
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
               <input
                 type="text"
-                placeholder="Cari berdasarkan nama atau kode..."
+                placeholder="Cari berdasarkan nama atau email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -345,70 +293,64 @@ const MataKuliahAdmin = ({ currentUser }) => {
               className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-xl font-medium flex items-center space-x-2 transition-all transform hover:scale-105 shadow-lg hover:shadow-xl"
             >
               <Plus className="w-5 h-5" />
-              <span>Tambah Mata Kuliah</span>
+              <span>Tambah Dosen</span>
             </button>
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-200">
-              <h3 className="text-lg font-semibold text-slate-800">Daftar Mata Kuliah</h3>
-              <p className="text-sm text-slate-600 mt-1">Total: {filteredAndSortedMataKuliah.length} mata kuliah</p>
+              <h3 className="text-lg font-semibold text-slate-800">Daftar Dosen</h3>
+              <p className="text-sm text-slate-600 mt-1">Total: {filteredDosen.length} dosen</p>
             </div>
             
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Mata Kuliah</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Kode</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">SKS</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Dosen</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Email</th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
                     <th className="px-6 py-4 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {filteredAndSortedMataKuliah.map((mk) => (
-                    <tr key={mk.id} className="hover:bg-slate-50 transition-colors">
+                  {filteredDosen.map((dosen) => (
+                    <tr key={dosen.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center space-x-3">
                           <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center">
-                            <BookOpen className="w-5 h-5 text-white" />
+                            <User className="w-5 h-5 text-white" />
                           </div>
                           <div>
-                            <div className="font-medium text-slate-800">{mk.nama}</div>
+                            <div className="font-medium text-slate-800">{dosen.nama}</div>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center space-x-2">
-                          <Code className="w-4 h-4 text-slate-400" />
-                          <span className="text-slate-600 font-mono">{mk.kode}-{mk.sks.toString().padStart(2, '0')}</span>
+                          <Mail className="w-4 h-4 text-slate-400" />
+                          <span className="text-slate-600">{dosen.email}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          {mk.sks} SKS
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                          mk.status === 'active' 
+                          dosen.status === 'Aktif' 
                             ? 'bg-green-100 text-green-800' 
                             : 'bg-red-100 text-red-800'
                         }`}>
-                          {mk.status === 'active' ? 'Aktif' : 'Nonaktif'}
+                          {dosen.status}
                         </span>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex justify-center space-x-2">
                           <button 
-                            onClick={() => handleEdit(mk.id)}
+                            onClick={() => handleEdit(dosen.id)}
                             className="bg-blue-100 hover:bg-blue-200 text-blue-600 p-2 rounded-lg transition-colors"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
                           <button 
-                            onClick={() => setShowDeleteConfirm(mk.id)}
+                            onClick={() => handleDelete(dosen.id)}
                             className="bg-red-100 hover:bg-red-200 text-red-600 p-2 rounded-lg transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -424,7 +366,6 @@ const MataKuliahAdmin = ({ currentUser }) => {
         </div>
         
         <Notification />
-        <DeleteConfirmModal />
       </div>
     );
   }
@@ -443,12 +384,12 @@ const MataKuliahAdmin = ({ currentUser }) => {
             ← Kembali ke Daftar
           </button>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {currentView === 'edit' ? 'Edit Mata Kuliah' : 'Tambah Mata Kuliah'}
+            {currentView === 'edit' ? 'Edit Dosen' : 'Tambah Dosen'}
           </h1>
           <p className="text-gray-600">
             {currentView === 'edit' 
-              ? 'Perbarui informasi mata kuliah yang sudah ada' 
-              : 'Tambahkan mata kuliah baru ke dalam sistem'
+              ? 'Perbarui informasi dosen yang sudah ada' 
+              : 'Tambahkan dosen baru ke dalam sistem'
             }
           </p>
         </div>
@@ -456,87 +397,131 @@ const MataKuliahAdmin = ({ currentUser }) => {
         {/* Form */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="bg-gradient-to-r from-blue-50 to-purple-50 px-6 py-4 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">Informasi Mata Kuliah</h2>
+            <h2 className="text-xl font-semibold text-gray-900">Informasi Dosen</h2>
           </div>
           
           <div className="p-6">
             <div className="space-y-6">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Nama Mata Kuliah *
+                  Nama Dosen *
                 </label>
                 <input
                   type="text"
-                  name="namaMataKuliah"
-                  value={formData.namaMataKuliah}
-                  onChange={handleInputChange}
+                  value={namaDosen}
+                  onChange={(e) => {
+                    setNamaDosen(e.target.value);
+                    if (formErrors.nama) {
+                      setFormErrors(prev => ({ ...prev, nama: '' }));
+                    }
+                  }}
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                    formErrors.namaMataKuliah ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                    formErrors.nama ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
-                  placeholder="Contoh: Algoritma Struktur Data"
+                  placeholder="Contoh: Dr. Ahmad Susanto"
                 />
-                {formErrors.namaMataKuliah && (
+                {formErrors.nama && (
                   <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
                     <AlertCircle className="w-4 h-4" />
-                    {formErrors.namaMataKuliah}
+                    {formErrors.nama}
                   </p>
                 )}
               </div>
               
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Kode Mata Kuliah *
+                  Email *
                 </label>
                 <input
-                  type="text"
-                  name="kodeMataKuliah"
-                  value={formData.kodeMataKuliah}
-                  onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors font-mono ${
-                    formErrors.kodeMataKuliah ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                  type="email"
+                  value={emailDosen}
+                  onChange={(e) => {
+                    setEmailDosen(e.target.value);
+                    if (formErrors.email) {
+                      setFormErrors(prev => ({ ...prev, email: '' }));
+                    }
+                  }}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                    formErrors.email ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
-                  placeholder="Contoh: AIF233101"
+                  placeholder="nama@unpar.ac.id"
                 />
-                {formErrors.kodeMataKuliah && (
+                {formErrors.email && (
                   <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
                     <AlertCircle className="w-4 h-4" />
-                    {formErrors.kodeMataKuliah}
+                    {formErrors.email}
                   </p>
                 )}
-                <p className="mt-2 text-xs text-gray-500">
-                  Format: 3 huruf kapital + 6 angka (contoh: AIF233101)
-                </p>
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Jumlah SKS *
+                  Password {currentView === 'edit' ? '(Kosongkan jika tidak ingin mengubah)' : '*'}
                 </label>
-                <select
-                  name="sks"
-                  value={formData.sks}
-                  onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                    formErrors.sks ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                  }`}
-                >
-                  <option value="">Pilih jumlah SKS</option>
-                  <option value="1">1 SKS</option>
-                  <option value="2">2 SKS</option>
-                  <option value="3">3 SKS</option>
-                  <option value="4">4 SKS</option>
-                  <option value="5">5 SKS</option>
-                  <option value="6">6 SKS</option>
-                </select>
-                {formErrors.sks && (
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={passwordDosen}
+                    onChange={(e) => {
+                      setPasswordDosen(e.target.value);
+                      if (formErrors.password) {
+                        setFormErrors(prev => ({ ...prev, password: '' }));
+                      }
+                    }}
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors pr-12 ${
+                      formErrors.password ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                    }`}
+                    placeholder="Masukkan password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                {formErrors.password && (
                   <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
                     <AlertCircle className="w-4 h-4" />
-                    {formErrors.sks}
+                    {formErrors.password}
                   </p>
                 )}
-                <p className="mt-2 text-xs text-gray-500">
-                  SKS akan ditampilkan sebagai: {formData.kodeMataKuliah && formData.sks ? `${formData.kodeMataKuliah}-${formData.sks.padStart(2, '0')}` : 'KODEMATKULIAH-SS'}
-                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Konfirmasi Password {currentView === 'edit' ? '(Jika mengisi password di atas)' : '*'}
+                </label>
+                <div className="relative">
+                  <input
+                    type={showRePassword ? 'text' : 'password'}
+                    value={rePasswordDosen}
+                    onChange={(e) => {
+                      setRePasswordDosen(e.target.value);
+                      if (formErrors.rePassword) {
+                        setFormErrors(prev => ({ ...prev, rePassword: '' }));
+                      }
+                    }}
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors pr-12 ${
+                      formErrors.rePassword ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                    }`}
+                    placeholder="Ulangi password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowRePassword(!showRePassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showRePassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                {formErrors.rePassword && (
+                  <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    {formErrors.rePassword}
+                  </p>
+                )}
               </div>
             </div>
             
@@ -555,7 +540,7 @@ const MataKuliahAdmin = ({ currentUser }) => {
                 className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all font-medium flex items-center justify-center gap-2 shadow-sm"
               >
                 <Save className="w-4 h-4" />
-                {currentView === 'edit' ? 'Update Mata Kuliah' : 'Simpan Mata Kuliah'}
+                {currentView === 'edit' ? 'Update Dosen' : 'Simpan Dosen'}
               </button>
             </div>
           </div>
@@ -563,9 +548,8 @@ const MataKuliahAdmin = ({ currentUser }) => {
       </main>
       
       <Notification />
-      <DeleteConfirmModal />
     </div>
   );
 };
 
-export default MataKuliahAdmin;
+export default AdminPage;

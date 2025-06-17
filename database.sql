@@ -14,12 +14,6 @@ DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS roles CASCADE;
 DROP TABLE IF EXISTS question_sets CASCADE;
 
--- Tabel untuk menyimpan peran pengguna (admin, dosen)
-CREATE TABLE roles (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(20) NOT NULL UNIQUE
-);
-
 -- Tabel untuk menyimpan data pengguna
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
@@ -27,16 +21,10 @@ CREATE TABLE users (
     email VARCHAR(100) NOT NULL UNIQUE,
     password VARCHAR(120) NOT NULL,
     full_name VARCHAR(100) NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'ROLE_USER' CHECK (role IN ('ROLE_USER', 'ROLE_ADMIN')),
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Tabel untuk relasi many-to-many antara users dan roles
-CREATE TABLE user_roles (
-    user_id INTEGER REFERENCES users(id),
-    role_id INTEGER REFERENCES roles(id),
-    PRIMARY KEY (user_id, role_id)
 );
 
 -- Tabel untuk menyimpan mata kuliah
@@ -142,28 +130,11 @@ CREATE TABLE question_history (
     file_id INTEGER REFERENCES files(id) ON DELETE SET NULL
 );
 
--- Insert initial data
-INSERT INTO roles (id, name) VALUES 
-(1, 'ROLE_USER'),
-(2, 'ROLE_ADMIN');
-
--- Insert admin user with ID 1
-INSERT INTO users (id, username, email, password, full_name, is_active) 
-VALUES (1, 'admin', 'admin@example.com', '$2a$08$mR4MU5esBbUd6JWuwFKwUeVFjYF6Zx3zYJhPpYJ5YQJ3YJ5YQJ3YJ', 'Administrator', TRUE);
-
--- Insert second admin user with ID 2
-INSERT INTO users (id, username, email, password, full_name, is_active) 
-VALUES (2, 'admin1', 'admin1@example.com', '$2a$08$mR4MU5esBbUd6JWuwFKwUeVFjYF6Zx3zYJhPpYJ5YQJ3YJ5YQJ3YJ', 'Administrator 2', TRUE);
-
--- Insert new admin user with ID 3 (admin2)
-INSERT INTO users (id, username, email, password, full_name, is_active) 
-VALUES (3, 'admin2', 'admin2@example.com', '$2a$08$vV8m5zFdU7ZvP5aG7b8Y/.8YQZxZxZxZxZxZxZxZxZxZxZxZxZx', 'Administrator 3', TRUE);
-
--- Assign roles to users
-INSERT INTO user_roles (user_id, role_id) VALUES 
-(1, 2),  -- First admin gets ROLE_ADMIN (role_id = 2)
-(2, 2),  -- Second admin gets ROLE_ADMIN (role_id = 2)
-(3, 2);  -- New admin2 gets ROLE_ADMIN (role_id = 2)
+-- Insert admin users
+INSERT INTO users (id, username, email, password, full_name, role, is_active) VALUES 
+(1, 'admin', 'admin@example.com', '$2a$08$mR4MU5esBbUd6JWuwFKwUeVFjYF6Zx3zYJhPpYJ5YQJ3YJ5YQJ3YJ', 'Administrator', 'ROLE_ADMIN', TRUE),
+(2, 'admin1', 'admin1@example.com', '$2a$08$mR4MU5esBbUd6JWuwFKwUeVFjYF6Zx3zYJhPpYJ5YQJ3YJ5YQJ3YJ', 'Administrator 2', 'ROLE_ADMIN', TRUE),
+(3, 'admin2', 'admin2@example.com', '$2a$08$vV8m5zFdU7ZvP5aG7b8Y/.8YQZxZxZxZxZxZxZxZxZxZxZxZxZx', 'Administrator 3', 'ROLE_ADMIN', TRUE);
 
 -- Memasukkan beberapa data awal untuk testing
 INSERT INTO course_tags (name) VALUES 
@@ -197,6 +168,14 @@ INSERT INTO question_sets (title, description, subject, year, level, lecturer, t
 ('UAS Algoritma Semester 1', 'Ujian Akhir Semester Algoritma dan Pemrograman', 'Algoritma dan Pemrograman', 2023, 'Sedang', 'Dosen 1', 'Array, Sorting, Searching', 1),
 ('UTS Struktur Data', 'Ujian Tengah Semester Struktur Data', 'Struktur Data', 2023, 'Sulit', 'Dosen 2', 'Linked List, Stack, Queue', 1),
 ('Quiz Basis Data', 'Quiz Basis Data Dasar', 'Basis Data', 2023, 'Mudah', 'Dosen 3', 'SQL, Normalisasi', 1);
+
+
+UPDATE users 
+SET password = '$2a$08$mR4MU5esBbUd6JWuwFKwUeVFjYF6Zx3zYJhPpYJ5YQJ3YJ5YQJ3YJ' 
+WHERE email = 'admin1@example.com';
+
+INSERT INTO users (username, email, password, full_name, role, is_active) 
+VALUES ('jonathan', 'jonathan@example.com', '$2a$08$mR4MU5esBbUd6JWuwFKwUeVFjYF6Zx3zYJhPpYJ5YQJ3YJ5YQJ3YJ', 'Jonathan', 'ROLE_USER', TRUE);
 
 -- Membuat indeks untuk optimasi query
 CREATE INDEX idx_files_question_set_id ON files(question_set_id);

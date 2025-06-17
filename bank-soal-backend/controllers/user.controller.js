@@ -1,7 +1,7 @@
 const db = require("../models");
 const User = db.user;
-const Role = db.role;
 const bcrypt = require("bcryptjs");
+const Op = db.Sequelize.Op;
 
 // Admin creates a new user (since you mentioned no self-signup)
 exports.createUser = async (req, res) => {
@@ -13,24 +13,9 @@ exports.createUser = async (req, res) => {
       email: req.body.email,
       password: bcrypt.hashSync(req.body.password, 8),
       fullName: req.body.fullName,
+      role: req.body.role || 'ROLE_USER',
       department: req.body.department
     });
-
-    // Assign roles
-    if (req.body.roles) {
-      const roles = await Role.findAll({
-        where: {
-          name: {
-            [Op.or]: req.body.roles
-          }
-        }
-      });
-      await user.setRoles(roles);
-    } else {
-      // Default role is "user"
-      const role = await Role.findOne({ where: { name: "user" } });
-      await user.setRoles([role]);
-    }
 
     res.send({ message: "User was registered successfully!" });
   } catch (error) {
@@ -41,12 +26,7 @@ exports.createUser = async (req, res) => {
 exports.getAllUsers = async (req, res) => {
   try {
     const users = await User.findAll({
-      attributes: ['id', 'username', 'email', 'fullName', 'department', 'isActive'],
-      include: [{
-        model: Role,
-        attributes: ['name'],
-        through: { attributes: [] }
-      }]
+      attributes: ['id', 'username', 'email', 'fullName', 'role', 'department', 'isActive']
     });
     
     res.status(200).send(users);
@@ -68,21 +48,10 @@ exports.updateUser = async (req, res) => {
     // Update user fields
     if (req.body.fullName) user.fullName = req.body.fullName;
     if (req.body.department) user.department = req.body.department;
+    if (req.body.role) user.role = req.body.role;
     if (req.body.isActive !== undefined) user.isActive = req.body.isActive;
     if (req.body.password) {
       user.password = bcrypt.hashSync(req.body.password, 8);
-    }
-    
-    // Update roles if provided
-    if (req.body.roles) {
-      const roles = await Role.findAll({
-        where: {
-          name: {
-            [Op.or]: req.body.roles
-          }
-        }
-      });
-      await user.setRoles(roles);
     }
     
     await user.save();

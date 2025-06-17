@@ -10,20 +10,49 @@ import AuthService from './services/auth.service';
 import QuestionSets from './pages/QuestionSets';
 import MataKuliahAdmin from './pages/admin/MataKuliahAdmin';
 import TaggingAdmin from './pages/admin/TaggingAdmin';
+import AdminPage from './pages/admin/AdminPage';
 import QuestionPreview from './pages/QuestionPreview';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(undefined);
+  const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
+    // Check for user in localStorage on app start
     const user = AuthService.getCurrentUser();
     if (user) {
       setCurrentUser(user);
     }
+    setIsLoading(false);
+  }, []);
+
+  // Listen for storage changes (when user logs in/out in another tab)
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'user') {
+        if (e.newValue) {
+          setCurrentUser(JSON.parse(e.newValue));
+        } else {
+          setCurrentUser(undefined);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   // Protected Route component for regular users
   const ProtectedRoute = ({ children }) => {
+    if (isLoading) {
+      return <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>;
+    }
+    
     if (!currentUser) {
       return <Navigate to="/login" />;
     }
@@ -32,6 +61,15 @@ export default function App() {
 
   // Protected Route component for admin users
   const AdminRoute = ({ children }) => {
+    if (isLoading) {
+      return <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>;
+    }
+    
     if (!currentUser) {
       return <Navigate to="/login" />;
     }
@@ -76,28 +114,33 @@ export default function App() {
         {/* Admin Protected Routes */}
         <Route path="/admin" element={
           <AdminRoute>
-            <Navigate to="/admin/mata-kuliah" />
+            <Navigate to="/admin/dosen" />
           </AdminRoute>
         } />
+        
+        {/* Admin Dosen Management */}
+        <Route path="/admin/dosen" element={
+          <AdminRoute>
+            <AdminPage currentUser={currentUser} />
+          </AdminRoute>
+        } />
+        
+        {/* Admin Mata Kuliah Management */}
         <Route path="/admin/mata-kuliah" element={
           <AdminRoute>
             <MataKuliahAdmin currentUser={currentUser} />
           </AdminRoute>
         } />
-        <Route path="/admin/dosen" element={
-          <AdminRoute>
-            {/* Komponen DosenAdmin akan dibuat nanti */}
-            <div className="p-8 text-center">
-              <h1 className="text-2xl font-bold">Halaman Dosen Admin</h1>
-              <p className="text-gray-600 mt-2">Coming Soon...</p>
-            </div>
-          </AdminRoute>
-        } />
+        
+        {/* Admin Tagging Management */}
         <Route path="/admin/tagging" element={
           <AdminRoute>
             <TaggingAdmin currentUser={currentUser} />
           </AdminRoute>
         } />
+        
+        {/* Question Preview Route */}
+        <Route path="/preview/:id" element={<QuestionPreview currentUser={currentUser} />} />
         
         {/* 404 Route */}
         <Route path="*" element={
@@ -111,8 +154,6 @@ export default function App() {
             </div>
           </div>
         } />
-        {/* Tambahkan route baru untuk preview soal */}
-        <Route path="/preview/:id" element={<QuestionPreview currentUser={currentUser} />} />
       </Routes>
     </Router>
   );

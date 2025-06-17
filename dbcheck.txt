@@ -1,0 +1,25 @@
+﻿
+
+StatusCode        : 200
+StatusDescription : OK
+Content           : {"message":"Database check successful","users":[{"id":1,"username":"admin","email":"adm
+                    in@example.com","password":"$2b$08$.P....","roles":["ROLE_ADMIN"]},{"id":2,"username":"
+                    admin1","email":"admin1@ex...
+RawContent        : HTTP/1.1 200 OK
+                    Access-Control-Allow-Origin: http://localhost:5173
+                    Vary: Origin
+                    Access-Control-Allow-Headers: x-access-token, Origin, Content-Type, Accept
+                    Connection: keep-alive
+                    Keep-Alive: timeo...
+Forms             : {}
+Headers           : {[Access-Control-Allow-Origin, http://localhost:5173], [Vary, Origin], 
+                    [Access-Control-Allow-Headers, x-access-token, Origin, Content-Type, Accept], 
+                    [Connection, keep-alive]...}
+Images            : {}
+InputFields       : {}
+Links             : {}
+ParsedHtml        : mshtml.HTMLDocumentClass
+RawContentLength  : 359
+
+
+

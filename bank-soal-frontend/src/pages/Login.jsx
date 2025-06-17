@@ -34,12 +34,14 @@ const LoginPage = ({ setCurrentUser }) => {
                 // Update current user in parent component
                 setCurrentUser(response);
                 
-                // Redirect based on role
-                if (response.roles && response.roles.includes('ROLE_ADMIN')) {
-                    navigate('/admin');
-                } else {
-                    navigate('/');
-                }
+                // Paksa reload agar App membaca user baru dari localStorage
+                setTimeout(() => {
+                    if (response.roles && response.roles.includes('ROLE_ADMIN')) {
+                        navigate('/admin/dosen');
+                    } else {
+                        navigate('/');
+                    }
+                }, 100); // beri delay kecil agar state update
             })
             .catch(error => {
                 setIsLoading(false);
