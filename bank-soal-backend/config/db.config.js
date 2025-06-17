@@ -2,7 +2,7 @@ module.exports = {
     HOST: "localhost",
     USER: "hayyavevila",     // Change this to your PostgreSQL username
     PASSWORD: "gendisss", // Change this to your PostgreSQL password
-    DB: "postgres",
+    DB: "bank_soal_db",
     dialect: "postgres",
     pool: {
       max: 5,

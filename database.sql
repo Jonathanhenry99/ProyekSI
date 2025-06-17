@@ -124,7 +124,7 @@ INSERT INTO roles (name) VALUES ('ROLE_DOSEN');
 
 -- Memasukkan data awal untuk admin (password harus di-hash pada implementasi sebenarnya)
 INSERT INTO users (username, email, password, full_name, is_active) 
-VALUES ('admin', 'admin@example.com', 'admin123', 'Administrator', TRUE);
+VALUES ('admin', 'dosen@example.com', 'dosen123', 'Dosen', TRUE);
 
 -- Menetapkan peran admin
 INSERT INTO user_roles (user_id, role_id) 
@@ -135,3 +135,6 @@ from users
 
 -- Gunakan password yang sudah di-hash dengan bcrypt
 UPDATE users SET password = 'admin123' WHERE email = 'admin@example.com';
+
+INSERT INTO users (username, email, password, full_name, is_active) 
+VALUES ('dosen', 'jon@example.com', 'jon123', 'Dosen', TRUE);
