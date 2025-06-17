@@ -8,30 +8,88 @@ import History from './pages/History';
 import Login from './pages/Login';
 import AuthService from './services/auth.service';
 import QuestionSets from './pages/QuestionSets';
+import MataKuliahAdmin from './pages/admin/MataKuliahAdmin';
+import TaggingAdmin from './pages/admin/TaggingAdmin';
+import AdminPage from './pages/admin/AdminPage';
+import QuestionPreview from './pages/QuestionPreview';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(undefined);
+  const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
+    // Check for user in localStorage on app start
     const user = AuthService.getCurrentUser();
     if (user) {
       setCurrentUser(user);
     }
+    setIsLoading(false);
   }, []);
 
-  // Protected Route component
+  // Listen for storage changes (when user logs in/out in another tab)
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'user') {
+        if (e.newValue) {
+          setCurrentUser(JSON.parse(e.newValue));
+        } else {
+          setCurrentUser(undefined);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  // Protected Route component for regular users
   const ProtectedRoute = ({ children }) => {
+    if (isLoading) {
+      return <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>;
+    }
+    
     if (!currentUser) {
       return <Navigate to="/login" />;
     }
     return children;
   };
 
+  // Protected Route component for admin users
+  const AdminRoute = ({ children }) => {
+    if (isLoading) {
+      return <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>;
+    }
+    
+    if (!currentUser) {
+      return <Navigate to="/login" />;
+    }
+    
+    // Check if user has admin role
+    if (!currentUser.roles || !currentUser.roles.includes('ROLE_ADMIN')) {
+      return <Navigate to="/" />;
+    }
+    
+    return children;
+  };
+
   return (
     <Router>
       <Routes>
+        {/* Public Routes */}
         <Route path="/" element={<Home currentUser={currentUser} />} />
         <Route path="/login" element={<Login setCurrentUser={setCurrentUser} />} />
+        
+        {/* User Protected Routes */}
         <Route path="/search" element={
           <ProtectedRoute>
             <Search currentUser={currentUser} />
@@ -52,7 +110,50 @@ export default function App() {
             <QuestionSets currentUser={currentUser} />
           </ProtectedRoute>
         } />
-        {/* Hapus rute /history */}
+        
+        {/* Admin Protected Routes */}
+        <Route path="/admin" element={
+          <AdminRoute>
+            <Navigate to="/admin/dosen" />
+          </AdminRoute>
+        } />
+        
+        {/* Admin Dosen Management */}
+        <Route path="/admin/dosen" element={
+          <AdminRoute>
+            <AdminPage currentUser={currentUser} />
+          </AdminRoute>
+        } />
+        
+        {/* Admin Mata Kuliah Management */}
+        <Route path="/admin/mata-kuliah" element={
+          <AdminRoute>
+            <MataKuliahAdmin currentUser={currentUser} />
+          </AdminRoute>
+        } />
+        
+        {/* Admin Tagging Management */}
+        <Route path="/admin/tagging" element={
+          <AdminRoute>
+            <TaggingAdmin currentUser={currentUser} />
+          </AdminRoute>
+        } />
+        
+        {/* Question Preview Route */}
+        <Route path="/preview/:id" element={<QuestionPreview currentUser={currentUser} />} />
+        
+        {/* 404 Route */}
+        <Route path="*" element={
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="text-center">
+              <h1 className="text-4xl font-bold text-gray-800">404</h1>
+              <p className="text-gray-600 mt-2">Halaman tidak ditemukan</p>
+              <a href="/" className="text-blue-600 hover:underline mt-4 inline-block">
+                Kembali ke Home
+              </a>
+            </div>
+          </div>
+        } />
       </Routes>
     </Router>
   );

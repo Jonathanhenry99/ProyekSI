@@ -24,13 +24,16 @@ module.exports = (sequelize, Sequelize) => {
       allowNull: false
     },
     fullName: {
-      type: Sequelize.STRING
+      type: Sequelize.STRING,
+      allowNull: false
     },
-    department: {
-      type: Sequelize.STRING
-    },
-    profilePicture: {
-      type: Sequelize.STRING
+    role: {
+      type: Sequelize.STRING,
+      allowNull: false,
+      defaultValue: 'ROLE_USER',
+      validate: {
+        isIn: [['ROLE_USER', 'ROLE_ADMIN']]
+      }
     },
     isActive: {
       type: Sequelize.BOOLEAN,

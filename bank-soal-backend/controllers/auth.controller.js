@@ -33,6 +33,7 @@ exports.signin = async (req, res) => {
     console.log("User found:", {
       id: user.id,
       email: user.email,
+      role: user.role,
       passwordInDB: user.password.substring(0, 10) + "..." // Hanya tampilkan sebagian untuk keamanan
     });
     console.log("Password from request:", req.body.password);
@@ -70,16 +71,10 @@ exports.signin = async (req, res) => {
       expiresIn: config.jwtExpiration || 86400 // Default ke 24 jam jika tidak ada konfigurasi
     });
 
-    // Ambil peran user
+    // Ambil role user langsung dari kolom role
     let authorities = [];
-    try {
-      const roles = await user.getRoles();
-      for (let i = 0; i < roles.length; i++) {
-        authorities.push("ROLE_" + roles[i].name.toUpperCase());
-      }
-    } catch (error) {
-      console.error("Error getting user roles:", error);
-      // Jika gagal mendapatkan peran, tetap lanjutkan dengan array kosong
+    if (user.role) {
+      authorities.push(user.role);
     }
 
     // Kirim respons dengan data user dan token
@@ -98,31 +93,27 @@ exports.signin = async (req, res) => {
   }
 };
 
-// Tambahkan fungsi ini untuk testing
-exports.resetAdminPassword = async (req, res) => {
+// Debug endpoint to check database status
+exports.checkDatabase = async (req, res) => {
   try {
-    // Cari user admin
-    const admin = await User.findOne({
-      where: {
-        email: "admin@example.com" // Sesuaikan dengan email admin Anda
-      }
+    // Check users table
+    const users = await User.findAll({
+      attributes: ['id', 'username', 'email', 'password', 'role', 'is_active']
     });
 
-    if (!admin) {
-      return res.status(404).send({ message: "Admin tidak ditemukan." });
-    }
-
-    // Reset password ke "admin123" dengan bcrypt
-    const hashedPassword = bcrypt.hashSync("admin123", 8);
-    admin.password = hashedPassword;
-    await admin.save();
-
-    res.status(200).send({ 
-      message: "Password admin berhasil direset!",
-      // Tampilkan hash untuk verifikasi (hanya untuk debugging)
-      hash: hashedPassword
+    res.status(200).send({
+      message: "Database check successful",
+      users: users.map(user => ({
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        password: user.password.substring(0, 10) + "...", // Only show part of password
+        role: user.role,
+        is_active: user.is_active
+      }))
     });
   } catch (error) {
+    console.error("Error checking database:", error);
     res.status(500).send({ message: error.message });
   }
 };
