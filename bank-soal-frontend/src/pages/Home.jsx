@@ -78,27 +78,6 @@ const HeroSection = () => {
             >
               Atur, Kelola, dan Akses Soal dengan Mudah dan Terstruktur            </motion.p>
 
-            <motion.div
-              className="flex flex-col sm:flex-row gap-4 pt-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.7, duration: 1 }}
-            >
-              <motion.button
-                className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-300"
-                whileHover={{ scale: 1.05, boxShadow: '0 0 15px rgba(59, 130, 246, 0.6)' }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Mulai Belajar
-              </motion.button>
-              <motion.button
-                className="px-8 py-3 bg-white text-blue-600 border border-blue-600 hover:bg-blue-50 rounded-lg font-medium transition-all duration-300"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Tentang Kami
-              </motion.button>
-            </motion.div>
           </motion.div>
 
           <motion.div
