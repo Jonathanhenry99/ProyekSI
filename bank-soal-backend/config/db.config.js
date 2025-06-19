@@ -11,4 +11,4 @@ module.exports = {
       idle: 10000
     }
   };
-  
+  git add bank-soal-backend/config/db.config.js

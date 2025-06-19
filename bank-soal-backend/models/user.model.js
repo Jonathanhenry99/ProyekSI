@@ -1,4 +1,4 @@
-// Pastikan definisi model seperti ini
+// models/user.model.js
 module.exports = (sequelize, Sequelize) => {
   const User = sequelize.define("users", {
     id: {
@@ -6,7 +6,7 @@ module.exports = (sequelize, Sequelize) => {
       primaryKey: true,
       autoIncrement: true
     },
-    username: {
+    username: { // Assuming username is same as email for dosen
       type: Sequelize.STRING,
       allowNull: false,
       unique: true
@@ -23,7 +23,7 @@ module.exports = (sequelize, Sequelize) => {
       type: Sequelize.STRING,
       allowNull: false
     },
-    fullName: {
+    fullName: { // Changed to fullName for consistency with camelCase in JS
       type: Sequelize.STRING,
       allowNull: false
     },
@@ -35,12 +35,12 @@ module.exports = (sequelize, Sequelize) => {
         isIn: [['ROLE_USER', 'ROLE_ADMIN']]
       }
     },
-    isActive: {
+    isActive: { // Changed to isActive for consistency with camelCase in JS
       type: Sequelize.BOOLEAN,
       defaultValue: true
     }
   }, {
-    underscored: true, // Menggunakan snake_case untuk nama kolom
+    underscored: true, // This will map fullName to full_name and isActive to is_active in DB
     createdAt: 'created_at',
     updatedAt: 'updated_at'
   });
