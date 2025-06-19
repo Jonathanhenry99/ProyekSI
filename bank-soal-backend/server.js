@@ -36,6 +36,7 @@ const courseTagRoutes = require('./routes/courseTag.routes');
 const questionSetRoutes = require('./routes/questionSet.routes');
 const fileRoutes = require('./routes/file.routes');
 const dosenRoutes = require('./routes/dosen.routes'); // <-- Import route dosen baru
+const materialRoutes = require('./routes/materialTag.routes'); // <-- Import route dosen baru
 
 authRoutes(app);
 userRoutes(app);
@@ -43,6 +44,7 @@ courseTagRoutes(app);
 questionSetRoutes(app);
 fileRoutes(app);
 dosenRoutes(app); // <-- Gunakan route dosen baru
+materialRoutes(app)
 
 // Set port and start server
 const PORT = process.env.PORT || 8080;
