@@ -170,7 +170,7 @@ const AdminPage = ({ currentUser }) => {
     const email = dosen.email || '';
 
     return nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           email.toLowerCase().includes(searchTerm.toLowerCase());
+      email.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
   // Komponen Notifikasi (Reusable)
@@ -180,8 +180,8 @@ const AdminPage = ({ currentUser }) => {
     return (
       <div className="fixed top-4 right-4 z-50">
         <div className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border ${notification.type === 'success'
-            ? 'bg-green-50 text-green-800 border-green-200'
-            : 'bg-red-50 text-red-800 border-red-200'
+          ? 'bg-green-50 text-green-800 border-green-200'
+          : 'bg-red-50 text-red-800 border-red-200'
           }`}>
           {notification.type === 'success' ? (
             <CheckCircle className="w-5 h-5" />
@@ -231,10 +231,7 @@ const AdminPage = ({ currentUser }) => {
           </nav>
 
           <div className="flex items-center justify-end space-x-4">
-            <span className="text-gray-700 font-medium">
-              {/* Ini bisa diganti dengan nama admin dari currentUser jika ada */}
-              Admin XXYY
-            </span>
+            <span className="text-gray-700 font-medium">{currentUser?.username || 'Admin'}</span>
             <div className="flex items-center space-x-2">
               <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
                 <User className="w-5 h-5 text-white" />
@@ -373,8 +370,8 @@ const AdminPage = ({ currentUser }) => {
                         </td>
                         <td className="px-6 py-4">
                           <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${dosen.status === 'Aktif'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
                             }`}>
                             {dosen.status}
                           </span>
