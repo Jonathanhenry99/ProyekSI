@@ -258,6 +258,7 @@ const UploadPage = ({ currentUser }) => {
       
       // 2. Upload files
       const uploadPromises = [];
+      const uploadedFileIds = [];
       
       for (const [category, file] of Object.entries(files)) {
         if (file) {
@@ -266,20 +267,42 @@ const UploadPage = ({ currentUser }) => {
           formData.append('questionSetId', questionSetId);
           formData.append('fileCategory', category);
           
-          uploadPromises.push(
-            axios.post(`${API_URL}/files/upload`, formData, {
-              headers: {
-                'Content-Type': 'multipart/form-data',
-                'x-access-token': token
-              }
-            })
-          );
+          const uploadResponse = await axios.post(`${API_URL}/files/upload`, formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+              'x-access-token': token
+            }
+          });
+          
+          // Simpan ID file yang diupload
+          if (uploadResponse.data && uploadResponse.data.id) {
+            uploadedFileIds.push(uploadResponse.data.id);
+          }
         }
       }
       
-      await Promise.all(uploadPromises);
+      // 3. Buat paket soal baru yang terhubung dengan question set
+      await axios.post(
+        `${API_URL}/paketsoal`,
+        {
+          title: metadata.title,
+          description: metadata.description,
+          subject: metadata.subject,
+          year: metadata.year,
+          level: metadata.difficulty,
+          lecturer: metadata.lecturer,
+          topics: metadata.topics.map(topic => topic.name).join(', '),
+          files: uploadedFileIds // Menghubungkan file yang diupload dengan paket soal
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'x-access-token': token
+          }
+        }
+      );
       
-      setSuccess("Soal berhasil diupload!");
+      setSuccess("Soal berhasil diupload dan ditambahkan ke paket soal!");
       
       // Reset form
       setFiles({

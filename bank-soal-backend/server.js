@@ -4,12 +4,12 @@ const db = require("./models"); // Import your Sequelize setup
 
 const app = express();
 
-// Configure CORS
-const corsOptions = {
-    origin: "http://localhost:5173" // URL aplikasi React Anda
-};
 
-app.use(cors(corsOptions));
+// Configure CORS
+app.use(cors({
+    origin: "http://localhost:5173", // Frontend URL
+    credentials: true // PENTING: Enable credentials
+}));
 
 // Parse JSON requests
 app.use(express.json());
@@ -37,6 +37,7 @@ const questionSetRoutes = require('./routes/questionSet.routes');
 const fileRoutes = require('./routes/file.routes');
 const dosenRoutes = require('./routes/dosen.routes'); // <-- Import route dosen baru
 const materialRoutes = require('./routes/materialTag.routes'); // <-- Import route dosen baru
+const paketSoalRoutes = require('./routes/paketSoal.routes');
 
 authRoutes(app);
 userRoutes(app);
@@ -45,6 +46,7 @@ questionSetRoutes(app);
 fileRoutes(app);
 dosenRoutes(app); // <-- Gunakan route dosen baru
 materialRoutes(app)
+paketSoalRoutes(app)
 
 // Set port and start server
 const PORT = process.env.PORT || 8080;

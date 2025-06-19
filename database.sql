@@ -13,6 +13,7 @@ DROP TABLE IF EXISTS user_roles CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS roles CASCADE;
 DROP TABLE IF EXISTS question_sets CASCADE;
+DROP TABLE IF EXISTS paket_soal CASCADE;
 
 -- Tabel untuk menyimpan data pengguna
 CREATE TABLE users (
@@ -80,8 +81,10 @@ CREATE TABLE files (
     filesize INTEGER NOT NULL,
     filecategory VARCHAR(50) NOT NULL CHECK (filecategory IN ('questions', 'answers', 'testCases')),
     question_set_id INTEGER REFERENCES question_sets(id) ON DELETE CASCADE,
+    paket_soal_id INT REFERENCES paket_soal(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_paket_soal FOREIGN KEY (paket_soal_id) REFERENCES paket_soal(id)
 );
 
 -- Tabel untuk menyimpan soal individual
@@ -128,6 +131,22 @@ CREATE TABLE question_history (
     action_type VARCHAR(50) NOT NULL CHECK (action_type IN ('view', 'download', 'edit', 'delete')),
     action_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     file_id INTEGER REFERENCES files(id) ON DELETE SET NULL
+);
+
+-- Tabel untuk menyimpan paket soal
+CREATE TABLE paket_soal (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    subject VARCHAR(255) NOT NULL,
+    year INT,
+    level VARCHAR(50),
+    lecturer VARCHAR(255),
+    topics TEXT,
+    downloads INT DEFAULT 0,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Insert admin users

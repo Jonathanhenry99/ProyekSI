@@ -412,6 +412,22 @@ const QuestionPreview = ({ currentUser }) => {
                 </div>
                 <div className="p-4">
                   {renderFilePreview(file)}
+                  {/* File History Table */}
+                  <div className="mt-4">
+                    <h4 className="text-md font-semibold mb-2 text-gray-800">Riwayat File</h4>
+                    <table className="min-w-max w-full table-auto text-sm border border-gray-200 rounded-lg overflow-hidden">
+                      <tbody>
+                        <tr className="border-b border-gray-100">
+                          <td className="px-3 py-2 font-medium text-gray-600">Dibuat</td>
+                          <td className="px-3 py-2 text-gray-800">{file.created_at ? new Date(file.created_at).toLocaleString('id-ID', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                        </tr>
+                        <tr>
+                          <td className="px-3 py-2 font-medium text-gray-600">Terakhir Diperbarui</td>
+                          <td className="px-3 py-2 text-gray-800">{file.updated_at ? new Date(file.updated_at).toLocaleString('id-ID', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             ))

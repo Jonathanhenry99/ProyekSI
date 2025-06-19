@@ -9,42 +9,10 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import EnhancedMarkdownEditor from '../components/EnhancedMarkdownEditor';
 import { Link } from "react-router-dom";
 import Header from '../components/Header';
+import axios from 'axios';
+import PaketSoalService from "../services/paketSoal.service";
 
-// Sample data for question bank
-const sampleQuestions = [
-    {
-        id: 1,
-        question: "Jelaskan konsep inheritance dalam pemrograman berorientasi objek?",
-        subject: "Pemrograman Berorientasi Objek",
-        difficulty: "Sedang",
-        type: "Essay",
-        lecturer: "Dr. Ahmad Fauzi"
-    },
-    {
-        id: 2,
-        question: "Buatlah program Java untuk menghitung bilangan Fibonacci dengan pendekatan rekursif dan iteratif!",
-        subject: "Algoritma dan Pemrograman",
-        difficulty: "Sulit",
-        type: "Coding",
-        lecturer: "Prof. Budi Santoso"
-    },
-    {
-        id: 3,
-        question: "Apa perbedaan antara stack dan queue? Berikan contoh implementasinya!",
-        subject: "Struktur Data",
-        difficulty: "Mudah",
-        type: "Essay",
-        lecturer: "Dr. Citra Dewi"
-    },
-    {
-        id: 4,
-        question: "Jelaskan langkah-langkah normalsiasi database sampai bentuk 3NF!",
-        subject: "Basis Data",
-        difficulty: "Sedang",
-        type: "Essay",
-        lecturer: "Dr. Ahmad Fauzi"
-    },
-];
+const API_URL = "http://localhost:8080/api";
 
 const FormCreatorPage = ({ currentUser }) => {
     const [formTitle, setFormTitle] = useState("Untitled Form");
@@ -54,7 +22,8 @@ const FormCreatorPage = ({ currentUser }) => {
     const [isSearching, setIsSearching] = useState(false);
     const [showMarkdownEditor, setShowMarkdownEditor] = useState(false);
     const [markdownContent, setMarkdownContent] = useState("");
-    const [filteredQuestions, setFilteredQuestions] = useState(sampleQuestions);
+    const [questionBank, setQuestionBank] = useState([]);
+    const [filteredQuestions, setFilteredQuestions] = useState([]);
     const markdownEditorRef = useRef(null);
     
     // State untuk tag mata kuliah
@@ -99,10 +68,6 @@ const FormCreatorPage = ({ currentUser }) => {
         setSelectedMaterialTags(newTags);
     };
     
-    // Tambahkan juga import untuk ikon X
-    // import { X } from 'lucide-react';
-
-
     // State for drag and drop
     const [draggedItemIndex, setDraggedItemIndex] = useState(null);
     const [dragOverItemIndex, setDragOverItemIndex] = useState(null);
@@ -158,13 +123,43 @@ const FormCreatorPage = ({ currentUser }) => {
         setSelectedQuestions(newQuestions);
     };
 
-    // Handle search functionality
+    // Fetch real question files from backend (like Search.jsx)
+    React.useEffect(() => {
+        const fetchQuestions = async () => {
+            try {
+                const response = await axios.get(`${API_URL}/questionsets`);
+                // Transform data to match question bank format
+                const transformed = response.data.map(item => ({
+                    id: item.id,
+                    question: item.title, // Use title as question name
+                    subject: item.subject,
+                    difficulty: item.level,
+                    type: 'File', // or item.type if available
+                    lecturer: item.lecturer || (item.creator ? (item.creator.fullName || item.creator.username) : 'Unknown'),
+                    fileName: item.title,
+                    year: item.year,
+                    topics: item.topics ? item.topics.split(',').map(t => t.trim()) : [],
+                    downloads: item.downloads || 0,
+                    lastUpdated: item.lastupdated || item.updated_at,
+                    description: item.description || ''
+                }));
+                setQuestionBank(transformed);
+                setFilteredQuestions(transformed);
+            } catch (err) {
+                setQuestionBank([]);
+                setFilteredQuestions([]);
+            }
+        };
+        fetchQuestions();
+    }, []);
+
+    // Update search to use questionBank
     const handleSearch = () => {
         setIsSearching(true);
-        const results = sampleQuestions.filter(q =>
-            q.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            q.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            q.lecturer.toLowerCase().includes(searchTerm.toLowerCase())
+        const results = questionBank.filter(q =>
+            (q.question && q.question.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (q.subject && q.subject.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (q.lecturer && q.lecturer.toLowerCase().includes(searchTerm.toLowerCase()))
         );
         setFilteredQuestions(results);
     };
@@ -188,30 +183,58 @@ const FormCreatorPage = ({ currentUser }) => {
     };
 
     // Download all selected questions
-    const handleDownload = () => {
-        const questionsText = selectedQuestions.map((q, index) =>
-            `${index + 1}. ${q.question}\n   Mata Kuliah: ${q.subject}\n   Tingkat Kesulitan: ${q.difficulty}\n   Dosen: ${q.lecturer}\n\n`
-        ).join('');
+    const handleDownload = async () => {
+        try {
+            // Log untuk debugging
+            console.log("Selected Questions:", selectedQuestions);
 
-        const blob = new Blob([`${formTitle}\n${formDescription}\n\nDAFTAR SOAL:\n\n${questionsText}`], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${formTitle.replace(/\s+/g, '_')}.txt`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+            // Siapkan data untuk paket soal
+            const paketSoalData = {
+                title: selectedQuestions[0]?.title || "Untitled Form",
+                description: "Paket soal gabungan",
+                subject: selectedQuestions[0]?.subject || "Informatika",
+                year: new Date().getFullYear(),
+                level: "Gabungan",
+                lecturer: currentUser?.username || "Unknown",
+                topics: selectedQuestions.map(q => q.topics).join(", "),
+                files: selectedQuestions.map(q => q.id) // array of file IDs
+            };
 
-        // Show download animation
-        const notification = document.createElement('div');
-        notification.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-blue-600 text-white px-8 py-4 rounded-xl shadow-2xl z-50 flex items-center gap-3';
-        notification.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-circle"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> File berhasil diunduh!';
-        document.body.appendChild(notification);
+            console.log("Sending paket soal data:", paketSoalData);
 
-        setTimeout(() => {
-            notification.remove();
-        }, 2000);
+            // Kirim ke backend
+            const response = await axios.post(
+                "http://localhost:8080/api/paketsoal", 
+                paketSoalData,
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-access-token': currentUser?.accessToken
+                    }
+                }
+            );
+
+            console.log("Response from backend:", response.data);
+
+            if (response.data) {
+                // Download files
+                selectedQuestions.forEach(question => {
+                    window.open(`http://localhost:8080/api/files/download/${question.id}`, '_blank');
+                });
+
+                // Reset selection
+                setSelectedQuestions([]);
+                
+                // Tampilkan pesan sukses
+                alert("Paket soal berhasil disimpan dan diunduh!");
+                
+                // Optional: Redirect ke halaman QuestionSets
+                window.location.href = '/paket-soal';
+            }
+        } catch (error) {
+            console.error("Error creating paket soal:", error);
+            alert(`Gagal menyimpan paket soal: ${error.response?.data?.message || error.message}`);
+        }
     };
 
     return (
@@ -224,7 +247,7 @@ const FormCreatorPage = ({ currentUser }) => {
                     animate={{ opacity: 1, y: 0 }}
                     className="text-center mb-8"
                 >
-                    <h1 className="text-4xl font-bold mb-4 text-gray-900">Pembuat Form Soal</h1>
+                    <h1 className="text-4xl font-bold mb-4 text-gray-900">Pembuat Paket Soal</h1>
                     <p className="text-xl text-gray-600">Susun dan atur soal-soal untuk ujian atau tugas</p>
                 </motion.div>
 
@@ -321,7 +344,7 @@ const FormCreatorPage = ({ currentUser }) => {
                                     <Database className="w-5 h-5 text-blue-500" />
                                     Bank Soal
                                 </h2>
-                                <button className="flex items-center gap-1 px-3 py-1 bg-gray-900 text-white rounded-lg text-sm">
+                                <button className="flex items-center gap-1 px-3 py-1 bg-blue-700 text-white rounded-lg text-sm">
                                     <ChevronDown className="w-4 h-4" />
                                     Filter Lanjutan
                                 </button>
@@ -340,180 +363,42 @@ const FormCreatorPage = ({ currentUser }) => {
                             </div>
 
                             {/* Question Grid Layout */}
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                                {/* Watering Grass */}
-                                <motion.div 
-                                    className="border border-gray-200 rounded-lg p-4"
-                                    whileHover={{ scale: 1.02, boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)" }}
-                                    transition={{ duration: 0.2 }}
-                                >
-                                    <div className="flex justify-between items-start mb-1">
-                                        <h3 className="font-medium text-gray-900 text-base">Watering Grass</h3>
-                                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Mudah</span>
-                                    </div>
-                                    <div className="text-sm text-gray-700 mb-1">Greedy</div>
-                                    <div className="text-xs text-gray-500 mb-2">Dosen 1</div>
-                                    <motion.button 
-                                        className="w-full bg-blue-600 text-white py-1.5 px-3 rounded text-sm font-medium"
-                                        whileHover={{ scale: 1.02, backgroundColor: "#2563EB" }}
-                                        whileTap={{ scale: 0.98 }}
-                                        onClick={() => handleAddQuestion({
-                                            id: 101,
-                                            question: "Watering Grass",
-                                            subject: "Greedy",
-                                            difficulty: "Mudah",
-                                            type: "Essay",
-                                            lecturer: "Dosen 1"
-                                        })}
-                                    >
-                                        Tambah
-                                    </motion.button>
-                                </motion.div>
-
-                                {/* Balanced Tree */}
-                                <motion.div 
-                                    className="border border-gray-200 rounded-lg p-4"
-                                    whileHover={{ scale: 1.02, boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)" }}
-                                    transition={{ duration: 0.2 }}
-                                >
-                                    <div className="flex justify-between items-start mb-1">
-                                        <h3 className="font-medium text-gray-900 text-base">Balanced Tree</h3>
-                                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Mudah</span>
-                                    </div>
-                                    <div className="text-sm text-gray-700 mb-1">Binary Search Tree</div>
-                                    <div className="text-xs text-gray-500 mb-2">Dosen 4</div>
-                                    <motion.button 
-                                        className="w-full bg-blue-600 text-white py-1.5 px-3 rounded text-sm font-medium"
-                                        whileHover={{ scale: 1.02, backgroundColor: "#2563EB" }}
-                                        whileTap={{ scale: 0.98 }}
-                                        onClick={() => handleAddQuestion({
-                                            id: 102,
-                                            question: "Balanced Tree",
-                                            subject: "Binary Search Tree",
-                                            difficulty: "Mudah",
-                                            type: "Essay",
-                                            lecturer: "Dosen 4"
-                                        })}
-                                    >
-                                        Tambah
-                                    </motion.button>
-                                </motion.div>
-
-                                {/* Minites Minggu 6 */}
-                                <motion.div 
-                                    className="border border-gray-200 rounded-lg p-4"
-                                    whileHover={{ scale: 1.02, boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)" }}
-                                    transition={{ duration: 0.2 }}
-                                >
-                                    <div className="flex justify-between items-start mb-1">
-                                        <h3 className="font-medium text-gray-900 text-base">Minites Minggu 6</h3>
-                                        <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Sulit</span>
-                                    </div>
-                                    <div className="text-sm text-gray-700 mb-1">Generic</div>
-                                    <div className="text-xs text-gray-500 mb-2">Dosen 2</div>
-                                    <motion.button 
-                                        className="w-full bg-blue-600 text-white py-1.5 px-3 rounded text-sm font-medium"
-                                        whileHover={{ scale: 1.02, backgroundColor: "#2563EB" }}
-                                        whileTap={{ scale: 0.98 }}
-                                        onClick={() => handleAddQuestion({
-                                            id: 103,
-                                            question: "Minites Minggu 6",
-                                            subject: "Generic",
-                                            difficulty: "Sulit",
-                                            type: "Essay",
-                                            lecturer: "Dosen 2"
-                                        })}
-                                    >
-                                        Tambah
-                                    </motion.button>
-                                </motion.div>
-
-                                {/* Minites Minggu 7 */}
-                                <motion.div 
-                                    className="border border-gray-200 rounded-lg p-4"
-                                    whileHover={{ scale: 1.02, boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)" }}
-                                    transition={{ duration: 0.2 }}
-                                >
-                                    <div className="flex justify-between items-start mb-1">
-                                        <h3 className="font-medium text-gray-900 text-base">Minites Minggu 7</h3>
-                                        <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Sulit</span>
-                                    </div>
-                                    <div className="text-sm text-gray-700 mb-1">Inheritance</div>
-                                    <div className="text-xs text-gray-500 mb-2">Dosen 2</div>
-                                    <motion.button 
-                                        className="w-full bg-blue-600 text-white py-1.5 px-3 rounded text-sm font-medium"
-                                        whileHover={{ scale: 1.02, backgroundColor: "#2563EB" }}
-                                        whileTap={{ scale: 0.98 }}
-                                        onClick={() => handleAddQuestion({
-                                            id: 104,
-                                            question: "Minites Minggu 7",
-                                            subject: "Inheritance",
-                                            difficulty: "Sulit",
-                                            type: "Essay",
-                                            lecturer: "Dosen 2"
-                                        })}
-                                    >
-                                        Tambah
-                                    </motion.button>
-                                </motion.div>
-
-                                {/* Memory Maze Game */}
-                                <motion.div 
-                                    className="border border-gray-200 rounded-lg p-4"
-                                    whileHover={{ scale: 1.02, boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)" }}
-                                    transition={{ duration: 0.2 }}
-                                >
-                                    <div className="flex justify-between items-start mb-1">
-                                        <h3 className="font-medium text-gray-900 text-base">Memory Maze Game</h3>
-                                        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Sedang</span>
-                                    </div>
-                                    <div className="text-sm text-gray-700 mb-1">Array 1D</div>
-                                    <div className="text-xs text-gray-500 mb-2">Dosen 3</div>
-                                    <motion.button 
-                                        className="w-full bg-blue-600 text-white py-1.5 px-3 rounded text-sm font-medium"
-                                        whileHover={{ scale: 1.02, backgroundColor: "#2563EB" }}
-                                        whileTap={{ scale: 0.98 }}
-                                        onClick={() => handleAddQuestion({
-                                            id: 105,
-                                            question: "Memory Maze Game",
-                                            subject: "Array 1D",
-                                            difficulty: "Sedang",
-                                            type: "Essay",
-                                            lecturer: "Dosen 3"
-                                        })}
-                                    >
-                                        Tambah
-                                    </motion.button>
-                                </motion.div>
-
-                                {/* Jadwal Bentrok */}
-                                <motion.div 
-                                    className="border border-gray-200 rounded-lg p-4"
-                                    whileHover={{ scale: 1.02, boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)" }}
-                                    transition={{ duration: 0.2 }}
-                                >
-                                    <div className="flex justify-between items-start mb-1">
-                                        <h3 className="font-medium text-gray-900 text-base">Jadwal Bentrok</h3>
-                                        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Sedang</span>
-                                    </div>
-                                    <div className="text-sm text-gray-700 mb-1">Array 1D</div>
-                                    <div className="text-xs text-gray-500 mb-2">Dosen 3</div>
-                                    <motion.button 
-                                        className="w-full bg-blue-600 text-white py-1.5 px-3 rounded text-sm font-medium"
-                                        whileHover={{ scale: 1.02, backgroundColor: "#2563EB" }}
-                                        whileTap={{ scale: 0.98 }}
-                                        onClick={() => handleAddQuestion({
-                                            id: 106,
-                                            question: "Jadwal Bentrok",
-                                            subject: "Array 1D",
-                                            difficulty: "Sedang",
-                                            type: "Essay",
-                                            lecturer: "Dosen 3"
-                                        })}
-                                    >
-                                        Tambah
-                                    </motion.button>
-                                </motion.div>
+                            <div className="grid grid-cols-2 gap-4 mb-4 max-h-96 overflow-y-auto pr-2">
+                                {filteredQuestions.length === 0 ? (
+                                    <p className="col-span-2 text-center py-4 text-gray-500">Tidak ada soal yang ditemukan</p>
+                                ) : (
+                                    filteredQuestions.map((question, index) => (
+                                        <motion.div
+                                            key={question.id}
+                                            className="border border-gray-200 rounded-lg p-4 flex flex-col justify-between bg-white shadow-sm"
+                                            whileHover={{ scale: 1.02, boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)" }}
+                                            transition={{ duration: 0.2 }}
+                                        >
+                                            <div>
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <h3 className="font-medium text-gray-900 text-base line-clamp-2">{question.question}</h3>
+                                                    <span className={`text-xs px-2 py-1 rounded ${
+                                                        question.difficulty === 'Mudah' ? 'bg-green-100 text-green-800' :
+                                                        question.difficulty === 'Sedang' ? 'bg-yellow-100 text-yellow-800' :
+                                                        'bg-red-100 text-red-800'
+                                                    }`}>
+                                                        {question.difficulty}
+                                                    </span>
+                                                </div>
+                                                <div className="text-sm text-gray-700 mb-1 line-clamp-1">{question.subject}</div>
+                                                <div className="text-xs text-gray-500 mb-2 line-clamp-1">{question.lecturer}</div>
+                                            </div>
+                                            <motion.button
+                                                className="w-full bg-blue-600 text-white py-1.5 px-3 rounded text-sm font-medium mt-2 hover:bg-blue-700"
+                                                whileHover={{ scale: 1.02 }}
+                                                whileTap={{ scale: 0.98 }}
+                                                onClick={() => handleAddQuestion(question)}
+                                            >
+                                                Tambah
+                                            </motion.button>
+                                        </motion.div>
+                                    ))
+                                )}
                             </div>
                         </div>
 
@@ -669,62 +554,6 @@ const FormCreatorPage = ({ currentUser }) => {
                 />
             )}
         </div>
-    );
-};
-
-// Animated question list component
-const AnimatedQuestionList = ({ questions, onAddQuestion }) => {
-    return (
-        <motion.div
-            initial="hidden"
-            animate="visible"
-            variants={{
-                visible: {
-                    transition: {
-                        staggerChildren: 0.05
-                    }
-                }
-            }}
-        >
-            {questions.length === 0 ? (
-                <p className="text-center py-4 text-gray-500">Tidak ada soal yang ditemukan</p>
-            ) : (
-                questions.map((question, index) => (
-                    <motion.div
-                        key={question.id}
-                        variants={{
-                            hidden: { opacity: 0, y: 20 },
-                            visible: { opacity: 1, y: 0 }
-                        }}
-                        className="bg-gray-50 rounded-lg p-3 mb-3 hover:bg-blue-50 transition-colors border border-gray-200"
-                    >
-                        <div className="flex justify-between">
-                            <span className="text-sm font-medium text-gray-700">{question.subject}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${question.difficulty === 'Mudah'
-                                ? 'bg-green-100 text-green-800'
-                                : question.difficulty === 'Sedang'
-                                    ? 'bg-yellow-100 text-yellow-800'
-                                    : 'bg-red-100 text-red-800'
-                                }`}>
-                                {question.difficulty}
-                            </span>
-                        </div>
-                        <p className="text-sm text-gray-800 mt-1 line-clamp-2">{question.question}</p>
-                        <div className="flex justify-between items-center mt-2">
-                            <span className="text-xs text-gray-500">{question.lecturer}</span>
-                            <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                className="text-xs bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700"
-                                onClick={() => onAddQuestion(question)}
-                            >
-                                Tambah
-                            </motion.button>
-                        </div>
-                    </motion.div>
-                ))
-            )}
-        </motion.div>
     );
 };
 

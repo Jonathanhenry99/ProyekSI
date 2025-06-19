@@ -50,28 +50,33 @@ exports.uploadFile = async (req, res) => {
 };
 
 // Download file
-exports.downloadFile = async (req, res) => {
+exports.download = async (req, res) => {
   try {
     const file = await File.findByPk(req.params.id);
-
     if (!file) {
-      return res.status(404).send({ message: "File tidak ditemukan!" });
+      return res.status(404).send({ message: "File not found" });
     }
 
-    // Cek apakah file ada di sistem
-    if (!fs.existsSync(file.filepath)) {
-      return res.status(404).send({ message: "File fisik tidak ditemukan!" });
+    const filePath = path.join(__dirname, '../uploads/questions/', file.filename);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).send({ message: "File not found on server" });
     }
 
-    // Set header untuk download
-    res.setHeader("Content-Disposition", `attachment; filename="${file.originalname}"`);
-    res.setHeader("Content-Type", "application/octet-stream");
+    // Set proper headers
+    res.setHeader('Access-Control-Allow-Origin', 'http://localhost:5173');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${file.filename}"`);
 
-    // Stream file ke response
-    const fileStream = fs.createReadStream(file.filepath);
+    // Stream file
+    const fileStream = fs.createReadStream(filePath);
     fileStream.pipe(res);
-  } catch (error) {
-    res.status(500).send({ message: error.message });
+  } catch (err) {
+    console.error("Error in download:", err);
+    res.status(500).send({
+      message: `Error downloading file: ${err.message}`
+    });
   }
 };
 

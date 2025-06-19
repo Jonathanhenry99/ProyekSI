@@ -1,0 +1,20 @@
+Clarence
+
+
+DAFTAR SOAL:
+
+1. Balanced Tree
+   Mata Kuliah: Binary Search Tree
+   Tingkat Kesulitan: Mudah
+   Dosen: Dosen 4
+
+2. Watering Grass
+   Mata Kuliah: Greedy
+   Tingkat Kesulitan: Mudah
+   Dosen: Dosen 1
+
+3. Minites Minggu 6
+   Mata Kuliah: Generic
+   Tingkat Kesulitan: Sulit
+   Dosen: Dosen 2
+

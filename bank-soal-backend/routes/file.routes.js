@@ -19,7 +19,7 @@ module.exports = function(app) {
   );
 
   // Download file (publik)
-  app.get("/api/files/download/:id", controller.downloadFile);
+  app.get("/api/files/download/:id", controller.download);
 
   // Hapus file (harus login dan pemilik atau admin)
   app.delete(

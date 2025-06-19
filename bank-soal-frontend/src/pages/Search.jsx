@@ -5,6 +5,8 @@ import Footer from '../components/Footer';
 import Header from '../components/Header';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import CourseTagService from '../services/courseTag.service';
+import MaterialTagService from '../services/materialTag.service';
 
 const API_URL = "http://localhost:8080/api";
 
@@ -32,8 +34,28 @@ const SearchPage = ({ currentUser }) => {
 
   // Data untuk dropdown
   const difficultyLevels = ['Mudah', 'Sedang', 'Sulit'];
-  const courseTags = ['Algoritma Struktur Dasar', 'Fisika', 'Kimia', 'Ilmu Komputer', 'Sistem Database', 'Ekonomi'];
-  const materialTags = ['Kalkulus', 'Integral', 'Mekanika Kuantum', 'Relativitas', 'Kimia Organik', 'Alkena', 'Algoritma', 'Struktur Data', 'SQL', 'Normalisasi', 'Makroekonomi', 'Inflasi'];
+  const [courseTags, setCourseTags] = useState([]);
+  const [materialTags, setMaterialTags] = useState([]);
+
+  // Fetch tags from backend
+  useEffect(() => {
+    // Fetch course tags
+    CourseTagService.getAllCourseTags()
+      .then(res => {
+        if (Array.isArray(res.data)) {
+          setCourseTags(res.data.map(tag => tag.name));
+        }
+      })
+      .catch(() => setCourseTags([]));
+    // Fetch material tags
+    MaterialTagService.getAllMaterialTag()
+      .then(res => {
+        if (Array.isArray(res.data)) {
+          setMaterialTags(res.data.map(tag => tag.name));
+        }
+      })
+      .catch(() => setMaterialTags([]));
+  }, []);
 
   // Generate more comprehensive mock data
   const mockData = [
@@ -161,7 +183,7 @@ const SearchPage = ({ currentUser }) => {
     // Filter berdasarkan tag mata kuliah
     if (selectedCourseTags.length > 0) {
       filtered = filtered.filter(item => {
-        return selectedCourseTags.some(tag => item.subject.toLowerCase().includes(tag.toLowerCase()));
+        return selectedCourseTags.some(tag => tag.toLowerCase() === item.subject.toLowerCase());
       });
     }
     
@@ -169,7 +191,7 @@ const SearchPage = ({ currentUser }) => {
     if (selectedMaterialTags.length > 0) {
       filtered = filtered.filter(item => {
         return selectedMaterialTags.some(tag =>
-          item.topics.some(topic => topic.toLowerCase().includes(tag.toLowerCase()))
+          item.topics.some(topic => topic.toLowerCase() === tag.toLowerCase())
         );
       });
     }
@@ -266,7 +288,6 @@ const SearchPage = ({ currentUser }) => {
 
    // Fungsi untuk mengambil data dari API
   const fetchQuestionSets = async () => {
-    setIsLoading(true);
     try {
       const response = await axios.get(`${API_URL}/questionsets`);
       console.log("API Response:", response.data); // Tambahkan log untuk melihat struktur data

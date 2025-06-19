@@ -1,6 +1,6 @@
 // src/components/Header.jsx
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import LogoUnpar from "../assets/LogoUnpar.png";
 import LogoIF from "../assets/LogoIF.jpg";
 import AuthService from "../services/auth.service";
@@ -34,24 +34,45 @@ export default function Header({ currentUser }) {
             { name: "Home", path: "/" },
             { name: "Cari Soal", path: "/search" },
             { name: "Paket Soal", path: "/question-sets" }
-          ].map((item) => (
-            <div className="relative group" key={item.name}>
-              <Link to={item.path}>
-                <motion.span
-                  whileHover={{ y: -2 }}
-                  className="text-gray-600 hover:text-blue-600 font-medium cursor-pointer px-1 py-2 block"
-                >
-                  {item.name}
-                </motion.span>
-                <motion.div
-                  className="h-0.5 w-0 bg-blue-600 absolute bottom-0 left-0"
-                  initial={{ width: 0 }}
-                  whileHover={{ width: "100%" }}
-                  transition={{ duration: 0.3 }}
-                />
-              </Link>
-            </div>
-          ))}
+          ].map((item) => {
+            const location = useLocation();
+            const isActive = location.pathname === item.path;
+            
+            return (
+              <div className="relative group" key={item.name}>
+                <Link to={item.path}>
+                  <motion.div
+                    className="relative"
+                    whileHover={{ y: -2 }}
+                  >
+                    {isActive && (
+                      <motion.div
+                        className="absolute -inset-1 rounded-lg bg-gradient-to-r from-blue-700 opacity-50 blur-sm"
+                        initial={{ opacity: 0 }}
+                        animate={{ 
+                          opacity: [0.5, 0.7, 0.5],
+                          scale: [1, 1.02, 1]
+                        }}
+                        transition={{
+                          duration: 2,
+                          repeat: Infinity,
+                          repeatType: "reverse"
+                        }}
+                      />
+                    )}
+                    <motion.span
+                      className={`relative z-10 px-4 py-2 rounded-lg font-medium cursor-pointer block
+                        ${isActive 
+                          ? 'text-white bg-gradient-to-r from-blue-700 to-blue-700' 
+                          : 'text-gray-600 hover:text-blue-700'}`}
+                    >
+                      {item.name}
+                    </motion.span>
+                  </motion.div>
+                </Link>
+              </div>
+            );
+          })}
         </nav>
 
         {currentUser ? (

@@ -47,7 +47,7 @@ exports.getAllQuestionSets = async (req, res) => {
         {
           model: File,
           as: "files",
-          attributes: ["id", "originalname", "filetype", "filecategory"]
+          attributes: ["id", "originalname", "filetype", "filecategory", "created_at", "updated_at"]
         }
       ]
     });
@@ -72,7 +72,7 @@ exports.getQuestionSetById = async (req, res) => {
         {
           model: File,
           as: "files",
-          attributes: ["id", "originalname", "filetype", "filecategory", "filepath"]
+          attributes: ["id", "originalname", "filetype", "filecategory", "filepath", "created_at", "updated_at"]
         }
       ]
     });

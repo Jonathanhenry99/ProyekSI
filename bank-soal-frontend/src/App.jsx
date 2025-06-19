@@ -12,6 +12,7 @@ import MataKuliahAdmin from './pages/admin/MataKuliahAdmin';
 import TaggingAdmin from './pages/admin/TaggingAdmin';
 import AdminPage from './pages/admin/AdminPage';
 import QuestionPreview from './pages/QuestionPreview';
+import QuestionSetPreview from './pages/QuestionSetPreview';
 
 import DosenPage from './pages/admin/DosenPage';
 
@@ -161,6 +162,11 @@ export default function App() {
         
         {/* Tambahkan route baru untuk preview soal */}
         <Route path="/preview/:id" element={<QuestionPreview currentUser={currentUser} />} />
+        <Route path="/question-set-preview/:id" element={
+          <ProtectedRoute>
+            <QuestionSetPreview currentUser={currentUser} />
+          </ProtectedRoute>
+        } />
         
         {/* 404 Route */}
         <Route path="*" element={

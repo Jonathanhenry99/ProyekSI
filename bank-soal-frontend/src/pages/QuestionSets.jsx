@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, CheckCircle, ChevronDown, FileText, BarChart2, Plus, Book, Check } from 'lucide-react';
 import Footer from '../components/Footer';
 import Header from '../components/Header';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 const QuestionSetsPage = ({ currentUser }) => {
   const [activeTab, setActiveTab] = useState('semua');
@@ -11,8 +12,10 @@ const QuestionSetsPage = ({ currentUser }) => {
   const [selectedLevel, setSelectedLevel] = useState([]);
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [viewMode, setViewMode] = useState('grid');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [data, setData] = useState([]);
+  const [error, setError] = useState(null);
   
   // State untuk dropdown
   const [showLevelDropdown, setShowLevelDropdown] = useState(false);
@@ -29,86 +32,34 @@ const QuestionSetsPage = ({ currentUser }) => {
   const courseTags = ['Algoritma dan Struktur Data', 'Pemrograman Web', 'Basis Data', 'Pemrograman Berorientasi Objek', 'Jaringan Komputer', 'Kecerdasan Buatan'];
   const materialTags = ['Algoritma', 'Struktur Data', 'HTML', 'CSS', 'JavaScript', 'React', 'SQL', 'Normalisasi', 'ERD', 'OOP', 'Java', 'Inheritance', 'Polymorphism', 'TCP/IP', 'Routing', 'Switching', 'Machine Learning', 'Neural Network', 'AI'];
 
-  // Generate mock data untuk paket soal
-  const mockData = [
-    {
-      id: 1,
-      title: 'UTS Algoritma dan Struktur Data 2023',
-      description: 'Kumpulan soal untuk UTS mata kuliah Algoritma dan Struktur Data',
-      questionCount: 15,
-      lecturer: 'Dr. Ahmad Fauzi',
-      level: 'Sedang',
-      lastUpdated: '2024-02-20',
-      topics: ['Algoritma', 'Struktur Data', 'Kompleksitas'],
-      downloads: 245
-    },
-    {
-      id: 2,
-      title: 'UAS Pemrograman Web 2023',
-      description: 'Kumpulan soal untuk UAS mata kuliah Pemrograman Web',
-      questionCount: 10,
-      lecturer: 'Prof. Siti Aminah',
-      level: 'Sulit',
-      lastUpdated: '2024-01-15',
-      topics: ['HTML', 'CSS', 'JavaScript', 'React'],
-      downloads: 187
-    },
-    {
-      id: 3,
-      title: 'Quiz Basis Data',
-      description: 'Kumpulan soal quiz untuk mata kuliah Basis Data',
-      questionCount: 8,
-      lecturer: 'Dr. Budi Santoso',
-      level: 'Mudah',
-      lastUpdated: '2024-01-28',
-      topics: ['SQL', 'Normalisasi', 'ERD'],
-      downloads: 156
-    },
-    {
-      id: 4,
-      title: 'UTS Pemrograman Berorientasi Objek',
-      description: 'Kumpulan soal untuk UTS mata kuliah PBO',
-      questionCount: 12,
-      lecturer: 'Dr. Wijaya Kusuma',
-      level: 'Sedang',
-      lastUpdated: '2024-02-10',
-      topics: ['OOP', 'Java', 'Inheritance', 'Polymorphism'],
-      downloads: 325
-    },
-    {
-      id: 5,
-      title: 'UAS Jaringan Komputer',
-      description: 'Kumpulan soal untuk UAS mata kuliah Jaringan Komputer',
-      questionCount: 20,
-      lecturer: 'Dr. Rahmat Hidayat',
-      level: 'Sulit',
-      lastUpdated: '2023-12-05',
-      topics: ['TCP/IP', 'Routing', 'Switching'],
-      downloads: 289
-    },
-    {
-      id: 6,
-      title: 'Quiz Kecerdasan Buatan',
-      description: 'Kumpulan soal quiz untuk mata kuliah Kecerdasan Buatan',
-      questionCount: 10,
-      lecturer: 'Prof. Diana Putri',
-      level: 'Mudah',
-      lastUpdated: '2024-02-15',
-      topics: ['Machine Learning', 'Neural Network', 'AI'],
-      downloads: 178
-    },
-  ];
+  useEffect(() => {
+    const fetchPaketSoal = async () => {
+      try {
+        setIsLoading(true);
+        const response = await axios.get("http://localhost:8080/api/paketsoal");
+        console.log("Fetched paket soal:", response.data);
+        setData(response.data);
+      } catch (err) {
+        console.error("Error fetching paket soal:", err);
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPaketSoal();
+  }, []);
 
   // Filter function
   const filterData = () => {
-    return mockData.filter(item => {
+    return data.filter(item => {
       // Filter by search query
       const matchesSearch =
         searchQuery === '' ||
         item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.lecturer.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.topics.some(topic => topic.toLowerCase().includes(searchQuery.toLowerCase()));
+        parseTopics(item.topics).some(topic => topic.toLowerCase().includes(searchQuery.toLowerCase()));
 
       // Filter by level
       const matchesLevel =
@@ -124,16 +75,10 @@ const QuestionSetsPage = ({ currentUser }) => {
       const matchesMaterialTags =
         selectedMaterialTags.length === 0 ||
         selectedMaterialTags.some(tag => 
-          item.topics.some(topic => topic.toLowerCase().includes(tag.toLowerCase()))
+          parseTopics(item.topics).some(topic => topic.toLowerCase().includes(tag.toLowerCase()))
         );
 
-      // Filter by date
-      const itemDate = new Date(item.lastUpdated);
-      const matchesDate =
-        (dateRange.start === '' || new Date(dateRange.start) <= itemDate) &&
-        (dateRange.end === '' || new Date(dateRange.end) >= itemDate);
-
-      return matchesSearch && matchesLevel && matchesCourseTags && matchesMaterialTags && matchesDate;
+      return matchesSearch && matchesLevel && matchesCourseTags && matchesMaterialTags;
     });
   };
 
@@ -198,6 +143,135 @@ const QuestionSetsPage = ({ currentUser }) => {
     hidden: { opacity: 0, y: -10, height: 0 },
     visible: { opacity: 1, y: 0, height: 'auto' }
   };
+
+  const navigate = useNavigate();
+
+  // Helper for level color
+  const getLevelColor = (level) => {
+    switch (level) {
+      case 'Mudah':
+        return 'bg-green-100 text-green-700';
+      case 'Sedang':
+        return 'bg-yellow-100 text-yellow-700';
+      case 'Sulit':
+        return 'bg-red-100 text-red-700';
+      default:
+        return 'bg-gray-100 text-gray-700';
+    }
+  };
+
+  // Helper for date formatting
+  const formatDate = (date) => {
+    return new Date(date).toLocaleDateString('id-ID', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  // Helper to parse topics string into array
+  const parseTopics = (topicsString) => {
+    if (!topicsString) return [];
+    try {
+      return JSON.parse(topicsString);
+    } catch (e) {
+      // If not JSON, try splitting by comma
+      return topicsString.split(',').map(t => t.trim());
+    }
+  };
+
+  // Card click handler for preview
+  const handleCardClick = (id) => {
+    navigate(`/preview/${id}`);
+  };
+
+  // Download handler
+  const handleDownload = async (id) => {
+    try {
+      const response = await axios.get(`http://localhost:8080/api/paketsoal/${id}`);
+      const questionFile = response.data.files.find(file => file.filecategory === 'questions');
+      if (questionFile) {
+        window.open(`http://localhost:8080/api/files/download/${questionFile.id}`, '_blank');
+      } else {
+        alert('File soal tidak ditemukan');
+      }
+    } catch (error) {
+      console.error("Error downloading file:", error);
+      alert('Gagal mendownload file');
+    }
+  };
+
+  // Card renderer (from Search.jsx)
+  const renderCard = (item) => (
+    <motion.div
+      variants={itemVariants}
+      className={`bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow cursor-pointer ${viewMode === 'grid' ? 'h-full' : ''}`}
+      onClick={() => handleCardClick(item.id)}
+      key={item.id}
+    >
+      <div className="p-6">
+        <div className="flex justify-between items-start mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">{item.title}</h3>
+          <span className={`px-2 py-1 text-xs rounded-full ${getLevelColor(item.level)}`}>
+            {item.level}
+          </span>
+        </div>
+        <div className="space-y-2 mb-4">
+          <div className="flex items-center text-sm text-gray-600">
+            <Book className="w-4 h-4 mr-2" />
+            <span>{item.subject || item.title}</span>
+          </div>
+          <div className="flex items-center text-sm text-gray-600">
+            <User className="w-4 h-4 mr-2" />
+            <span>{item.lecturer}</span>
+          </div>
+          <div className="flex items-center text-sm text-gray-600">
+            <Calendar className="w-4 h-4 mr-2" />
+            <span>{formatDate(item.lastUpdated)}</span>
+          </div>
+        </div>
+        {item.topics && (
+          <div className="flex flex-wrap gap-1 mb-4">
+            {parseTopics(item.topics).map((topic, index) => (
+              <span
+                key={index}
+                className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
+              >
+                {topic}
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="flex justify-between items-center mt-4">
+          <div className="flex items-center text-sm text-gray-500">
+            <Download className="w-4 h-4 mr-1" />
+            <span>{item.downloads} unduhan</span>
+          </div>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDownload(item.id);
+            }}
+          >
+            Unduh
+          </motion.button>
+        </div>
+      </div>
+    </motion.div>
+  );
+
+  // Render loading state
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
+  // Render error state
+  if (error) {
+    return <div>Error: {error}</div>;
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -571,81 +645,9 @@ const QuestionSetsPage = ({ currentUser }) => {
               variants={containerVariants}
               initial="hidden"
               animate="visible"
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto"
             >
-              {filteredData.map((item) => (
-                <motion.div
-                  key={item.id}
-                  variants={itemVariants}
-                  className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
-                >
-                  <div className="p-6">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center">
-                        <div className="bg-blue-100 p-2 rounded-lg mr-3">
-                          <Book className="w-6 h-6 text-blue-600" />
-                        </div>
-                        <span className={`px-2 py-1 text-xs rounded-full ${
-                          item.level === 'Mudah' ? 'bg-green-100 text-green-800' :
-                          item.level === 'Sedang' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {item.level}
-                        </span>
-                      </div>
-                      <div className="flex items-center text-gray-500 text-sm">
-                        <Download className="w-4 h-4 mr-1" />
-                        {item.downloads}
-                      </div>
-                    </div>
-                    
-                    <h3 className="text-lg font-semibold mb-2 text-gray-900">{item.title}</h3>
-                    <p className="text-gray-600 text-sm mb-3 line-clamp-2">{item.description}</p>
-                    
-                    <div className="flex items-center text-sm text-gray-500 mb-3">
-                      <User className="w-4 h-4 mr-1" />
-                      <span>{item.lecturer}</span>
-                    </div>
-                    
-                    <div className="flex items-center text-sm text-gray-500 mb-4">
-                      <Tag className="w-4 h-4 mr-1" />
-                      <span>{item.questionCount} soal</span>
-                    </div>
-                    
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {item.topics.slice(0, 3).map((topic, index) => (
-                        <span key={index} className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
-                          {topic}
-                        </span>
-                      ))}
-                      {item.topics.length > 3 && (
-                        <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
-                          +{item.topics.length - 3}
-                        </span>
-                      )}
-                    </div>
-                    
-                    <div className="flex justify-between items-center">
-                      <div className="text-xs text-gray-500 flex items-center">
-                        <Clock className="w-3 h-3 mr-1" />
-                        {new Date(item.lastUpdated).toLocaleDateString('id-ID', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric'
-                        })}
-                      </div>
-                      
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium"
-                      >
-                        Lihat Detail
-                      </motion.button>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
+              {filteredData.map((item) => renderCard(item))}
             </motion.div>
           ) : (
             <motion.div
@@ -705,7 +707,7 @@ const QuestionSetsPage = ({ currentUser }) => {
                       </div>
                       
                       <div className="flex flex-wrap gap-2 mt-3">
-                        {item.topics.map((topic, index) => (
+                        {parseTopics(item.topics).map((topic, index) => (
                           <span key={index} className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
                             {topic}
                           </span>

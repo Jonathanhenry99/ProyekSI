@@ -31,6 +31,7 @@ db.question = require("./question.model.js")(sequelize, Sequelize);
 db.questionSet = require("./questionSet.model.js")(sequelize, Sequelize);
 db.questionHistory = require("./questionHistory.model.js")(sequelize, Sequelize);
 db.file = require("./file.model.js")(sequelize, Sequelize);
+db.paket_soal = require("./paketSoal.model.js")(sequelize, Sequelize);
 
 // Define relationships
 
@@ -87,6 +88,14 @@ db.questionHistory.belongsTo(db.question, { foreignKey: "questionId" });
 // File relationships
 db.questionSet.hasMany(db.file, { as: "files", foreignKey: "question_set_id" });
 db.file.belongsTo(db.questionSet, { foreignKey: "question_set_id" });
+
+// Relasi: satu paket soal punya banyak file
+db.paket_soal.hasMany(db.file, {
+  foreignKey: 'paket_soal_id'
+});
+db.file.belongsTo(db.paket_soal, {
+  foreignKey: 'paket_soal_id'
+});
 
 module.exports = db;
 
