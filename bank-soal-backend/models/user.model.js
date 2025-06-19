@@ -27,6 +27,14 @@ module.exports = (sequelize, Sequelize) => {
       type: Sequelize.STRING,
       allowNull: false
     },
+    role: {
+      type: Sequelize.STRING,
+      allowNull: false,
+      defaultValue: 'ROLE_USER',
+      validate: {
+        isIn: [['ROLE_USER', 'ROLE_ADMIN']]
+      }
+    },
     isActive: {
       type: Sequelize.BOOLEAN,
       defaultValue: true

@@ -16,12 +16,6 @@ module.exports = function(app) {
     controller.signin
   );
 
-  // Endpoint untuk reset password admin (hanya untuk testing)
-  app.post("/api/auth/reset-admin", controller.resetAdminPassword);
-
-  // Debug endpoint
+  // Debug endpoint to check database status
   app.get("/api/auth/debug/check-database", controller.checkDatabase);
-
-  // Add route for resetting admin password (temporary for development)
-  app.post("/api/auth/reset-admin-password", controller.resetAdminPassword);
 };

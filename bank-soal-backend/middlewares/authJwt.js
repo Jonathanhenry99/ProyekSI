@@ -27,12 +27,9 @@ verifyToken = (req, res, next) => {
 isAdmin = async (req, res, next) => {
   try {
     const user = await User.findByPk(req.userId);
-    const roles = await user.getRoles();
     
-    for (let i = 0; i < roles.length; i++) {
-      if (roles[i].name === "admin") {
-        return next();
-      }
+    if (user.role === "ROLE_ADMIN") {
+      return next();
     }
 
     return res.status(403).send({

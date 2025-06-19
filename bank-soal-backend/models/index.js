@@ -25,7 +25,6 @@ db.sequelize = sequelize;
 
 // Load models
 db.user = require("./user.model.js")(sequelize, Sequelize);
-db.role = require("./role.model.js")(sequelize, Sequelize);
 db.courseTag = require("./courseTag.model.js")(sequelize, Sequelize);
 db.materialTag = require("./materialTag.model.js")(sequelize, Sequelize);
 db.question = require("./question.model.js")(sequelize, Sequelize);
@@ -34,24 +33,6 @@ db.questionHistory = require("./questionHistory.model.js")(sequelize, Sequelize)
 db.file = require("./file.model.js")(sequelize, Sequelize);
 
 // Define relationships
-
-// User and Role (Many-to-Many)
-db.role.belongsToMany(db.user, {
-  through: {
-    model: "user_roles",
-    timestamps: false
-  },
-  foreignKey: "roleId",
-  otherKey: "userId"
-});
-db.user.belongsToMany(db.role, {
-  through: {
-    model: "user_roles",
-    timestamps: false
-  },
-  foreignKey: "userId",
-  otherKey: "roleId"
-});
 
 // User and Question (One-to-Many)
 db.user.hasMany(db.question, { as: "questions", foreignKey: "createdBy" });

@@ -10,39 +10,55 @@ import AuthService from './services/auth.service';
 import QuestionSets from './pages/QuestionSets';
 import MataKuliahAdmin from './pages/admin/MataKuliahAdmin';
 import TaggingAdmin from './pages/admin/TaggingAdmin';
+import AdminPage from './pages/admin/AdminPage';
 import QuestionPreview from './pages/QuestionPreview';
 
 import DosenPage from './pages/admin/DosenPage';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(undefined);
+  const [isLoading, setIsLoading] = useState(true);
   
   // *** DEVELOPMENT MODE - Set to true to bypass admin authentication ***
   const DEVELOPMENT_MODE = true; // Change to false in production
   
   useEffect(() => {
+    // Check for user in localStorage on app start
     const user = AuthService.getCurrentUser();
     if (user) {
       setCurrentUser(user);
     }
-    
-    // *** Auto-set mock admin user in development mode ***
-    if (DEVELOPMENT_MODE && !user) {
-      const mockAdmin = {
-        id: 1,
-        username: 'dev-admin',
-        email: 'admin@dev.com',
-        full_name: 'Development Admin',
-        roles: ['ROLE_ADMIN'],
-        is_active: true
-      };
-      setCurrentUser(mockAdmin);
-    }
+    setIsLoading(false);
+  }, []);
+
+  // Listen for storage changes (when user logs in/out in another tab)
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'user') {
+        if (e.newValue) {
+          setCurrentUser(JSON.parse(e.newValue));
+        } else {
+          setCurrentUser(undefined);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   // Protected Route component for regular users
   const ProtectedRoute = ({ children }) => {
-    if (!DEVELOPMENT_MODE && !currentUser) {
+    if (isLoading) {
+      return <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>;
+    }
+    
+    if (!currentUser) {
       return <Navigate to="/login" />;
     }
     return children;
@@ -50,9 +66,13 @@ export default function App() {
 
   // Protected Route component for admin users
   const AdminRoute = ({ children }) => {
-    // *** Skip authentication in development mode ***
-    if (DEVELOPMENT_MODE) {
-      return children;
+    if (isLoading) {
+      return <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>;
     }
     
     if (!currentUser) {
@@ -99,21 +119,25 @@ export default function App() {
         {/* Admin Protected Routes */}
         <Route path="/admin" element={
           <AdminRoute>
-            <Navigate to="/admin/mata-kuliah" />
+            <Navigate to="/admin/dosen" />
           </AdminRoute>
         } />
+        
+        {/* Admin Dosen Management */}
+        <Route path="/admin/dosen" element={
+          <AdminRoute>
+            <AdminPage currentUser={currentUser} />
+          </AdminRoute>
+        } />
+        
+        {/* Admin Mata Kuliah Management */}
         <Route path="/admin/mata-kuliah" element={
           <AdminRoute>
             <MataKuliahAdmin currentUser={currentUser} />
           </AdminRoute>
         } />
-        <Route path="/admin/dosen" element={
-          
-            <AdminRoute>
-            <DosenPage currentUser={currentUser} />
-          </AdminRoute>
-       
-        } />
+        
+        {/* Admin Tagging Management */}
         <Route path="/admin/tagging" element={
           <AdminRoute>
             <TaggingAdmin currentUser={currentUser} />

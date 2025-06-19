@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, User, LogOut, Tag, Edit, Trash2, Save, X, AlertCircle, CheckCircle } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import CourseTagService from '../../services/courseTag.service';
 import AuthService from '../../services/auth.service';
 
@@ -13,6 +14,7 @@ const TaggingAdmin = ({ currentUser }) => {
   const [editingTag, setEditingTag] = useState(null);
   const [formData, setFormData] = useState({ name: '' });
   const [formErrors, setFormErrors] = useState({});
+  const navigate = useNavigate();
 
   // Fetch tags on component mount
   useEffect(() => {
@@ -27,7 +29,6 @@ const TaggingAdmin = ({ currentUser }) => {
       setError(null);
     } catch (err) {
       setError('Gagal memuat data tag. Silakan coba lagi.');
-      console.error('Error fetching tags:', err);
     } finally {
       setIsLoading(false);
     }
@@ -68,7 +69,6 @@ const TaggingAdmin = ({ currentUser }) => {
   // Handle form submit
   const handleSubmit = async () => {
     if (!validateForm()) return;
-
     try {
       if (editingTag) {
         await CourseTagService.updateCourseTag(editingTag.id, formData);
@@ -112,7 +112,7 @@ const TaggingAdmin = ({ currentUser }) => {
   // Handle logout
   const handleLogout = () => {
     AuthService.logout();
-    window.location.href = '/login';
+    navigate('/login');
   };
 
   // Filter tags based on search
@@ -120,56 +120,53 @@ const TaggingAdmin = ({ currentUser }) => {
     tag.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Header Component
+  // Header Component (konsisten dengan admin lain)
   const Header = () => (
-    <header className="bg-white border-b border-gray-200 px-6 py-4">
-      <div className="flex justify-between items-center max-w-7xl mx-auto">
-        <div className="flex items-center space-x-4">
+    <header className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-40">
+      <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="grid grid-cols-3 items-center">
           <div className="flex items-center space-x-3">
             <img 
               src="/src/assets/LogoIF.jpg" 
-              alt="Logo UNPAR Informatika" 
-              className="h-12 w-auto"
+              alt="Logo Informatika UNPAR" 
+              className="h-10 w-auto"
             />
           </div>
-        </div>
-        
-        <nav className="flex space-x-8">
-          <a 
-            href="/admin/dosen" 
-            className="text-gray-700 hover:text-gray-900 transition-colors"
-          >
-            Dosen
-          </a>
-          <a 
-            href="/admin/mata-kuliah" 
-            className="text-gray-700 hover:text-gray-900 transition-colors"
-          >
-            Mata Kuliah
-          </a>
-          <a 
-            href="/admin/tagging" 
-            className="text-gray-900 font-medium border-b-2 border-blue-600"
-          >
-            Tagging
-          </a>
-        </nav>
-        
-        <div className="flex items-center space-x-4">
-          <span className="text-gray-700">
-            Hi, {currentUser?.username || 'Admin'}
-          </span>
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-              <User className="w-5 h-5 text-gray-600" />
-            </div>
-            <button
-              onClick={handleLogout}
-              className="p-2 text-gray-600 hover:text-gray-800 transition-colors"
-              title="Logout"
+          <nav className="flex justify-center space-x-8">
+            <Link 
+              to="/admin/dosen" 
+              className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-2 py-1"
             >
-              <LogOut className="w-5 h-5" />
-            </button>
+              Dosen
+            </Link>
+            <Link 
+              to="/admin/mata-kuliah" 
+              className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-2 py-1"
+            >
+              Mata Kuliah
+            </Link>
+            <Link 
+              to="/admin/tagging" 
+              className="text-blue-600 font-semibold relative px-2 py-1"
+            >
+              Tagging
+              <div className="absolute -bottom-4 left-0 right-0 h-0.5 bg-blue-600 rounded-full"></div>
+            </Link>
+          </nav>
+          <div className="flex items-center justify-end space-x-4">
+            <span className="text-gray-700 font-medium">{currentUser?.username || 'Admin'}</span>
+            <div className="flex items-center space-x-2">
+              <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                <User className="w-5 h-5 text-white" />
+              </div>
+              <button
+                onClick={handleLogout}
+                className="p-2 text-gray-500 hover:text-gray-700 transition-colors rounded-lg hover:bg-gray-100"
+                title="Logout"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -179,9 +176,8 @@ const TaggingAdmin = ({ currentUser }) => {
   // Notification Component
   const Notification = () => {
     if (!notification) return null;
-    
     return (
-      <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right duration-300">
+      <div className="fixed top-4 right-4 z-50">
         <div className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border ${
           notification.type === 'success' 
             ? 'bg-green-50 text-green-800 border-green-200' 
@@ -201,12 +197,10 @@ const TaggingAdmin = ({ currentUser }) => {
   // Delete Confirmation Modal
   const DeleteConfirmModal = () => {
     if (!showDeleteConfirm) return null;
-    
     const tag = tagsList.find(t => t.id === showDeleteConfirm);
-    
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-in fade-in duration-200">
-        <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 animate-in zoom-in-95 duration-200">
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
               <Trash2 className="w-5 h-5 text-red-600" />
@@ -216,11 +210,9 @@ const TaggingAdmin = ({ currentUser }) => {
               <p className="text-sm text-gray-500">Aksi ini tidak dapat dibatalkan</p>
             </div>
           </div>
-          
           <p className="text-gray-700 mb-6">
             Apakah Anda yakin ingin menghapus tag <strong>"{tag?.name}"</strong>?
           </p>
-          
           <div className="flex gap-3">
             <button
               onClick={() => setShowDeleteConfirm(null)}
@@ -271,14 +263,12 @@ const TaggingAdmin = ({ currentUser }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
       <Header />
       <Notification />
       <DeleteConfirmModal />
-      
       <main className="max-w-7xl mx-auto px-6 py-8">
         <h1 className="text-3xl font-bold text-center mb-8">Manajemen Tagging</h1>
-        
         {/* Search and Add Form */}
         <div className="max-w-2xl mx-auto mb-8">
           <div className="flex gap-4">
@@ -307,9 +297,8 @@ const TaggingAdmin = ({ currentUser }) => {
             Menampilkan {filteredTags.length} hasil pencarian
           </p>
         </div>
-
         {/* Add/Edit Form */}
-        {editingTag !== null && (
+        {(editingTag !== null || formData.name) && (
           <div className="max-w-2xl mx-auto mb-8 bg-white rounded-lg shadow-sm p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900">
@@ -322,7 +311,6 @@ const TaggingAdmin = ({ currentUser }) => {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
             <div className="space-y-4">
               <div>
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
@@ -340,10 +328,12 @@ const TaggingAdmin = ({ currentUser }) => {
                   placeholder="Masukkan nama tag"
                 />
                 {formErrors.name && (
-                  <p className="mt-1 text-sm text-red-600">{formErrors.name}</p>
+                  <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    {formErrors.name}
+                  </p>
                 )}
               </div>
-              
               <div className="flex justify-end gap-3">
                 <button
                   onClick={resetForm}
@@ -362,7 +352,6 @@ const TaggingAdmin = ({ currentUser }) => {
             </div>
           </div>
         )}
-
         {/* Tags Table */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden max-w-6xl mx-auto">
           <div className="bg-gray-100 px-6 py-4 border-b">
@@ -372,7 +361,6 @@ const TaggingAdmin = ({ currentUser }) => {
               <h2 className="font-semibold text-gray-800">Aksi</h2>
             </div>
           </div>
-          
           <div className="divide-y divide-gray-200">
             {filteredTags.map((tag) => (
               <div key={tag.id} className="px-6 py-4 grid grid-cols-3 gap-4 items-center hover:bg-gray-50">
@@ -381,11 +369,11 @@ const TaggingAdmin = ({ currentUser }) => {
                   <span className="text-gray-700">{tag.name}</span>
                 </div>
                 <span className="text-gray-600">
-                  {new Date(tag.createdAt).toLocaleDateString('id-ID', {
+                  {tag.created_at ? new Date(tag.created_at).toLocaleDateString('id-ID', {
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric'
-                  })}
+                  }) : '-'}
                 </span>
                 <div className="flex space-x-2">
                   <button
@@ -407,7 +395,6 @@ const TaggingAdmin = ({ currentUser }) => {
             ))}
           </div>
         </div>
-
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8 max-w-6xl mx-auto">
           <div className="bg-white rounded-lg shadow-sm p-6">
@@ -421,7 +408,6 @@ const TaggingAdmin = ({ currentUser }) => {
               </div>
             </div>
           </div>
-          
           <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -433,14 +419,14 @@ const TaggingAdmin = ({ currentUser }) => {
               </div>
             </div>
           </div>
-          
           <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Tags Baru (Bulan Ini)</p>
                 <p className="text-2xl font-bold text-gray-900">
                   {tagsList.filter(tag => {
-                    const tagDate = new Date(tag.createdAt);
+                    if (!tag.created_at) return false;
+                    const tagDate = new Date(tag.created_at);
                     const now = new Date();
                     return tagDate.getMonth() === now.getMonth() && 
                            tagDate.getFullYear() === now.getFullYear();

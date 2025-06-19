@@ -33,6 +33,7 @@ exports.signin = async (req, res) => {
     console.log("User found:", {
       id: user.id,
       email: user.email,
+      role: user.role,
       passwordInDB: user.password.substring(0, 10) + "..." // Hanya tampilkan sebagian untuk keamanan
     });
     console.log("Password from request:", req.body.password);
@@ -70,16 +71,10 @@ exports.signin = async (req, res) => {
       expiresIn: config.jwtExpiration || 86400 // Default ke 24 jam jika tidak ada konfigurasi
     });
 
-    // Ambil peran user
+    // Ambil role user langsung dari kolom role
     let authorities = [];
-    try {
-      const roles = await user.getRoles();
-      for (let i = 0; i < roles.length; i++) {
-        authorities.push("ROLE_" + roles[i].name.toUpperCase());
-      }
-    } catch (error) {
-      console.error("Error getting user roles:", error);
-      // Jika gagal mendapatkan peran, tetap lanjutkan dengan array kosong
+    if (user.role) {
+      authorities.push(user.role);
     }
 
     // Kirim respons dengan data user dan token
@@ -98,69 +93,12 @@ exports.signin = async (req, res) => {
   }
 };
 
-// Tambahkan fungsi ini untuk testing
-exports.resetAdminPassword = async (req, res) => {
-  try {
-    // Cari atau buat user admin2
-    let admin = await User.findOne({
-      where: {
-        email: "admin2@example.com"
-      }
-    });
-
-    if (!admin) {
-      // Buat user baru jika belum ada
-      admin = await User.create({
-        username: "admin2",
-        email: "admin2@example.com",
-        password: bcrypt.hashSync("admin123", 8),
-        fullName: "Admin 2",
-        isActive: true
-      });
-
-      // Set role admin
-      const adminRole = await Role.findOne({ where: { name: "admin" } });
-      if (adminRole) {
-        await admin.setRoles([adminRole]);
-      }
-    } else {
-      // Reset password jika user sudah ada
-      admin.password = bcrypt.hashSync("admin123", 8);
-      await admin.save();
-
-      // Pastikan user memiliki role admin
-      const adminRole = await Role.findOne({ where: { name: "admin" } });
-      if (adminRole) {
-        await admin.setRoles([adminRole]);
-      }
-    }
-
-    res.status(200).send({ 
-      message: "Admin2 berhasil dibuat/direset!",
-      user: {
-        id: admin.id,
-        username: admin.username,
-        email: admin.email,
-        roles: (await admin.getRoles()).map(role => role.name)
-      }
-    });
-  } catch (error) {
-    console.error("Error in resetAdminPassword:", error);
-    res.status(500).send({ message: error.message });
-  }
-};
-
 // Debug endpoint to check database status
 exports.checkDatabase = async (req, res) => {
   try {
     // Check users table
     const users = await User.findAll({
-      attributes: ['id', 'username', 'email', 'password', 'is_active'],
-      include: [{
-        model: Role,
-        attributes: ['id', 'name'],
-        through: { attributes: [] }
-      }]
+      attributes: ['id', 'username', 'email', 'password', 'role', 'is_active']
     });
 
     res.status(200).send({
@@ -170,8 +108,8 @@ exports.checkDatabase = async (req, res) => {
         username: user.username,
         email: user.email,
         password: user.password.substring(0, 10) + "...", // Only show part of password
-        is_active: user.is_active,
-        roles: user.roles.map(role => role.name)
+        role: user.role,
+        is_active: user.is_active
       }))
     });
   } catch (error) {
