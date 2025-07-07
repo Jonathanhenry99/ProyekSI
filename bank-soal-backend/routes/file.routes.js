@@ -36,4 +36,7 @@ module.exports = function(app) {
 
   // Route untuk menggabungkan file dari satu question set
   app.get("/api/files/combine-preview/:id", controller.combineFilesForPreview);
+
+  // Indikator kelengkapan soal berdasarkan questionSetId (publik)
+  app.get("/api/files/completeness/:questionSetId", controller.getFileCompleteness);
 };
