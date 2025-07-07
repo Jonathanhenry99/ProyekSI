@@ -259,3 +259,23 @@ exports.combineFilesForPreview = async (req, res) => {
     res.status(500).send({ message: error.message });
   }
 };
+
+exports.getFileCompleteness = async (req, res) => {
+  try {
+    const questionSetId = req.params.questionSetId;
+
+    const files = await File.findAll({
+      where: { question_set_id: questionSetId },
+      attributes: ['filecategory']
+    });
+
+    const categories = files.map(file => file.filecategory);
+
+    const hasAnswerKey = categories.includes('answers');
+    const hasTestCase = categories.includes('testCases');
+
+    res.status(200).json({ hasAnswerKey, hasTestCase });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

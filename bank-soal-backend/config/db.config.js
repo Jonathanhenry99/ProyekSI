@@ -1,7 +1,7 @@
 module.exports = {
     HOST: "localhost",
-    USER: "postgres",     // Change this to your PostgreSQL username
-    PASSWORD: "jonathan24", // Change this to your PostgreSQL password
+    USER: "hayyavevila",     // Change this to your PostgreSQL username
+    PASSWORD: "gendisss", // Change this to your PostgreSQL password
     DB: "bank_soal_db",
     dialect: "postgres",
     pool: {
@@ -11,4 +11,3 @@ module.exports = {
       idle: 10000
     }
   };
-
