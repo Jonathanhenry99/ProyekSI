@@ -271,7 +271,6 @@ const MataKuliahAdmin = ({ currentUser }) => {
     );
   };
 
-  // Header Component
   const Header = () => (
     <header className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-6 py-4">
@@ -283,30 +282,23 @@ const MataKuliahAdmin = ({ currentUser }) => {
               className="h-10 w-auto"
             />
           </div>
-
+          
           <nav className="flex justify-center space-x-8">
-            <Link
-              to="/admin/dosen"
-              className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-2 py-1"
-            >
+            <Link to="/admin/dosen" className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-2 py-1">
               Dosen
             </Link>
-            <Link
-              to="/admin/mata-kuliah"
-              className="text-blue-600 font-semibold relative px-2 py-1"
-            >
+            <Link to="/admin/mata-kuliah" className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-2 py-1">
               Mata Kuliah
+            </Link>
+            <Link to="/admin/tagging" className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-2 py-1">
+              Tagging
+            </Link>
+            <Link to="/admin/course-tagging" className="text-blue-600 font-semibold relative px-2 py-1">
+              Tagging Mata Kuliah
               <div className="absolute -bottom-4 left-0 right-0 h-0.5 bg-blue-600 rounded-full"></div>
             </Link>
-            <Link
-              to="/admin/tagging"
-              className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-2 py-1"
-            >
-              Tagging
-
-            </Link>
           </nav>
-
+            
           <div className="flex items-center justify-end space-x-4">
             <span className="text-gray-700 font-medium">{currentUser?.username || 'Admin'}</span>
             <div className="flex items-center space-x-2">
@@ -326,7 +318,7 @@ const MataKuliahAdmin = ({ currentUser }) => {
       </div>
     </header>
   );
-
+  
   // Stats Cards
   const StatsCards = () => (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

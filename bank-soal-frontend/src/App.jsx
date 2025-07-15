@@ -10,6 +10,7 @@ import AuthService from './services/auth.service';
 import QuestionSets from './pages/QuestionSets';
 import MataKuliahAdmin from './pages/admin/MataKuliahAdmin';
 import TaggingAdmin from './pages/admin/TaggingAdmin';
+import CourseTaggingAdmin from './pages/admin/CourseTaggingAdmin'; // New import
 import AdminPage from './pages/admin/AdminPage';
 import QuestionPreview from './pages/QuestionPreview';
 
@@ -144,6 +145,13 @@ export default function App() {
           </AdminRoute>
         } />
         
+        {/* Admin Course Tagging Management - NEW ROUTE */}
+        <Route path="/admin/course-tagging" element={
+          <AdminRoute>
+            <CourseTaggingAdmin currentUser={currentUser} />
+          </AdminRoute>
+        } />
+        
         {/* *** DEVELOPMENT ONLY - Direct Admin Routes *** */}
         {DEVELOPMENT_MODE && (
           <>
@@ -156,6 +164,8 @@ export default function App() {
               </div>
             } />
             <Route path="/dev/admin/tagging" element={<TaggingAdmin currentUser={currentUser} />} />
+            {/* Development Course Tagging Route - NEW */}
+            <Route path="/dev/admin/course-tagging" element={<CourseTaggingAdmin currentUser={currentUser} />} />
           </>
         )}
         
