@@ -35,75 +35,7 @@ const SearchPage = ({ currentUser }) => {
   const courseTags = ['Algoritma Struktur Dasar', 'Fisika', 'Kimia', 'Ilmu Komputer', 'Sistem Database', 'Ekonomi'];
   const materialTags = ['Kalkulus', 'Integral', 'Mekanika Kuantum', 'Relativitas', 'Kimia Organik', 'Alkena', 'Algoritma', 'Struktur Data', 'SQL', 'Normalisasi', 'Makroekonomi', 'Inflasi'];
 
-  // Generate more comprehensive mock data
-  const mockData = [
-    {
-      id: 1,
-      fileName: 'UTS_MTK_2023_Ganjil.pdf',
-      subject: 'Algoritma Struktur Dasar',
-      year: 2023,
-      lecturer: 'Dr. Ahmad Fauzi',
-      level: 'Mudah',
-      lastUpdated: '2024-02-20',
-      topics: ['Kalkulus', 'Integral'],
-      downloads: 245
-    },
-    {
-      id: 2,
-      fileName: 'UAS_Fisika_2023_Genap.pdf',
-      subject: 'Fisika',
-      year: 2023,
-      lecturer: 'Prof. Siti Aminah',
-      level: 'Sulit',
-      lastUpdated: '2024-01-15',
-      topics: ['Mekanika Kuantum', 'Relativitas'],
-      downloads: 187
-    },
-    {
-      id: 3,
-      fileName: 'Quiz_Kimia_Organik.pdf',
-      subject: 'Kimia',
-      year: 2023,
-      lecturer: 'Dr. Budi Santoso',
-      level: 'Sedang',
-      lastUpdated: '2024-01-28',
-      topics: ['Kimia Organik', 'Alkena'],
-      downloads: 156
-    },
-    {
-      id: 4,
-      fileName: 'Tugas_Algo_Strukdat.pdf',
-      subject: 'Ilmu Komputer',
-      year: 2023,
-      lecturer: 'Dr. Wijaya Kusuma',
-      level: 'Sedang',
-      lastUpdated: '2024-02-10',
-      topics: ['Algoritma', 'Struktur Data'],
-      downloads: 325
-    },
-    {
-      id: 5,
-      fileName: 'UTS_Database_2023.pdf',
-      subject: 'Sistem Database',
-      year: 2023,
-      lecturer: 'Dr. Rahmat Hidayat',
-      level: 'Sulit',
-      lastUpdated: '2023-12-05',
-      topics: ['SQL', 'Normalisasi'],
-      downloads: 289
-    },
-    {
-      id: 6,
-      fileName: 'UAS_Ekonomi_Makro.pdf',
-      subject: 'Ekonomi',
-      year: 2023,
-      lecturer: 'Prof. Diana Putri',
-      level: 'Mudah',
-      lastUpdated: '2024-02-15',
-      topics: ['Makroekonomi', 'Inflasi'],
-      downloads: 178
-    },
-  ];
+  
 
   // Fungsi untuk mendownload file
   const handleDownload = async (id) => {

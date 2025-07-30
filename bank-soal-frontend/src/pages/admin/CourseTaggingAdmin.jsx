@@ -1,81 +1,118 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Plus, User, LogOut, Tag, BookOpen, Trash2, Save, X, AlertCircle, CheckCircle, ChevronRight, ArrowLeft } from 'lucide-react';
-import { Link } from 'react-router-dom'; // Pastikan Link diimport
-// Mock services - replace with actual service implementations
+import { BrowserRouter as Router, Link, useNavigate } from 'react-router-dom';
+import axios from 'axios'; // Menggunakan Axios untuk permintaan HTTP
+import AuthService from '../../services/auth.service'; // Assuming this path is correct
+
+const API_URL = "http://localhost:8080/api";
+
+// Updated Services to work with real database API using axios
 const CourseService = {
   getAllCourses: async () => {
-    // Mock data based on database structure
-    return {
-      data: [
-        { id: 1, name: 'Algoritma dan Pemrograman', code: 'IF001', description: 'Mata kuliah dasar pemrograman' },
-        { id: 2, name: 'Struktur Data', code: 'IF002', description: 'Mata kuliah struktur data dan algoritma' },
-        { id: 3, name: 'Basis Data', code: 'IF003', description: 'Mata kuliah sistem basis data' },
-        { id: 4, name: 'Pemrograman Web', code: 'IF004', description: 'Mata kuliah pengembangan web' },
-        { id: 5, name: 'Pemrograman Mobile', code: 'IF005', description: 'Mata kuliah pengembangan aplikasi mobile' }
-      ]
-    };
+    const user = JSON.parse(localStorage.getItem('user'));
+    const headers = user?.accessToken ? { 'x-access-token': user.accessToken } : {};
+    
+    try {
+      const response = await axios.get(`${API_URL}/course-tags`, { headers });
+      const data = response.data;
+      
+      // Transform course_tags to match expected format
+      return {
+        data: data.map(course => ({
+          id: course.id,
+          name: course.name,
+          code: `CS${course.id.toString().padStart(3, '0')}`, // Generate code
+          description: `Mata kuliah ${course.name.toLowerCase()}`
+        }))
+      };
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to fetch course tags');
+    }
   }
 };
 
 const MaterialTagService = {
   getAllMaterialTag: async () => {
-    return {
-      data: [
-        { id: 1, name: 'Array' },
-        { id: 2, name: 'Linked List' },
-        { id: 3, name: 'Stack' },
-        { id: 4, name: 'Queue' },
-        { id: 5, name: 'Tree' },
-        { id: 6, name: 'Graph' },
-        { id: 7, name: 'Sorting' },
-        { id: 8, name: 'Searching' },
-        { id: 9, name: 'Heap' },
-        { id: 10, name: 'Greedy' },
-        { id: 11, name: 'Dynamic Programming' },
-        { id: 12, name: 'SQL' },
-        { id: 13, name: 'NoSQL' },
-        { id: 14, name: 'HTML' },
-        { id: 15, name: 'CSS' },
-        { id: 16, name: 'JavaScript' },
-        { id: 17, name: 'React' },
-        { id: 18, name: 'Node.js' }
-      ]
-    };
+    const user = JSON.parse(localStorage.getItem('user'));
+    const headers = user?.accessToken ? { 'x-access-token': user.accessToken } : {};
+    
+    try {
+      const response = await axios.get(`${API_URL}/material-tags`, { headers });
+      return { data: response.data };
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to fetch material tags');
+    }
   }
 };
 
 const CourseTaggingService = {
   getCourseMaterialTags: async (courseId) => {
-    // Mock data - replace with actual API call
-    const mockData = {
-      1: [1, 2, 7, 8], // Algoritma dan Pemrograman: Array, Linked List, Sorting, Searching
-      2: [1, 2, 3, 4, 5, 6, 9], // Struktur Data: Array, Linked List, Stack, Queue, Tree, Graph, Heap
-      3: [12, 13], // Basis Data: SQL, NoSQL
-      4: [14, 15, 16, 17, 18], // Pemrograman Web: HTML, CSS, JavaScript, React, Node.js
-      5: [16, 17] // Pemrograman Mobile: JavaScript, React
-    };
-    return { data: mockData[courseId] || [] };
+    const user = JSON.parse(localStorage.getItem('user'));
+    const headers = user?.accessToken ? { 'x-access-token': user.accessToken } : {};
+    
+    try {
+      const response = await axios.get(`${API_URL}/material-tags/by-course/${courseId}`, { headers });
+      const data = response.data;
+      
+      // Return array of material tag IDs for compatibility
+      return { data: data.map(tag => tag.id) };
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to fetch course material tags');
+    }
   },
   
   addMaterialTagToCourse: async (courseId, materialTagId) => {
-    // Mock implementation
-    return { success: true };
+    const user = JSON.parse(localStorage.getItem('user'));
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(user?.accessToken ? { 'x-access-token': user.accessToken } : {})
+    };
+    
+    try {
+      await axios.put(`${API_URL}/material-tags/${materialTagId}/assign-course`, 
+        { course_tag_id: courseId }, 
+        { headers }
+      );
+      return { success: true };
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to assign material tag to course');
+    }
   },
   
   removeMaterialTagFromCourse: async (courseId, materialTagId) => {
-    // Mock implementation
-    return { success: true };
-  }
-};
+    const user = JSON.parse(localStorage.getItem('user'));
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(user?.accessToken ? { 'x-access-token': user.accessToken } : {})
+    };
+    
+    try {
+      await axios.put(`${API_URL}/material-tags/${materialTagId}/unassign-course`, 
+        {}, 
+        { headers }
+      );
+      return { success: true };
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to unassign material tag from course');
+    }
+  },
 
-const AuthService = {
-  logout: () => {
-    // Mock logout
-    localStorage.removeItem('token');
+  // Get statistics
+  getCourseStatistics: async () => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    const headers = user?.accessToken ? { 'x-access-token': user.accessToken } : {};
+    
+    try {
+      const response = await axios.get(`${API_URL}/course-material-stats`, { headers });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to fetch course statistics');
+    }
   }
 };
 
 const CourseTaggingAdmin = ({ currentUser }) => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [coursesList, setCoursesList] = useState([]);
   const [materialTagsList, setMaterialTagsList] = useState([]);
@@ -86,7 +123,8 @@ const CourseTaggingAdmin = ({ currentUser }) => {
   const [notification, setNotification] = useState(null);
   const [showAddTagModal, setShowAddTagModal] = useState(false);
   const [availableTags, setAvailableTags] = useState([]);
-  const [currentView, setCurrentView] = useState('courses'); // 'courses' or 'tags'
+  const [currentView, setCurrentView] = useState('courses');
+  const [statistics, setStatistics] = useState([]);
 
   // Fetch initial data
   useEffect(() => {
@@ -100,32 +138,35 @@ const CourseTaggingAdmin = ({ currentUser }) => {
     }
   }, [selectedCourse]);
 
-  const fetchInitialData = async () => {
+  const fetchInitialData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [coursesResponse, materialTagsResponse] = await Promise.all([
+      const [coursesResponse, materialTagsResponse, statsResponse] = await Promise.all([
         CourseService.getAllCourses(),
-        MaterialTagService.getAllMaterialTag()
+        MaterialTagService.getAllMaterialTag(),
+        CourseTaggingService.getCourseStatistics()
       ]);
+      
       setCoursesList(coursesResponse.data);
       setMaterialTagsList(materialTagsResponse.data);
+      setStatistics(statsResponse);
     } catch (err) {
       console.error("Error fetching initial data:", err);
-      const errorMessage = err.response?.data?.message || 'Gagal memuat data. Silakan coba lagi.';
+      const errorMessage = err.message || 'Gagal memuat data. Silakan coba lagi.';
       setError(errorMessage);
       showNotification(errorMessage, 'error');
       
-      if (err.response?.status === 401 || err.response?.status === 403) {
+      if (err.message.includes('401') || err.message.includes('403') || err.message.includes('Unauthorized')) {
         AuthService.logout();
-        console.log('User unauthorized - redirecting to login');
+        navigate('/login');
       }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [navigate]);
 
-  const fetchCourseTags = async () => {
+  const fetchCourseTags = useCallback(async () => {
     if (!selectedCourse) return;
     
     setIsLoading(true);
@@ -140,30 +181,31 @@ const CourseTaggingAdmin = ({ currentUser }) => {
       setAvailableTags(available);
     } catch (err) {
       console.error("Error fetching course tags:", err);
-      const errorMessage = err.response?.data?.message || 'Gagal memuat tag mata kuliah.';
+      const errorMessage = err.message || 'Gagal memuat tag mata kuliah.';
       setError(errorMessage);
       showNotification(errorMessage, 'error');
       
-      if (err.response?.status === 401 || err.response?.status === 403) {
+      if (err.message.includes('401') || err.message.includes('403') || err.message.includes('Unauthorized')) {
         AuthService.logout();
-        console.log('User unauthorized - redirecting to login');
+        navigate('/login');
       }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedCourse, materialTagsList, navigate]);
 
-  const showNotification = (message, type = 'success') => {
+  const showNotification = useCallback((message, type = 'success') => {
     setNotification({ message, type });
-    setTimeout(() => setNotification(null), 3000);
-  };
+    setTimeout(() => setNotification(null), 5000);
+  }, []);
 
-  const handleCourseSelect = (course) => {
+  const handleCourseSelect = useCallback((course) => {
     setSelectedCourse(course);
     setCurrentView('tags');
-  };
+    setSearchTerm(''); // Reset search when selecting course
+  }, []);
 
-  const handleAddTag = async (materialTagId) => {
+  const handleAddTag = useCallback(async (materialTagId) => {
     if (!selectedCourse) return;
     
     try {
@@ -173,13 +215,15 @@ const CourseTaggingAdmin = ({ currentUser }) => {
       fetchCourseTags(); // Refresh tags
     } catch (err) {
       console.error("Error adding tag:", err);
-      const errorMessage = err.response?.data?.message || 'Gagal menambahkan tag.';
+      const errorMessage = err.message || 'Gagal menambahkan tag.';
       showNotification(errorMessage, 'error');
     }
-  };
+  }, [selectedCourse, fetchCourseTags, showNotification]);
 
-  const handleRemoveTag = async (materialTagId) => {
+  const handleRemoveTag = useCallback(async (materialTagId) => {
     if (!selectedCourse) return;
+    
+    if (!window.confirm('Yakin ingin menghapus tag ini dari mata kuliah?')) return;
     
     try {
       await CourseTaggingService.removeMaterialTagFromCourse(selectedCourse.id, materialTagId);
@@ -187,23 +231,23 @@ const CourseTaggingAdmin = ({ currentUser }) => {
       fetchCourseTags(); // Refresh tags
     } catch (err) {
       console.error("Error removing tag:", err);
-      const errorMessage = err.response?.data?.message || 'Gagal menghapus tag.';
+      const errorMessage = err.message || 'Gagal menghapus tag.';
       showNotification(errorMessage, 'error');
     }
-  };
+  }, [selectedCourse, fetchCourseTags, showNotification]);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     AuthService.logout();
-    // In a real app, this would redirect to login page
-    console.log('User logged out');
-  };
+    navigate('/login');
+  }, [navigate]);
 
-  const handleBackToCourses = () => {
+  const handleBackToCourses = useCallback(() => {
     setSelectedCourse(null);
     setCurrentView('courses');
     setCourseTags([]);
     setAvailableTags([]);
-  };
+    setSearchTerm(''); // Reset search
+  }, []);
 
   // Filter courses or tags based on search term
   const filteredCourses = coursesList.filter(course =>
@@ -215,56 +259,57 @@ const CourseTaggingAdmin = ({ currentUser }) => {
     tag.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Calculate statistics
+  const totalMaterialTags = materialTagsList.length;
+  const averageTagsPerCourse = coursesList.length > 0 ? 
+    Math.round((statistics.reduce((sum, stat) => sum + parseInt(stat.material_count || 0), 0) / coursesList.length) * 10) / 10 : 0;
 
-
-const Header = () => (
-  <header className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-40">
-    <div className="max-w-7xl mx-auto px-6 py-4">
-      <div className="grid grid-cols-3 items-center">
-        <div className="flex items-center space-x-3">
-          <img
-            src="/src/assets/LogoIF.jpg"
-            alt="Logo Informatika UNPAR"
-            className="h-10 w-auto"
-          />
-        </div>
-        
-        <nav className="flex justify-center space-x-8">
-          <Link to="/admin/dosen" className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-2 py-1">
-            Dosen
-          </Link>
-          <Link to="/admin/mata-kuliah" className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-2 py-1">
-            Mata Kuliah
-          </Link>
-          <Link to="/admin/tagging" className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-2 py-1">
-            Tagging
-          </Link>
-          <Link to="/admin/course-tagging" className="text-blue-600 font-semibold relative px-2 py-1">
-            Tagging Mata Kuliah
-            <div className="absolute -bottom-4 left-0 right-0 h-0.5 bg-blue-600 rounded-full"></div>
-          </Link>
-        </nav>
-          
-        <div className="flex items-center justify-end space-x-4">
-          <span className="text-gray-700 font-medium">{currentUser?.username || 'Admin'}</span>
-          <div className="flex items-center space-x-2">
-            <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-              <User className="w-5 h-5 text-white" />
+  const Header = () => (
+    <header className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-40">
+      <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="grid grid-cols-3 items-center">
+          <div className="flex items-center space-x-3">
+            <div className="h-10 w-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+              <BookOpen className="w-6 h-6 text-white" />
             </div>
-            <button
-              onClick={handleLogout}
-              className="p-2 text-gray-500 hover:text-gray-700 transition-colors rounded-lg hover:bg-gray-100"
-              title="Logout"
-            >
-              <LogOut className="w-5 h-5" />
-            </button>
+            <span className="font-bold text-gray-900">Course Manager</span>
+          </div>
+          
+          <nav className="flex justify-center space-x-8">
+            <Link to="/admin/dosen" className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-2 py-1">
+              Dosen
+            </Link>
+            <Link to="/admin/mata-kuliah" className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-2 py-1">
+              Mata Kuliah
+            </Link>
+            <Link to="/admin/tagging" className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-2 py-1">
+              Tagging
+            </Link>
+            <Link to="/admin/course-tagging" className="text-blue-600 font-semibold relative px-2 py-1">
+              Tagging Mata Kuliah
+              <div className="absolute -bottom-4 left-0 right-0 h-0.5 bg-blue-600 rounded-full"></div>
+            </Link>
+          </nav>
+            
+          <div className="flex items-center justify-end space-x-4">
+            <span className="text-gray-700 font-medium">{currentUser?.username || 'Admin'}</span>
+            <div className="flex items-center space-x-2">
+              <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                <User className="w-5 h-5 text-white" />
+              </div>
+              <button
+                onClick={handleLogout}
+                className="p-2 text-gray-500 hover:text-gray-700 transition-colors rounded-lg hover:bg-gray-100"
+                title="Logout"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  </header>
-);
-
+    </header>
+  );
 
   // Notification Component
   const Notification = () => {
@@ -325,6 +370,17 @@ const Header = () => (
     );
   };
 
+  if (isLoading && coursesList.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Memuat data...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
       <Header />
@@ -381,7 +437,7 @@ const Header = () => (
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-green-600 text-sm font-medium">Total Tag Materi</p>
-                    <p className="text-2xl font-bold text-green-900">{materialTagsList.length}</p>
+                    <p className="text-2xl font-bold text-green-900">{totalMaterialTags}</p>
                   </div>
                   <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center">
                     <Tag className="w-6 h-6 text-white" />
@@ -392,9 +448,7 @@ const Header = () => (
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-purple-600 text-sm font-medium">Rata-rata Tag per MK</p>
-                    <p className="text-2xl font-bold text-purple-900">
-                      {coursesList.length > 0 ? Math.round((materialTagsList.length / coursesList.length) * 10) / 10 : 0}
-                    </p>
+                    <p className="text-2xl font-bold text-purple-900">{averageTagsPerCourse}</p>
                   </div>
                   <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center">
                     <Tag className="w-6 h-6 text-white" />
@@ -419,37 +473,49 @@ const Header = () => (
 
             {/* Courses Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {isLoading ? (
-                Array.from({ length: 6 }).map((_, index) => (
-                  <div key={index} className="bg-white rounded-xl p-6 border border-slate-200 animate-pulse">
-                    <div className="h-6 bg-gray-200 rounded mb-3"></div>
-                    <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                  </div>
-                ))
-              ) : filteredCourses.length === 0 ? (
+              {filteredCourses.length === 0 ? (
                 <div className="col-span-full text-center py-12">
                   <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">Tidak ada mata kuliah yang ditemukan</p>
+                  <p className="text-gray-500">
+                    {searchTerm ? 'Tidak ada mata kuliah yang ditemukan' : 'Belum ada mata kuliah'}
+                  </p>
                 </div>
               ) : (
-                filteredCourses.map((course) => (
-                  <div
-                    key={course.id}
-                    onClick={() => handleCourseSelect(course)}
-                    className="bg-white rounded-xl p-6 border border-slate-200 hover:border-blue-300 hover:shadow-lg transition-all cursor-pointer group"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-                        <BookOpen className="w-6 h-6 text-white" />
+                filteredCourses.map((course) => {
+                  const courseStats = statistics.find(stat => stat.id === course.id);
+                  const materialCount = courseStats ? parseInt(courseStats.material_count || 0) : 0;
+                  const questionSetCount = courseStats ? parseInt(courseStats.question_set_count || 0) : 0;
+                  
+                  return (
+                    <div
+                      key={course.id}
+                      onClick={() => handleCourseSelect(course)}
+                      className="bg-white rounded-xl p-6 border border-slate-200 hover:border-blue-300 hover:shadow-lg transition-all cursor-pointer group"
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                          <BookOpen className="w-6 h-6 text-white" />
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition-colors" />
                       </div>
-                      <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                      <h3 className="font-semibold text-gray-900 mb-2">{course.name}</h3>
+                      <p className="text-sm text-gray-600 mb-3">{course.code}</p>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-500">{materialCount} materi</span>
+                        <span className="text-gray-500">{questionSetCount} soal</span>
+                      </div>
+                      <div className="mt-2">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          materialCount > 0 
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {materialCount > 0 ? 'Setup Complete' : 'Perlu Setup'}
+                        </span>
+                      </div>
                     </div>
-                    <h3 className="font-semibold text-gray-900 mb-2">{course.name}</h3>
-                    <p className="text-sm text-gray-600 mb-3">{course.code}</p>
-                    <p className="text-sm text-gray-500 line-clamp-2">{course.description}</p>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </>
@@ -506,13 +572,15 @@ const Header = () => (
               ) : filteredCourseTags.length === 0 ? (
                 <div className="p-6 text-center text-gray-500">
                   <Tag className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <p>Belum ada tag materi untuk mata kuliah ini</p>
-                  <button
-                    onClick={() => setShowAddTagModal(true)}
-                    className="mt-4 text-blue-600 hover:text-blue-700 font-medium"
-                  >
-                    Tambah tag pertama
-                  </button>
+                  <p>{searchTerm ? 'Tidak ada tag yang ditemukan' : 'Belum ada tag materi untuk mata kuliah ini'}</p>
+                  {!searchTerm && availableTags.length > 0 && (
+                    <button
+                      onClick={() => setShowAddTagModal(true)}
+                      className="mt-4 text-blue-600 hover:text-blue-700 font-medium"
+                    >
+                      Tambah tag pertama
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">

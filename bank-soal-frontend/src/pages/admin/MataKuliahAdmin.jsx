@@ -287,15 +287,16 @@ const MataKuliahAdmin = ({ currentUser }) => {
             <Link to="/admin/dosen" className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-2 py-1">
               Dosen
             </Link>
-            <Link to="/admin/mata-kuliah" className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-2 py-1">
+            <Link to="/admin/mata-kuliah" className="text-blue-600 font-semibold relative px-2 py-1">
               Mata Kuliah
+               <div className="absolute -bottom-4 left-0 right-0 h-0.5 bg-blue-600 rounded-full"></div>
             </Link>
             <Link to="/admin/tagging" className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-2 py-1">
               Tagging
             </Link>
-            <Link to="/admin/course-tagging" className="text-blue-600 font-semibold relative px-2 py-1">
+            <Link to="/admin/course-tagging" className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-2 py-1  ">
               Tagging Mata Kuliah
-              <div className="absolute -bottom-4 left-0 right-0 h-0.5 bg-blue-600 rounded-full"></div>
+             
             </Link>
           </nav>
             
