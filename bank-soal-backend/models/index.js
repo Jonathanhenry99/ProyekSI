@@ -78,15 +78,16 @@ db.question.belongsToMany(db.questionSet, {
 db.user.hasMany(db.questionSet, { as: "questionSets", foreignKey: "createdBy" });
 db.questionSet.belongsTo(db.user, { as: "creator", foreignKey: "createdBy" });
 
-// QuestionHistory relationships
+// QuestionHistory relationships - Fixed untuk QuestionSet
 db.user.hasMany(db.questionHistory, { foreignKey: "userId" });
 db.questionHistory.belongsTo(db.user, { foreignKey: "userId" });
-db.question.hasMany(db.questionHistory, { foreignKey: "questionId" });
-db.questionHistory.belongsTo(db.question, { foreignKey: "questionId" });
+
+// QuestionHistory with QuestionSet (bukan Question)
+db.questionSet.hasMany(db.questionHistory, { foreignKey: "questionSetId" });
+db.questionHistory.belongsTo(db.questionSet, { foreignKey: "questionSetId" });
 
 // File relationships
 db.questionSet.hasMany(db.file, { as: "files", foreignKey: "question_set_id" });
 db.file.belongsTo(db.questionSet, { foreignKey: "question_set_id" });
 
 module.exports = db;
-
