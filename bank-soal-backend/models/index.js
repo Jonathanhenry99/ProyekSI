@@ -25,26 +25,14 @@ db.sequelize = sequelize;
 
 // Load models
 db.user = require("./user.model.js")(sequelize, Sequelize);
-db.role = require("./role.model.js")(sequelize, Sequelize);
 db.courseTag = require("./courseTag.model.js")(sequelize, Sequelize);
 db.materialTag = require("./materialTag.model.js")(sequelize, Sequelize);
 db.question = require("./question.model.js")(sequelize, Sequelize);
 db.questionSet = require("./questionSet.model.js")(sequelize, Sequelize);
 db.questionHistory = require("./questionHistory.model.js")(sequelize, Sequelize);
+db.file = require("./file.model.js")(sequelize, Sequelize);
 
 // Define relationships
-
-// User and Role (Many-to-Many)
-db.role.belongsToMany(db.user, {
-  through: "user_roles",
-  foreignKey: "roleId",
-  otherKey: "userId"
-});
-db.user.belongsToMany(db.role, {
-  through: "user_roles",
-  foreignKey: "userId",
-  otherKey: "roleId"
-});
 
 // User and Question (One-to-Many)
 db.user.hasMany(db.question, { as: "questions", foreignKey: "createdBy" });
@@ -95,6 +83,10 @@ db.user.hasMany(db.questionHistory, { foreignKey: "userId" });
 db.questionHistory.belongsTo(db.user, { foreignKey: "userId" });
 db.question.hasMany(db.questionHistory, { foreignKey: "questionId" });
 db.questionHistory.belongsTo(db.question, { foreignKey: "questionId" });
+
+// File relationships
+db.questionSet.hasMany(db.file, { as: "files", foreignKey: "question_set_id" });
+db.file.belongsTo(db.questionSet, { foreignKey: "question_set_id" });
 
 module.exports = db;
 
