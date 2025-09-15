@@ -6,8 +6,28 @@ import LogoUnpar from '../assets/LogoUnpar.png';
 import Footer from '../components/Footer';
 import Header from '../components/Header';
 import axios from 'axios';
+import { saveAs } from 'file-saver';
 
 const API_URL = "http://localhost:8080/api";
+
+const handleDownloadTemplate = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/files/download-template`, {
+      responseType: "blob",
+    });
+
+    const blob = new Blob([response.data], {
+      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    });
+
+    saveAs(blob, "Template_Soal.docx");
+  } catch (error) {
+    console.error("Error downloading file:", error);
+    alert("Gagal mendownload template");
+  }
+};
+
+
 
 const UploadPage = ({ currentUser }) => {
   const [files, setFiles] = useState({
@@ -411,13 +431,35 @@ const UploadPage = ({ currentUser }) => {
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="bg-white rounded-2xl p-8 shadow-lg"
+            className="flex flex-col gap-8"
           >
-            <h2 className="text-2xl font-semibold mb-6 text-gray-900">Upload Files</h2>
+            {/* Upload Files Card */}
+            <div className="bg-white rounded-2xl p-8 shadow-lg">
+              <h2 className="text-2xl font-semibold mb-6 text-gray-900">Upload Files</h2>
 
-            {renderFileInput('questions', 'Upload Soal', 'Format: PDF, DOCX, atau TXT', Upload)}
-            {renderFileInput('answers', 'Upload Kunci Jawaban', 'Format: PDF, DOCX, atau TXT', File)}
-            {renderFileInput('testCases', 'Upload Test Cases', 'Format: PDF, DOCX, atau TXT', AlertCircle)}
+              {renderFileInput('questions', 'Upload Soal', 'Format: PDF, DOCX, atau TXT', Upload)}
+              {renderFileInput('answers', 'Upload Kunci Jawaban', 'Format: PDF, DOCX, atau TXT', File)}
+              {renderFileInput('testCases', 'Upload Test Cases', 'Format: PDF, DOCX, atau TXT', AlertCircle)}
+            </div>
+
+            {/* Template Soal Card */}
+            <div className="bg-white rounded-2xl p-8 shadow-lg">
+              <h3 className="text-2xl font-semibold mb-6 text-gray-900">Template Soal</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Unduh template soal dalam format DOCX untuk mempermudah pembuatan soal.
+              </p>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="w-full mt-8 bg-blue-600 text-white py-4 rounded-xl font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                onClick={handleDownloadTemplate}
+              >
+                <>
+                  <Upload className="w-5 h-5" />
+                  Download Template Soal
+                </>
+              </motion.button>
+            </div>
           </motion.div>
 
           {/* Metadata Section */}

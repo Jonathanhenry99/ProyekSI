@@ -279,3 +279,25 @@ exports.getFileCompleteness = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// Fungsi untuk mengunduh template soal
+exports.downloadTemplate = (_, res) => {
+  try {
+    const filePath = path.resolve(__dirname, "../uploads/template_soal.docx");
+
+    if (fs.existsSync(filePath)) {
+      res.download(filePath, "Template_Soal.docx", (err) => {
+        if (err) {
+          console.error("Download error:", err);
+          res.status(500).send({ message: "Gagal mendownload template" });
+        }
+      });
+    } else {
+      res.status(404).send({ message: "File template tidak ditemukan" });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: "Internal server error" });
+  }
+};
+

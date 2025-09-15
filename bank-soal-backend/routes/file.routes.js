@@ -39,4 +39,7 @@ module.exports = function(app) {
 
   // Indikator kelengkapan soal berdasarkan questionSetId (publik)
   app.get("/api/files/completeness/:questionSetId", controller.getFileCompleteness);
+
+  // Rute untuk mengunduh template soal
+  app.get("/api/files/download-template", controller.downloadTemplate);
 };
