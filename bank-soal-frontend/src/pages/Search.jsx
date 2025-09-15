@@ -35,75 +35,7 @@ const SearchPage = ({ currentUser }) => {
   const courseTags = ['Algoritma Struktur Dasar', 'Fisika', 'Kimia', 'Ilmu Komputer', 'Sistem Database', 'Ekonomi'];
   const materialTags = ['Kalkulus', 'Integral', 'Mekanika Kuantum', 'Relativitas', 'Kimia Organik', 'Alkena', 'Algoritma', 'Struktur Data', 'SQL', 'Normalisasi', 'Makroekonomi', 'Inflasi'];
 
-  // Generate more comprehensive mock data
-  const mockData = [
-    {
-      id: 1,
-      fileName: 'UTS_MTK_2023_Ganjil.pdf',
-      subject: 'Algoritma Struktur Dasar',
-      year: 2023,
-      lecturer: 'Dr. Ahmad Fauzi',
-      level: 'Mudah',
-      lastUpdated: '2024-02-20',
-      topics: ['Kalkulus', 'Integral'],
-      downloads: 245
-    },
-    {
-      id: 2,
-      fileName: 'UAS_Fisika_2023_Genap.pdf',
-      subject: 'Fisika',
-      year: 2023,
-      lecturer: 'Prof. Siti Aminah',
-      level: 'Sulit',
-      lastUpdated: '2024-01-15',
-      topics: ['Mekanika Kuantum', 'Relativitas'],
-      downloads: 187
-    },
-    {
-      id: 3,
-      fileName: 'Quiz_Kimia_Organik.pdf',
-      subject: 'Kimia',
-      year: 2023,
-      lecturer: 'Dr. Budi Santoso',
-      level: 'Sedang',
-      lastUpdated: '2024-01-28',
-      topics: ['Kimia Organik', 'Alkena'],
-      downloads: 156
-    },
-    {
-      id: 4,
-      fileName: 'Tugas_Algo_Strukdat.pdf',
-      subject: 'Ilmu Komputer',
-      year: 2023,
-      lecturer: 'Dr. Wijaya Kusuma',
-      level: 'Sedang',
-      lastUpdated: '2024-02-10',
-      topics: ['Algoritma', 'Struktur Data'],
-      downloads: 325
-    },
-    {
-      id: 5,
-      fileName: 'UTS_Database_2023.pdf',
-      subject: 'Sistem Database',
-      year: 2023,
-      lecturer: 'Dr. Rahmat Hidayat',
-      level: 'Sulit',
-      lastUpdated: '2023-12-05',
-      topics: ['SQL', 'Normalisasi'],
-      downloads: 289
-    },
-    {
-      id: 6,
-      fileName: 'UAS_Ekonomi_Makro.pdf',
-      subject: 'Ekonomi',
-      year: 2023,
-      lecturer: 'Prof. Diana Putri',
-      level: 'Mudah',
-      lastUpdated: '2024-02-15',
-      topics: ['Makroekonomi', 'Inflasi'],
-      downloads: 178
-    },
-  ];
+  
 
   // Fungsi untuk mendownload file
   const handleDownload = async (id) => {
@@ -264,36 +196,33 @@ const SearchPage = ({ currentUser }) => {
     }
   };
 
-   // Fungsi untuk mengambil data dari API
+  // Fungsi untuk mengambil data dari API
   const fetchQuestionSets = async () => {
-    setIsLoading(true);
-    try {
-      const response = await axios.get(`${API_URL}/questionsets`);
-      console.log("API Response:", response.data); // Tambahkan log untuk melihat struktur data
-      
-      // Transform data untuk sesuai dengan format yang digunakan di frontend
-      const transformedData = response.data.map(item => ({
-        id: item.id,
-        fileName: item.title,
-        subject: item.subject,
-        year: item.year,
-        lecturer: item.lecturer || (item.creator ? (item.creator.fullName || item.creator.username) : 'Unknown'),
-        level: item.level,
-        lastUpdated: new Date(item.lastupdated || item.updated_at).toISOString(),
-        topics: item.topics ? item.topics.split(',').map(topic => topic.trim()) : [],
-        downloads: item.downloads || 0,
-        description: item.description || ''
-      }));
-      
-      console.log("Transformed Data:", transformedData); // Tambahkan log untuk melihat hasil transformasi
-      setQuestionSets(transformedData);
-      setFilteredData(transformedData);
-    } catch (error) {
-      console.error("Error fetching question sets:", error);
-      console.error("Error details:", error.response ? error.response.data : "No response data"); // Tambahkan detail error
-    } finally {
-      setIsLoading(false);
-    }
+   setIsLoading(true);
+   try {
+    const response = await axios.get(`${API_URL}/questionsets`);
+    // Cek jika response.data adalah array dan setiap item memiliki files
+    const transformedData = response.data.map(item => ({
+      id: item.id,
+      fileName: item.title,
+      subject: item.subject,
+      year: item.year,
+      lecturer: item.lecturer || (item.creator ? (item.creator.fullName || item.creator.username) : 'Unknown'),
+      level: item.level,
+      lastUpdated: new Date(item.lastupdated || item.updated_at).toISOString(),
+      topics: item.topics ? item.topics.split(',').map(topic => topic.trim()) : [],
+      downloads: item.downloads || 0,
+      description: item.description || '',
+      hasAnswerKey: Array.isArray(item.files) && item.files.some(file => file.filecategory === 'answers'),
+      hasTestCase: Array.isArray(item.files) && item.files.some(file => file.filecategory === 'testCases')
+    }));
+    setQuestionSets(transformedData);
+    setFilteredData(transformedData);
+   } catch (error) {
+    console.error("Error fetching question sets:", error);
+   } finally {
+    setIsLoading(false);
+   }
   };
   
   // Panggil fetchQuestionSets saat komponen dimount
@@ -302,68 +231,114 @@ const SearchPage = ({ currentUser }) => {
   }, []);
   
 
-  const renderCard = (item) => (
-    <motion.div
-      variants={itemVariants}
-      className={`bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow cursor-pointer ${viewMode === 'grid' ? 'h-full' : ''}`}
-      onClick={() => handleCardClick(item.id)}
-    >
-      <div className="p-6">
-        <div className="flex justify-between items-start mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">{item.fileName}</h3>
-          <span className={`px-2 py-1 text-xs rounded-full ${getLevelColor(item.level)}`}>
-            {item.level}
-          </span>
-        </div>
-        
-        <div className="space-y-2 mb-4">
-          <div className="flex items-center text-sm text-gray-600">
-            <BookOpen className="w-4 h-4 mr-2" />
-            <span>{item.subject}</span>
+  const renderCard = (item) => {
+    const hasAnswerKey = item.hasAnswerKey ?? false;
+    const hasTestCase = item.hasTestCase ?? false;
+
+    const completeness = (hasAnswerKey ? 1 : 0) + (hasTestCase ? 1 : 0);
+    const completenessPercent = (completeness / 2) * 100;
+
+    let completenessLabel = "Belum Lengkap";
+    let barColor = "bg-red-400";
+    if (completeness === 1) {
+      completenessLabel = hasAnswerKey ? "Ada Kunci Jawaban" : "Ada Test Case";
+      barColor = "bg-yellow-400";
+    } else if (completeness === 2) {
+      completenessLabel = "Lengkap";
+      barColor = "bg-green-500";
+    }
+
+    return (
+      <motion.div
+        variants={itemVariants}
+        className={`bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow cursor-pointer ${viewMode === 'grid' ? 'h-full' : ''}`}
+        onClick={() => handleCardClick(item.id)}
+      >
+        <div className="p-6">
+          <div className="flex justify-between items-start mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">{item.fileName}</h3>
+            <span className={`px-2 py-1 text-xs rounded-full ${getLevelColor(item.level)}`}>
+              {item.level}
+            </span>
           </div>
-          <div className="flex items-center text-sm text-gray-600">
-            <User className="w-4 h-4 mr-2" />
-            <span>{item.lecturer}</span>
-          </div>
-          <div className="flex items-center text-sm text-gray-600">
-            <Calendar className="w-4 h-4 mr-2" />
-            <span>{formatDate(item.lastUpdated)}</span>
-          </div>
-        </div>
-        
-        {item.topics && item.topics.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-4">
-            {item.topics.map((topic, index) => (
-              <span 
-                key={index} 
-                className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
-              >
-                {topic}
+
+          {/* Indikator Kelengkapan Soal */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-medium text-gray-600">Kelengkapan Soal</span>
+              <span className={`text-xs font-semibold ${
+                completeness === 2 ? 'text-green-600' :
+                completeness === 1 ? 'text-yellow-600' :
+                'text-red-600'
+              }`}>
+                {completenessLabel}
               </span>
-            ))}
+            </div>
+            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className={`h-2 ${barColor} transition-all`}
+                style={{ width: `${completenessPercent}%` }}
+              />
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className={`text-[10px] flex items-center gap-1 ${hasAnswerKey ? 'text-green-600' : 'text-gray-400'}`}>
+                <Check className="w-3 h-3" /> Kunci Jawaban
+              </span>
+              <span className={`text-[10px] flex items-center gap-1 ${hasTestCase ? 'text-green-600' : 'text-gray-400'}`}>
+                <Check className="w-3 h-3" /> Test Case
+              </span>
+            </div>
           </div>
-        )}
-        
-        <div className="flex justify-between items-center mt-4">
-          <div className="flex items-center text-sm text-gray-500">
-            <Download className="w-4 h-4 mr-1" />
-            <span>{item.downloads} unduhan</span>
+
+          <div className="space-y-2 mb-4">
+            <div className="flex items-center text-sm text-gray-600">
+              <BookOpen className="w-4 h-4 mr-2" />
+              <span>{item.subject}</span>
+            </div>
+            <div className="flex items-center text-sm text-gray-600">
+              <User className="w-4 h-4 mr-2" />
+              <span>{item.lecturer}</span>
+            </div>
+            <div className="flex items-center text-sm text-gray-600">
+              <Calendar className="w-4 h-4 mr-2" />
+              <span>{formatDate(item.lastUpdated)}</span>
+            </div>
           </div>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation(); // Mencegah event bubbling ke parent div
-              handleDownload(item.id);
-            }}
-          >
-            Unduh
-          </motion.button>
+
+          {item.topics?.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-4">
+              {item.topics.map((topic, index) => (
+                <span
+                  key={index}
+                  className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
+                >
+                  {topic}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="flex justify-between items-center mt-4">
+            <div className="flex items-center text-sm text-gray-500">
+              <Download className="w-4 h-4 mr-1" />
+              <span>{item.downloads} unduhan</span>
+            </div>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation(); // Mencegah event bubbling ke parent div
+                handleDownload(item.id);
+              }}
+            >
+              Unduh
+            </motion.button>
+          </div>
         </div>
-      </div>
-    </motion.div>
-  );
+      </motion.div>
+    );
+  };
 
 
   const itemVariants = {

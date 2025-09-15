@@ -10,12 +10,18 @@ import AuthService from './services/auth.service';
 import QuestionSets from './pages/QuestionSets';
 import MataKuliahAdmin from './pages/admin/MataKuliahAdmin';
 import TaggingAdmin from './pages/admin/TaggingAdmin';
+import CourseTaggingAdmin from './pages/admin/CourseTaggingAdmin'; // New import
 import AdminPage from './pages/admin/AdminPage';
 import QuestionPreview from './pages/QuestionPreview';
+
+import DosenPage from './pages/admin/DosenPage';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(undefined);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // *** DEVELOPMENT MODE - Set to true to bypass admin authentication ***
+  const DEVELOPMENT_MODE = true; // Change to false in production
   
   useEffect(() => {
     // Check for user in localStorage on app start
@@ -139,7 +145,31 @@ export default function App() {
           </AdminRoute>
         } />
         
-        {/* Question Preview Route */}
+        {/* Admin Course Tagging Management - NEW ROUTE */}
+        <Route path="/admin/course-tagging" element={
+          <AdminRoute>
+            <CourseTaggingAdmin currentUser={currentUser} />
+          </AdminRoute>
+        } />
+        
+        {/* *** DEVELOPMENT ONLY - Direct Admin Routes *** */}
+        {DEVELOPMENT_MODE && (
+          <>
+            <Route path="/dev/admin" element={<Navigate to="/dev/admin/mata-kuliah" />} />
+            <Route path="/dev/admin/mata-kuliah" element={<MataKuliahAdmin currentUser={currentUser} />} />
+            <Route path="/dev/admin/dosen" element={
+              <div className="p-8 text-center">
+                <h1 className="text-2xl font-bold">Halaman Dosen Admin (DEV)</h1>
+                <p className="text-gray-600 mt-2">Coming Soon...</p>
+              </div>
+            } />
+            <Route path="/dev/admin/tagging" element={<TaggingAdmin currentUser={currentUser} />} />
+            {/* Development Course Tagging Route - NEW */}
+            <Route path="/dev/admin/course-tagging" element={<CourseTaggingAdmin currentUser={currentUser} />} />
+          </>
+        )}
+        
+        {/* Tambahkan route baru untuk preview soal */}
         <Route path="/preview/:id" element={<QuestionPreview currentUser={currentUser} />} />
         
         {/* 404 Route */}
