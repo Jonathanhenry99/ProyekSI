@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Plus, User, LogOut, Tag, BookOpen, Trash2, Save, X, AlertCircle, CheckCircle, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Search, Plus, User, LogOut, Tag, BookOpen, Trash2, Save, X, AlertCircle, CheckCircle, ChevronRight, ArrowLeft, Edit3 } from 'lucide-react';
 import { BrowserRouter as Router, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios'; // Menggunakan Axios untuk permintaan HTTP
 import AuthService from '../../services/auth.service'; // Assuming this path is correct
@@ -31,6 +31,8 @@ const CourseService = {
   }
 };
 
+// Update bagian MaterialTagService di CourseTaggingAdmin.jsx
+
 const MaterialTagService = {
   getAllMaterialTag: async () => {
     const user = JSON.parse(localStorage.getItem('user'));
@@ -41,6 +43,106 @@ const MaterialTagService = {
       return { data: response.data };
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Failed to fetch material tags');
+    }
+  },
+
+  // NEW: Get materials by course - WITH DEBUGGING
+  getMaterialsByCourse: async (courseId) => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    const headers = user?.accessToken ? { 'x-access-token': user.accessToken } : {};
+    
+    try {
+      console.log(`🔍 Fetching materials for course ID: ${courseId}`);
+      const response = await axios.get(`${API_URL}/course-materials/${courseId}`, { headers });
+      
+      console.log(`✅ Materials response:`, response.data);
+      
+      if (response.data.success) {
+        return response.data;
+      } else {
+        throw new Error(response.data.message || 'Failed to fetch materials');
+      }
+    } catch (error) {
+      console.error(`❌ Error fetching materials for course ${courseId}:`, error);
+      
+      // Temporary fallback - return empty array
+      if (error.response?.status === 500) {
+        console.warn('⚠️ Server error, returning empty materials array as fallback');
+        return {
+          success: true,
+          data: []
+        };
+      }
+      
+      throw new Error(error.response?.data?.message || 'Failed to fetch course materials');
+    }
+  },
+
+  // NEW: Add material to specific course - WITH DEBUGGING
+  addMaterialToCourse: async (courseId, materialName) => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(user?.accessToken ? { 'x-access-token': user.accessToken } : {})
+    };
+    
+    try {
+      console.log(`🔍 Adding material "${materialName}" to course ${courseId}`);
+      const response = await axios.post(`${API_URL}/course-materials`, 
+        { courseId, materialName }, 
+        { headers }
+      );
+      
+      console.log(`✅ Add material response:`, response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Error adding material:`, error);
+      
+      if (error.response?.status === 500) {
+        throw new Error('Server error: Mungkin kolom course_tag_id belum ditambahkan ke database material_tags');
+      }
+      
+      throw new Error(error.response?.data?.message || 'Failed to add material to course');
+    }
+  },
+
+  // NEW: Update material - WITH DEBUGGING
+  updateMaterial: async (materialId, materialName) => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(user?.accessToken ? { 'x-access-token': user.accessToken } : {})
+    };
+    
+    try {
+      console.log(`🔍 Updating material ${materialId} to "${materialName}"`);
+      const response = await axios.put(`${API_URL}/course-materials/${materialId}`, 
+        { materialName }, 
+        { headers }
+      );
+      
+      console.log(`✅ Update material response:`, response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Error updating material:`, error);
+      throw new Error(error.response?.data?.message || 'Failed to update material');
+    }
+  },
+
+  // NEW: Delete material - WITH DEBUGGING
+  deleteMaterial: async (materialId) => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    const headers = user?.accessToken ? { 'x-access-token': user.accessToken } : {};
+    
+    try {
+      console.log(`🔍 Deleting material ${materialId}`);
+      const response = await axios.delete(`${API_URL}/course-materials/${materialId}`, { headers });
+      
+      console.log(`✅ Delete material response:`, response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Error deleting material:`, error);
+      throw new Error(error.response?.data?.message || 'Failed to delete material');
     }
   }
 };
@@ -126,6 +228,15 @@ const CourseTaggingAdmin = ({ currentUser }) => {
   const [currentView, setCurrentView] = useState('courses');
   const [statistics, setStatistics] = useState([]);
 
+  // NEW: Course Materials Management States
+  const [courseMaterials, setCourseMaterials] = useState([]);
+  const [showAddMaterialModal, setShowAddMaterialModal] = useState(false);
+  const [newMaterialName, setNewMaterialName] = useState('');
+  const [editingMaterial, setEditingMaterial] = useState(null);
+  const [editMaterialName, setEditMaterialName] = useState('');
+  const [materialView, setMaterialView] = useState('tags'); // 'tags' or 'materials'
+  const [saving, setSaving] = useState(false);
+
   // Fetch initial data
   useEffect(() => {
     fetchInitialData();
@@ -134,9 +245,13 @@ const CourseTaggingAdmin = ({ currentUser }) => {
   // Fetch tags when course is selected
   useEffect(() => {
     if (selectedCourse) {
-      fetchCourseTags();
+      if (materialView === 'tags') {
+        fetchCourseTags();
+      } else {
+        fetchCourseMaterials();
+      }
     }
-  }, [selectedCourse]);
+  }, [selectedCourse, materialView]);
 
   const fetchInitialData = useCallback(async () => {
     setIsLoading(true);
@@ -194,6 +309,26 @@ const CourseTaggingAdmin = ({ currentUser }) => {
     }
   }, [selectedCourse, materialTagsList, navigate]);
 
+  // NEW: Fetch course materials
+  const fetchCourseMaterials = useCallback(async () => {
+    if (!selectedCourse) return;
+    
+    setIsLoading(true);
+    try {
+      const response = await MaterialTagService.getMaterialsByCourse(selectedCourse.id);
+      if (response.success) {
+        setCourseMaterials(response.data);
+      }
+    } catch (err) {
+      console.error("Error fetching course materials:", err);
+      const errorMessage = err.message || 'Gagal memuat materi mata kuliah.';
+      setError(errorMessage);
+      showNotification(errorMessage, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedCourse]);
+
   const showNotification = useCallback((message, type = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 5000);
@@ -202,6 +337,7 @@ const CourseTaggingAdmin = ({ currentUser }) => {
   const handleCourseSelect = useCallback((course) => {
     setSelectedCourse(course);
     setCurrentView('tags');
+    setMaterialView('materials'); // Default to materials view for the new feature
     setSearchTerm(''); // Reset search when selecting course
   }, []);
 
@@ -236,6 +372,64 @@ const CourseTaggingAdmin = ({ currentUser }) => {
     }
   }, [selectedCourse, fetchCourseTags, showNotification]);
 
+  // NEW: Add material to course
+  const handleAddMaterial = useCallback(async () => {
+    if (!newMaterialName.trim() || !selectedCourse) return;
+    
+    setSaving(true);
+    try {
+      await MaterialTagService.addMaterialToCourse(selectedCourse.id, newMaterialName.trim());
+      showNotification('Materi berhasil ditambahkan', 'success');
+      setNewMaterialName('');
+      setShowAddMaterialModal(false);
+      fetchCourseMaterials();
+    } catch (err) {
+      console.error("Error adding material:", err);
+      const errorMessage = err.message || 'Gagal menambahkan materi.';
+      showNotification(errorMessage, 'error');
+    } finally {
+      setSaving(false);
+    }
+  }, [selectedCourse, newMaterialName, fetchCourseMaterials, showNotification]);
+
+  // NEW: Update material
+  const handleUpdateMaterial = useCallback(async (materialId) => {
+    if (!editMaterialName.trim()) return;
+    
+    setSaving(true);
+    try {
+      await MaterialTagService.updateMaterial(materialId, editMaterialName.trim());
+      showNotification('Materi berhasil diperbarui', 'success');
+      setEditingMaterial(null);
+      setEditMaterialName('');
+      fetchCourseMaterials();
+    } catch (err) {
+      console.error("Error updating material:", err);
+      const errorMessage = err.message || 'Gagal memperbarui materi.';
+      showNotification(errorMessage, 'error');
+    } finally {
+      setSaving(false);
+    }
+  }, [editMaterialName, fetchCourseMaterials, showNotification]);
+
+  // NEW: Delete material
+  const handleDeleteMaterial = useCallback(async (materialId) => {
+    if (!window.confirm('Yakin ingin menghapus materi ini?')) return;
+    
+    setSaving(true);
+    try {
+      await MaterialTagService.deleteMaterial(materialId);
+      showNotification('Materi berhasil dihapus', 'success');
+      fetchCourseMaterials();
+    } catch (err) {
+      console.error("Error deleting material:", err);
+      const errorMessage = err.message || 'Gagal menghapus materi.';
+      showNotification(errorMessage, 'error');
+    } finally {
+      setSaving(false);
+    }
+  }, [fetchCourseMaterials, showNotification]);
+
   const handleLogout = useCallback(() => {
     AuthService.logout();
     navigate('/login');
@@ -245,6 +439,7 @@ const CourseTaggingAdmin = ({ currentUser }) => {
     setSelectedCourse(null);
     setCurrentView('courses');
     setCourseTags([]);
+    setCourseMaterials([]);
     setAvailableTags([]);
     setSearchTerm(''); // Reset search
   }, []);
@@ -257,6 +452,11 @@ const CourseTaggingAdmin = ({ currentUser }) => {
 
   const filteredCourseTags = courseTags.filter(tag =>
     tag.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // NEW: Filter materials
+  const filteredCourseMaterials = courseMaterials.filter(material =>
+    material.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Calculate statistics
@@ -370,6 +570,69 @@ const CourseTaggingAdmin = ({ currentUser }) => {
     );
   };
 
+  // NEW: Add Material Modal
+  const AddMaterialModal = () => {
+    if (!showAddMaterialModal) return null;
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-gray-900">Tambah Materi ke {selectedCourse?.name}</h3>
+            <button
+              onClick={() => setShowAddMaterialModal(false)}
+              className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nama Materi
+              </label>
+              <input
+                type="text"
+                value={newMaterialName}
+                onChange={(e) => setNewMaterialName(e.target.value)}
+                placeholder="Masukkan nama materi..."
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onKeyPress={(e) => e.key === 'Enter' && handleAddMaterial()}
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleAddMaterial}
+                disabled={saving || !newMaterialName.trim()}
+                className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+              >
+                {saving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Menyimpan...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Simpan
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setShowAddMaterialModal(false);
+                  setNewMaterialName('');
+                }}
+                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (isLoading && coursesList.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30 flex items-center justify-center">
@@ -386,6 +649,7 @@ const CourseTaggingAdmin = ({ currentUser }) => {
       <Header />
       <Notification />
       <AddTagModal />
+      <AddMaterialModal />
       
       <main className="max-w-7xl mx-auto px-6 py-8">
         {/* Breadcrumb */}
@@ -407,12 +671,14 @@ const CourseTaggingAdmin = ({ currentUser }) => {
         {/* Header */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            {currentView === 'courses' ? 'Manajemen Tagging Mata Kuliah' : `Tag Materi - ${selectedCourse?.name}`}
+            {currentView === 'courses' ? 'Manajemen Mata Kuliah & Materi' : `${selectedCourse?.name} - ${materialView === 'tags' ? 'Tag Materi' : 'Materi Khusus'}`}
           </h2>
           <p className="text-gray-600">
             {currentView === 'courses' 
-              ? 'Pilih mata kuliah untuk mengelola tag materi' 
-              : 'Kelola tag materi untuk mata kuliah ini'
+              ? 'Pilih mata kuliah untuk mengelola materi dan tag' 
+              : materialView === 'tags' 
+                ? 'Kelola tag materi global untuk mata kuliah ini'
+                : 'Kelola materi khusus untuk mata kuliah ini'
             }
           </p>
         </div>
@@ -521,35 +787,74 @@ const CourseTaggingAdmin = ({ currentUser }) => {
           </>
         )}
 
-        {/* Course Tags Management View */}
+        {/* Course Management View */}
         {currentView === 'tags' && selectedCourse && (
           <>
-            {/* Back Button and Actions */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+            {/* Back Button and Tab Navigation */}
+            <div className="flex flex-col gap-4 mb-8">
               <button
                 onClick={handleBackToCourses}
-                className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
+                className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors self-start"
               >
                 <ArrowLeft className="w-5 h-5" />
                 <span>Kembali ke Daftar Mata Kuliah</span>
               </button>
-              <button
-                onClick={() => setShowAddTagModal(true)}
-                disabled={availableTags.length === 0}
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-xl font-medium flex items-center space-x-2 transition-all transform hover:scale-105 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-              >
-                <Plus className="w-5 h-5" />
-                <span>Tambah Tag</span>
-              </button>
+
+              {/* Tab Navigation */}
+              <div className="flex space-x-1 bg-gray-100 rounded-lg p-1 w-fit">
+                <button
+                  onClick={() => setMaterialView('materials')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    materialView === 'materials'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Materi Khusus
+                </button>
+                <button
+                  onClick={() => setMaterialView('tags')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    materialView === 'tags'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Tag Global
+                </button>
+              </div>
             </div>
 
-            {/* Search Tags */}
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+              <div className="flex-1"></div>
+              {materialView === 'materials' ? (
+                <button
+                  onClick={() => setShowAddMaterialModal(true)}
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 py-3 rounded-xl font-medium flex items-center space-x-2 transition-all transform hover:scale-105 shadow-lg hover:shadow-xl"
+                >
+                  <Plus className="w-5 h-5" />
+                  <span>Tambah Materi</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowAddTagModal(true)}
+                  disabled={availableTags.length === 0}
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-xl font-medium flex items-center space-x-2 transition-all transform hover:scale-105 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                >
+                  <Plus className="w-5 h-5" />
+                  <span>Tambah Tag</span>
+                </button>
+              )}
+            </div>
+
+            {/* Search */}
             <div className="mb-8">
               <div className="relative max-w-md">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
                 <input
                   type="text"
-                  placeholder="Cari tag materi..."
+                  placeholder={`Cari ${materialView === 'materials' ? 'materi' : 'tag'}...`}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -557,55 +862,155 @@ const CourseTaggingAdmin = ({ currentUser }) => {
               </div>
             </div>
 
-            {/* Tags List */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="px-6 py-4 bg-slate-50 border-b border-slate-200">
-                <h3 className="text-lg font-semibold text-slate-800">Tag Materi {selectedCourse.name}</h3>
-                <p className="text-sm text-slate-600 mt-1">Total: {filteredCourseTags.length} tag</p>
-              </div>
+            {/* Content Based on View */}
+            {materialView === 'materials' ? (
+              /* Materials List */
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="px-6 py-4 bg-slate-50 border-b border-slate-200">
+                  <h3 className="text-lg font-semibold text-slate-800">Materi Khusus {selectedCourse.name}</h3>
+                  <p className="text-sm text-slate-600 mt-1">Total: {filteredCourseMaterials.length} materi</p>
+                </div>
 
-              {isLoading ? (
-                <div className="p-6 text-center text-gray-600">
-                  <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-                  Memuat tag materi...
-                </div>
-              ) : filteredCourseTags.length === 0 ? (
-                <div className="p-6 text-center text-gray-500">
-                  <Tag className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <p>{searchTerm ? 'Tidak ada tag yang ditemukan' : 'Belum ada tag materi untuk mata kuliah ini'}</p>
-                  {!searchTerm && availableTags.length > 0 && (
-                    <button
-                      onClick={() => setShowAddTagModal(true)}
-                      className="mt-4 text-blue-600 hover:text-blue-700 font-medium"
-                    >
-                      Tambah tag pertama
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
-                  {filteredCourseTags.map((tag) => (
-                    <div key={tag.id} className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-4 group hover:shadow-md transition-all">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
-                            <Tag className="w-4 h-4 text-white" />
+                {isLoading ? (
+                  <div className="p-6 text-center text-gray-600">
+                    <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+                    Memuat materi...
+                  </div>
+                ) : filteredCourseMaterials.length === 0 ? (
+                  <div className="p-6 text-center text-gray-500">
+                    <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <p>{searchTerm ? 'Tidak ada materi yang ditemukan' : 'Belum ada materi untuk mata kuliah ini'}</p>
+                    {!searchTerm && (
+                      <button
+                        onClick={() => setShowAddMaterialModal(true)}
+                        className="mt-4 text-green-600 hover:text-green-700 font-medium"
+                      >
+                        Tambah materi pertama
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+                    {filteredCourseMaterials.map((material) => (
+                      <div key={material.id} className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 group hover:shadow-md transition-all">
+                        {editingMaterial === material.id ? (
+                          <div className="space-y-3">
+                            <input
+                              type="text"
+                              value={editMaterialName}
+                              onChange={(e) => setEditMaterialName(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                              onKeyPress={(e) => e.key === 'Enter' && handleUpdateMaterial(material.id)}
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleUpdateMaterial(material.id)}
+                                disabled={saving}
+                                className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm flex items-center justify-center gap-1"
+                              >
+                                {saving ? (
+                                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                ) : (
+                                  <Save className="w-3 h-3" />
+                                )}
+                                Simpan
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditingMaterial(null);
+                                  setEditMaterialName('');
+                                }}
+                                className="flex-1 px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm"
+                              >
+                                Batal
+                              </button>
+                            </div>
                           </div>
-                          <span className="font-medium text-gray-900">{tag.name}</span>
-                        </div>
-                        <button
-                          onClick={() => handleRemoveTag(tag.id)}
-                          className="opacity-0 group-hover:opacity-100 p-1 text-red-500 hover:text-red-700 transition-all"
-                          title="Hapus tag"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg flex items-center justify-center">
+                                <BookOpen className="w-4 h-4 text-white" />
+                              </div>
+                              <span className="font-medium text-gray-900">{material.name}</span>
+                            </div>
+                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                              <button
+                                onClick={() => {
+                                  setEditingMaterial(material.id);
+                                  setEditMaterialName(material.name);
+                                }}
+                                className="p-1 text-blue-500 hover:text-blue-700 transition-colors"
+                                title="Edit materi"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteMaterial(material.id)}
+                                className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                                title="Hapus materi"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Tags List */
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="px-6 py-4 bg-slate-50 border-b border-slate-200">
+                  <h3 className="text-lg font-semibold text-slate-800">Tag Materi Global {selectedCourse.name}</h3>
+                  <p className="text-sm text-slate-600 mt-1">Total: {filteredCourseTags.length} tag</p>
                 </div>
-              )}
-            </div>
+
+                {isLoading ? (
+                  <div className="p-6 text-center text-gray-600">
+                    <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+                    Memuat tag materi...
+                  </div>
+                ) : filteredCourseTags.length === 0 ? (
+                  <div className="p-6 text-center text-gray-500">
+                    <Tag className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <p>{searchTerm ? 'Tidak ada tag yang ditemukan' : 'Belum ada tag materi untuk mata kuliah ini'}</p>
+                    {!searchTerm && availableTags.length > 0 && (
+                      <button
+                        onClick={() => setShowAddTagModal(true)}
+                        className="mt-4 text-blue-600 hover:text-blue-700 font-medium"
+                      >
+                        Tambah tag pertama
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+                    {filteredCourseTags.map((tag) => (
+                      <div key={tag.id} className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-4 group hover:shadow-md transition-all">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
+                              <Tag className="w-4 h-4 text-white" />
+                            </div>
+                            <span className="font-medium text-gray-900">{tag.name}</span>
+                          </div>
+                          <button
+                            onClick={() => handleRemoveTag(tag.id)}
+                            className="opacity-0 group-hover:opacity-100 p-1 text-red-500 hover:text-red-700 transition-all"
+                            title="Hapus tag"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
       </main>

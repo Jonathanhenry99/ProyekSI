@@ -30,12 +30,66 @@ const SearchPage = ({ currentUser }) => {
   const [selectedCourseTags, setSelectedCourseTags] = useState([]);
   const [selectedMaterialTags, setSelectedMaterialTags] = useState([]);
 
-  // Data untuk dropdown
-  const difficultyLevels = ['Mudah', 'Sedang', 'Sulit'];
-  const courseTags = ['Algoritma Struktur Dasar', 'Fisika', 'Kimia', 'Ilmu Komputer', 'Sistem Database', 'Ekonomi'];
-  const materialTags = ['Kalkulus', 'Integral', 'Mekanika Kuantum', 'Relativitas', 'Kimia Organik', 'Alkena', 'Algoritma', 'Struktur Data', 'SQL', 'Normalisasi', 'Makroekonomi', 'Inflasi'];
+  // PERUBAHAN: Data dropdown sekarang menjadi state yang akan diisi dari API
+  const [difficultyLevels, setDifficultyLevels] = useState([]);
+  const [courseTags, setCourseTags] = useState([]);
+  const [materialTags, setMaterialTags] = useState([]);
+  const [dropdownLoading, setDropdownLoading] = useState(false);
+  const [dropdownError, setDropdownError] = useState(null);
 
-  
+  // TAMBAHAN: Fungsi untuk mengambil data dropdown dari API
+  const fetchDropdownData = async () => {
+    setDropdownLoading(true);
+    setDropdownError(null);
+    
+    try {
+      console.log('🔄 Fetching dropdown data...');
+      const response = await axios.get(`${API_URL}/dropdown/all-dropdown-data`);
+      
+      if (response.data.success) {
+        const { courseTags: courseTagsData, materialTags: materialTagsData, difficultyLevels: difficultyData } = response.data.data;
+        
+        // Map data dari API ke format yang dibutuhkan
+        setCourseTags(courseTagsData.map(tag => tag.name));
+        setMaterialTags(materialTagsData.map(tag => tag.name));
+        setDifficultyLevels(difficultyData.map(level => level.level));
+        
+        console.log('✅ Dropdown data loaded successfully:', {
+          courseTags: courseTagsData.length,
+          materialTags: materialTagsData.length,
+          difficultyLevels: difficultyData.length
+        });
+      } else {
+        throw new Error(response.data.message || 'Failed to fetch dropdown data');
+      }
+      
+    } catch (error) {
+      console.error("❌ Error fetching dropdown data:", error);
+      setDropdownError(error.message);
+      
+      // Fallback ke data default jika API gagal
+      console.log('🔄 Using fallback data for dropdowns');
+      setDifficultyLevels(['Mudah', 'Sedang', 'Sulit']);
+      setCourseTags([
+        'Algoritma dan Pemrograman',
+        'Struktur Data', 
+        'Basis Data',
+        'Pemrograman Web',
+        'Pemrograman Mobile',
+        'Jaringan Komputer',
+        'Sistem Operasi',
+        'Rekayasa Perangkat Lunak'
+      ]);
+      setMaterialTags([
+        'Array', 'Linked List', 'Stack', 'Queue', 'Tree', 
+        'Graph', 'Sorting', 'Searching', 'SQL', 'NoSQL',
+        'HTML', 'CSS', 'JavaScript', 'React', 'Node.js',
+        'PHP', 'Python', 'Java'
+      ]);
+    } finally {
+      setDropdownLoading(false);
+    }
+  };
 
   // Fungsi untuk mendownload file
   const handleDownload = async (id) => {
@@ -62,9 +116,6 @@ const SearchPage = ({ currentUser }) => {
   const handleCardClick = (id) => {
     navigate(`/preview/${id}`);
   };
-
-
-
 
   // Filter function
   const filterData = () => {
@@ -171,7 +222,6 @@ const SearchPage = ({ currentUser }) => {
     }
   };
 
-
   // Helper function to format date
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -225,11 +275,33 @@ const SearchPage = ({ currentUser }) => {
    }
   };
   
-  // Panggil fetchQuestionSets saat komponen dimount
+  // PERUBAHAN: Update useEffect untuk mengambil data dropdown dan question sets
   useEffect(() => {
-    fetchQuestionSets();
+    const initializeData = async () => {
+      try {
+        // Ambil data dropdown dan question sets secara bersamaan
+        await Promise.all([
+          fetchDropdownData(),
+          fetchQuestionSets()
+        ]);
+      } catch (error) {
+        console.error('Error initializing data:', error);
+      }
+    };
+    
+    initializeData();
   }, []);
-  
+
+  // TAMBAHAN: Auto-filter saat ada perubahan
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (questionSets.length > 0 && !dropdownLoading) {
+        filterData();
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, selectedLevel, selectedCourseTags, selectedMaterialTags, dateRange, questionSets, dropdownLoading]);
 
   const renderCard = (item) => {
     const hasAnswerKey = item.hasAnswerKey ?? false;
@@ -340,13 +412,12 @@ const SearchPage = ({ currentUser }) => {
     );
   };
 
-
   const itemVariants = {
     hidden: { y: 20, opacity: 0 },
     visible: { y: 0, opacity: 1 }
   };
 
-  // Loading animation component
+  // PERUBAHAN: Loading animation dengan informasi dropdown loading
   const LoadingAnimation = () => (
     <div className="fixed inset-0 flex items-center justify-center bg-white bg-opacity-90 z-50">
       <motion.div
@@ -369,10 +440,26 @@ const SearchPage = ({ currentUser }) => {
         }}
         className="ml-4 text-lg font-medium text-blue-600"
       >
-        Memuat Data...
+        {dropdownLoading ? 'Memuat Filter Data...' : 'Memuat Data...'}
       </motion.p>
     </div>
   );
+
+  // TAMBAHAN: Indikator jika menggunakan data fallback
+  const DropdownStatusIndicator = () => {
+    if (dropdownError && !dropdownLoading) {
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-2 rounded-lg mb-4 text-sm max-w-6xl mx-auto"
+        >
+          ⚠️ Menggunakan data filter default. Server mungkin sedang bermasalah. ({dropdownError})
+        </motion.div>
+      );
+    }
+    return null;
+  };
 
   // Dropdown animation variants
   const dropdownVariants = {
@@ -384,7 +471,10 @@ const SearchPage = ({ currentUser }) => {
     <div className="min-h-screen bg-white">
       <Header currentUser={currentUser} />
 
-      {isLoading ? (
+      {/* TAMBAHAN: Status indicator */}
+      <DropdownStatusIndicator />
+
+      {isLoading || dropdownLoading ? (
         <LoadingAnimation />
       ) : (
         <div className="w-full px-4 md:px-8 py-8 md:py-12">
@@ -720,8 +810,6 @@ const SearchPage = ({ currentUser }) => {
               </motion.div>
             )}
 
-            {/* Filter Tags - Menghapus bagian ini sesuai permintaan */}
-
             {/* View Toggle and Results Count */}
             <div className="flex justify-between items-center mt-6">
               <p className="text-gray-600 text-sm">
@@ -906,7 +994,7 @@ const SearchPage = ({ currentUser }) => {
                     Tingkat Kesulitan
                   </label>
                   <div className="space-y-2">
-                    {['Mudah', 'Sedang', 'Sulit'].map((level) => (
+                    {difficultyLevels.map((level) => (
                       <label key={level} className="flex items-center space-x-3">
                         <input
                           type="checkbox"
