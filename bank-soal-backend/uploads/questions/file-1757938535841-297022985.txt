@@ -1,0 +1,15 @@
+Ada beberapa yang perlu dikoreksi (lihat juga komentar di file pdf). Tolong kirim ke saya lagi tanggal 9 ya.
+
+1. Hilangkan cara pada rumusan masalah! Karena tidak hanya cara, tapi juga proses pengembangannya! (DONE)
+3. Gambar 4 bukan lagi struktur, tapi hubungan/relasi. Perbaiki judulnya! (DONE)
+5. Pada bagian pengesahan, "Nama" hilangkan, sehingga menjadi 1 baris saja! (DONE)
+
+
+
+2. Pada bagian 5 Uraikan dulu tahapan kegiatan yang dilaksanakan pada TA1 ini, baru kemudian detail hasil setiap tahapan. 
+Agar pembaca mendapat gambaran utuh dulu rangkaian prosesnya! (DONE)
+
+4. Semua Swimline diganti dengan diagram proses bisnis! Jelaskan juga aspek pewaktuannya: digunakan untuk apa, 
+ada apa makna nilai tersebut (cycle time dan processing time).
+
+6. Desain UI/UX diberi nomor dan penjelasan seperti terlampir! (DONE)
