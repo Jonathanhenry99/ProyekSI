@@ -1,0 +1,44 @@
+select * from course_tags
+
+select * from courses
+
+select * from material_tags
+
+Tambahkan kolom course_tag_id ke material_tags untuk relasi
+ALTER TABLE material_tags 
+ADD COLUMN course_tag_id INTEGER REFERENCES course_tags(id) ON DELETE CASCADE;
+
+-- Buat index untuk optimasi query
+CREATE INDEX idx_material_tags_course_tag_id ON material_tags(course_tag_id);
+
+-- Atau alternatif: buat tabel junction terpisah (lebih fleksibel)
+CREATE TABLE course_materials (
+    id SERIAL PRIMARY KEY,
+    course_tag_id INTEGER NOT NULL REFERENCES course_tags(id) ON DELETE CASCADE,
+    material_tag_id INTEGER NOT NULL REFERENCES material_tags(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(course_tag_id, material_tag_id)
+);
+
+-- Index untuk optimasi
+CREATE INDEX idx_course_materials_course_tag ON course_materials(course_tag_id);
+CREATE INDEX idx_course_materials_material_tag ON course_materials(material_tag_id);
+
+ALTER TABLE material_tags 
+ADD COLUMN course_tag_id INTEGER REFERENCES course_tags(id) ON DELETE SET NULL;
+
+-- Buat index untuk optimasi
+CREATE INDEX idx_material_tags_course_tag_id ON material_tags(course_tag_id);
+
+SELECT id, name, course_tag_id FROM material_tags;
+SELECT id, name FROM course_tags;
+
+UPDATE material_tags 
+SET course_tag_id = (SELECT id FROM course_tags WHERE name = 'Algoritma dan Pemrograman')
+WHERE name IN ('Array', 'Linked List', 'Stack');
+
+
+SELECT column_name, data_type 
+FROM information_schema.columns 
+WHERE table_name = 'material_tags';
