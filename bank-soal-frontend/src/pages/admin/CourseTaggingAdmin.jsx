@@ -259,17 +259,67 @@ const CourseTaggingAdmin = ({ currentUser }) => {
   const handleRemoveMaterial = useCallback(async (materialId) => {
     if (!selectedCourse) return;
     
-    if (!window.confirm('Yakin ingin menghapus assignment materi ini?')) return;
+    // Enhanced confirmation dialog
+    const isConfirmed = window.confirm(
+      '🗑️ Apakah Anda yakin ingin menghapus assignment materi ini?\n\n' +
+      '⚠️ Tindakan ini tidak dapat dibatalkan.'
+    );
+    
+    if (!isConfirmed) return;
+    
+    // Show loading notification
+    const loadingToast = showNotification('⏳ Menghapus assignment materi...', 'loading');
     
     try {
       await CourseAssignmentService.removeMaterialAssignment(selectedCourse.id, materialId);
-      showNotification('Assignment materi berhasil dihapus', 'success');
+      
+      // Hide loading notification
+      if (loadingToast && typeof loadingToast.dismiss === 'function') {
+        loadingToast.dismiss();
+      }
+      
+      // Enhanced success notification
+      showNotification(
+        '✅ Berhasil! Assignment materi telah dihapus dari kursus',
+        'success',
+        {
+          duration: 4000,
+          position: 'top-right',
+          showCloseButton: true
+        }
+      );
+      
       fetchCourseAssignments();
       fetchInitialData(); // Refresh overview data
+      
     } catch (err) {
       console.error("Error removing material assignment:", err);
-      const errorMessage = err.message || 'Gagal menghapus assignment materi.';
-      showNotification(errorMessage, 'error');
+      
+      // Hide loading notification
+      if (loadingToast && typeof loadingToast.dismiss === 'function') {
+        loadingToast.dismiss();
+      }
+      
+      // Enhanced error notification with more context
+      const errorMessage = err.response?.data?.message || 
+                          err.message || 
+                          'Terjadi kesalahan saat menghapus assignment materi';
+      
+      showNotification(
+        `❌ Gagal Menghapus: ${errorMessage}`,
+        'error',
+        {
+          duration: 6000,
+          position: 'top-right',
+          showCloseButton: true,
+          actions: [
+            {
+              label: '🔄 Coba Lagi',
+              onClick: () => handleRemoveMaterial(materialId)
+            }
+          ]
+        }
+      );
     }
   }, [selectedCourse, fetchCourseAssignments, fetchInitialData, showNotification]);
 

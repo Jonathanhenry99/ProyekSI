@@ -19,6 +19,7 @@ const SearchPage = ({ currentUser }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [questionSets, setQuestionSets] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
+  const [courseOptions, setCourseOptions] = useState([]);
 
   // State untuk dropdown
   const [showLevelDropdown, setShowLevelDropdown] = useState(false);
@@ -30,14 +31,85 @@ const SearchPage = ({ currentUser }) => {
   const [selectedCourseTags, setSelectedCourseTags] = useState([]);
   const [selectedMaterialTags, setSelectedMaterialTags] = useState([]);
 
-  // PERUBAHAN: Data dropdown sekarang menjadi state yang akan diisi dari API
+  // Data dropdown state
   const [difficultyLevels, setDifficultyLevels] = useState([]);
   const [courseTags, setCourseTags] = useState([]);
   const [materialTags, setMaterialTags] = useState([]);
   const [dropdownLoading, setDropdownLoading] = useState(false);
   const [dropdownError, setDropdownError] = useState(null);
 
-  // TAMBAHAN: Fungsi untuk mengambil data dropdown dari API
+  // PERBAIKAN: Helper function untuk mendapatkan nama mata kuliah berdasarkan ID
+  const getSubjectNameById = (subjectId) => {
+    if (!subjectId || !courseOptions.length) return subjectId; // Return ID as fallback
+    
+    const course = courseOptions.find(course => 
+      course.id.toString() === subjectId.toString()
+    );
+    
+    return course ? course.name : subjectId; // Return name if found, otherwise return ID
+  };
+
+  // Helper function to get auth token
+  const getAuthToken = () => {
+    let token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    
+    if (!token && currentUser?.accessToken) {
+      token = currentUser.accessToken;
+    }
+    
+    if (!token) {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          token = user.accessToken;
+        } catch (e) {
+          console.error('Error parsing user from localStorage:', e);
+        }
+      }
+    }
+    
+    return token;
+  };
+
+  // PERBAIKAN: Fungsi untuk mengambil data course options
+  const fetchCourseOptions = async () => {
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        console.warn("No auth token found for fetching courses");
+        return;
+      }
+      
+      console.log('🔄 Fetching course options...');
+      
+      const response = await axios.get(`${API_URL}/course-material-stats`, {
+        headers: { 
+          "x-access-token": token,
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (response.data && Array.isArray(response.data)) {
+        const courses = response.data.map(course => ({
+          id: course.id,
+          name: course.name
+        }));
+        
+        setCourseOptions(courses);
+        console.log(`✅ Loaded ${courses.length} course options`);
+        return courses;
+      } else {
+        console.warn("Invalid course data format received");
+        return [];
+      }
+    } catch (error) {
+      console.error("❌ Error fetching course options:", error);
+      return [];
+    }
+  };
+
+  // Fungsi untuk mengambil data dropdown
   const fetchDropdownData = async () => {
     setDropdownLoading(true);
     setDropdownError(null);
@@ -97,8 +169,10 @@ const SearchPage = ({ currentUser }) => {
       // Ambil detail question set
       const response = await axios.get(`${API_URL}/questionsets/${id}?download=true`);
       
-      // Ambil file soal (asumsi file pertama dengan kategori 'questions')
-      const questionFile = response.data.files.find(file => file.filecategory === 'questions');
+      // Ambil file soal (asumsi file pertama dengan kategori 'soal' atau 'questions')
+      const questionFile = response.data.files.find(file => 
+        file.filecategory === 'soal' || file.filecategory === 'questions'
+      );
       
       if (questionFile) {
         // Buka link download di tab baru
@@ -117,7 +191,7 @@ const SearchPage = ({ currentUser }) => {
     navigate(`/preview/${id}`);
   };
 
-  // Filter function
+  // Filter function - PERBAIKAN: Filter berdasarkan nama mata kuliah, bukan ID
   const filterData = () => {
     setIsLoading(true);
     
@@ -127,9 +201,10 @@ const SearchPage = ({ currentUser }) => {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(item => {
+        const subjectName = getSubjectNameById(item.subject).toLowerCase();
         return (
           item.fileName.toLowerCase().includes(query) ||
-          item.subject.toLowerCase().includes(query) ||
+          subjectName.includes(query) ||
           item.lecturer.toLowerCase().includes(query) ||
           (item.topics && item.topics.some(topic => topic.toLowerCase().includes(query)))
         );
@@ -141,10 +216,11 @@ const SearchPage = ({ currentUser }) => {
       filtered = filtered.filter(item => selectedLevel.includes(item.level));
     }
     
-    // Filter berdasarkan tag mata kuliah
+    // PERBAIKAN: Filter berdasarkan tag mata kuliah menggunakan nama, bukan ID
     if (selectedCourseTags.length > 0) {
       filtered = filtered.filter(item => {
-        return selectedCourseTags.some(tag => item.subject.toLowerCase().includes(tag.toLowerCase()));
+        const subjectName = getSubjectNameById(item.subject).toLowerCase();
+        return selectedCourseTags.some(tag => subjectName.includes(tag.toLowerCase()));
       });
     }
     
@@ -246,62 +322,96 @@ const SearchPage = ({ currentUser }) => {
     }
   };
 
-  // Fungsi untuk mengambil data dari API
-  const fetchQuestionSets = async () => {
-   setIsLoading(true);
-   try {
-    const response = await axios.get(`${API_URL}/questionsets`);
-    // Cek jika response.data adalah array dan setiap item memiliki files
-    const transformedData = response.data.map(item => ({
-      id: item.id,
-      fileName: item.title,
-      subject: item.subject,
-      year: item.year,
-      lecturer: item.lecturer || (item.creator ? (item.creator.fullName || item.creator.username) : 'Unknown'),
-      level: item.level,
-      lastUpdated: new Date(item.lastupdated || item.updated_at).toISOString(),
-      topics: item.topics ? item.topics.split(',').map(topic => topic.trim()) : [],
-      downloads: item.downloads || 0,
-      description: item.description || '',
-      hasAnswerKey: Array.isArray(item.files) && item.files.some(file => file.filecategory === 'answers'),
-      hasTestCase: Array.isArray(item.files) && item.files.some(file => file.filecategory === 'testCases')
-    }));
-    setQuestionSets(transformedData);
-    setFilteredData(transformedData);
-   } catch (error) {
-    console.error("Error fetching question sets:", error);
-   } finally {
-    setIsLoading(false);
-   }
+  // PERBAIKAN: Fungsi untuk mengambil data dari API dengan konversi subject ID ke nama
+  const fetchQuestionSets = async (courses = []) => {
+    setIsLoading(true);
+    try {
+      const response = await axios.get(`${API_URL}/questionsets`);
+      
+      console.log('🔄 Processing question sets data...');
+      
+      // Transform data dengan konversi subject ID ke nama
+      const transformedData = response.data.map(item => {
+        // PERBAIKAN: Gunakan courseName jika tersedia dari backend, atau konversi dari ID
+        let subjectName = item.subject;
+        
+        if (item.courseName || item.subjectName) {
+          // Jika backend sudah mengirim nama mata kuliah
+          subjectName = item.courseName || item.subjectName;
+        } else if (courses.length > 0) {
+          // Jika tidak, konversi dari ID menggunakan course options
+          const course = courses.find(course => 
+            course.id.toString() === item.subject.toString()
+          );
+          subjectName = course ? course.name : item.subject;
+        }
+        
+        return {
+          id: item.id,
+          fileName: item.title,
+          subject: subjectName, // PERBAIKAN: Gunakan nama mata kuliah, bukan ID
+          subjectId: item.subject, // Simpan ID asli untuk kebutuhan internal
+          year: item.year,
+          lecturer: item.lecturer || (item.creator ? (item.creator.fullName || item.creator.username) : 'Unknown'),
+          level: item.level,
+          lastUpdated: new Date(item.lastupdated || item.updated_at).toISOString(),
+          topics: item.topics ? item.topics.split(',').map(topic => topic.trim()) : [],
+          downloads: item.downloads || 0,
+          description: item.description || '',
+          hasAnswerKey: Array.isArray(item.files) && item.files.some(file => 
+            file.filecategory === 'kunci' || file.filecategory === 'answers'
+          ),
+          hasTestCase: Array.isArray(item.files) && item.files.some(file => 
+            file.filecategory === 'test' || file.filecategory === 'testCases'
+          )
+        };
+      });
+      
+      console.log(`✅ Processed ${transformedData.length} question sets with subject names`);
+      
+      setQuestionSets(transformedData);
+      setFilteredData(transformedData);
+    } catch (error) {
+      console.error("❌ Error fetching question sets:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
   
-  // PERUBAHAN: Update useEffect untuk mengambil data dropdown dan question sets
+  // PERBAIKAN: Update useEffect untuk mengambil course options terlebih dahulu
   useEffect(() => {
     const initializeData = async () => {
       try {
+        console.log('🔄 Initializing SearchPage data...');
+        
+        // Ambil course options terlebih dahulu
+        const courses = await fetchCourseOptions();
+        
         // Ambil data dropdown dan question sets secara bersamaan
         await Promise.all([
           fetchDropdownData(),
-          fetchQuestionSets()
+          fetchQuestionSets(courses) // Pass courses ke fetchQuestionSets
         ]);
+        
+        console.log('✅ SearchPage data initialization complete');
       } catch (error) {
-        console.error('Error initializing data:', error);
+        console.error('❌ Error initializing data:', error);
       }
     };
     
     initializeData();
   }, []);
 
-  // TAMBAHAN: Auto-filter saat ada perubahan
+  // Auto-filter saat ada perubahan
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      if (questionSets.length > 0 && !dropdownLoading) {
+      if (questionSets.length > 0 && !dropdownLoading && courseOptions.length > 0) {
         filterData();
       }
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchQuery, selectedLevel, selectedCourseTags, selectedMaterialTags, dateRange, questionSets, dropdownLoading]);
+  }, [searchQuery, selectedLevel, selectedCourseTags, selectedMaterialTags, dateRange, questionSets, dropdownLoading, courseOptions]);
 
   const renderCard = (item) => {
     const hasAnswerKey = item.hasAnswerKey ?? false;
@@ -365,7 +475,8 @@ const SearchPage = ({ currentUser }) => {
           <div className="space-y-2 mb-4">
             <div className="flex items-center text-sm text-gray-600">
               <BookOpen className="w-4 h-4 mr-2" />
-              <span>{item.subject}</span>
+              {/* PERBAIKAN: Tampilkan nama mata kuliah yang sudah dikonversi */}
+              <span title={`Subject ID: ${item.subjectId}`}>{item.subject}</span>
             </div>
             <div className="flex items-center text-sm text-gray-600">
               <User className="w-4 h-4 mr-2" />
@@ -417,7 +528,7 @@ const SearchPage = ({ currentUser }) => {
     visible: { y: 0, opacity: 1 }
   };
 
-  // PERUBAHAN: Loading animation dengan informasi dropdown loading
+  // Loading animation dengan informasi yang lebih spesifik
   const LoadingAnimation = () => (
     <div className="fixed inset-0 flex items-center justify-center bg-white bg-opacity-90 z-50">
       <motion.div
@@ -440,12 +551,14 @@ const SearchPage = ({ currentUser }) => {
         }}
         className="ml-4 text-lg font-medium text-blue-600"
       >
-        {dropdownLoading ? 'Memuat Filter Data...' : 'Memuat Data...'}
+        {dropdownLoading && courseOptions.length === 0 ? 'Memuat Data Mata Kuliah...' :
+         dropdownLoading ? 'Memuat Filter Data...' : 
+         'Memuat Data...'}
       </motion.p>
     </div>
   );
 
-  // TAMBAHAN: Indikator jika menggunakan data fallback
+  // Indikator jika menggunakan data fallback
   const DropdownStatusIndicator = () => {
     if (dropdownError && !dropdownLoading) {
       return (
@@ -471,10 +584,10 @@ const SearchPage = ({ currentUser }) => {
     <div className="min-h-screen bg-white">
       <Header currentUser={currentUser} />
 
-      {/* TAMBAHAN: Status indicator */}
+      {/* Status indicator */}
       <DropdownStatusIndicator />
 
-      {isLoading || dropdownLoading ? (
+      {isLoading || dropdownLoading || courseOptions.length === 0 ? (
         <LoadingAnimation />
       ) : (
         <div className="w-full px-4 md:px-8 py-8 md:py-12">
@@ -901,7 +1014,8 @@ const SearchPage = ({ currentUser }) => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {item.fileName}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700" title={`Subject ID: ${item.subjectId}`}>
+                          {/* PERBAIKAN: Tampilkan nama mata kuliah di table juga */}
                           {item.subject}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">

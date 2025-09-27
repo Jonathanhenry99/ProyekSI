@@ -1,33 +1,36 @@
 module.exports = (sequelize, Sequelize) => {
-  const QuestionSet = sequelize.define("question_sets", {
+  const QuestionSet = sequelize.define("QuestionSet", {
     id: {
       type: Sequelize.INTEGER,
       primaryKey: true,
       autoIncrement: true
     },
     title: {
-      type: Sequelize.STRING,
+      type: Sequelize.STRING(255),
       allowNull: false
     },
     description: {
       type: Sequelize.TEXT
     },
-    // Tambahan field untuk integrasi dengan Search.jsx
     subject: {
-      type: Sequelize.STRING,
+      type: Sequelize.STRING(255),
       allowNull: false
     },
     year: {
       type: Sequelize.INTEGER
     },
     level: {
-      type: Sequelize.STRING // Mudah, Sedang, Sulit
+      type: Sequelize.STRING(50),
+      validate: {
+        isIn: [['Mudah', 'Sedang', 'Sulit']]
+      }
     },
     lecturer: {
-      type: Sequelize.STRING
+      type: Sequelize.STRING(255)
     },
     topics: {
-      type: Sequelize.TEXT // Disimpan sebagai string dengan pemisah koma
+      type: Sequelize.TEXT,
+       // Disimpan sebagai string dengan pemisah koma
     },
     downloads: {
       type: Sequelize.INTEGER,
@@ -36,16 +39,30 @@ module.exports = (sequelize, Sequelize) => {
     last_updated: {
       type: Sequelize.DATE,
       defaultValue: Sequelize.NOW
+    },
+    created_by: {
+      type: Sequelize.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'users',
+        key: 'id'
+      }
     }
   }, {
-    // Tambahkan opsi ini untuk menggunakan nama kolom yang sama persis dengan definisi
-    underscored: true,
-    // Gunakan timestamps: false jika tidak ingin menggunakan created_at dan updated_at
-    // timestamps: false
-    // Atau tentukan nama kolom timestamp secara eksplisit
+    tableName: 'question_sets', // Eksplisit nama tabel sesuai database
+    underscored: true, // Gunakan snake_case untuk kolom
     createdAt: 'created_at',
     updatedAt: 'updated_at'
   });
+
+  // Define associations if needed
+  QuestionSet.associate = function(models) {
+    // Jika ada relasi dengan User model
+    QuestionSet.belongsTo(models.User, {
+      foreignKey: 'created_by',
+      as: 'creator'
+    });
+  };
 
   return QuestionSet;
 };

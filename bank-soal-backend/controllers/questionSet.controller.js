@@ -2,6 +2,7 @@ const db = require("../models");
 const QuestionSet = db.questionSet;
 const File = db.file;
 const User = db.user;
+const Course = db.course; // Pastikan model Course diimport
 const fs = require("fs");
 
 // Membuat question set baru
@@ -18,11 +19,13 @@ exports.createQuestionSet = async (req, res) => {
       description: req.body.description,
       subject: req.body.subject,
       year: req.body.year,
-      level: req.body.difficulty, // Pastikan ini konsisten dengan frontend
+      level: req.body.difficulty,
       lecturer: req.body.lecturer,
-      topics: req.body.topics,
-      last_updated: req.body.last_updated || new Date(), // Gunakan snake_case untuk konsistensi
-      created_by: req.userId // Gunakan snake_case untuk konsistensi
+      topics: Array.isArray(req.body.topics) 
+        ? req.body.topics.join(', ') 
+        : (req.body.topics || ''),
+      last_updated: req.body.last_updated || new Date(),
+      created_by: req.userId
     });
 
     res.status(201).send({
@@ -34,6 +37,24 @@ exports.createQuestionSet = async (req, res) => {
   }
 };
 
+// Helper function untuk mendapatkan nama course berdasarkan ID
+const getCourseNameById = async (courseId) => {
+  try {
+    if (!courseId) return null;
+    
+    // Asumsikan ada model Course atau tabel course
+    // Jika menggunakan endpoint course-material-stats
+    const course = await Course.findByPk(courseId, {
+      attributes: ['id', 'name']
+    });
+    
+    return course ? course.name : null;
+  } catch (error) {
+    console.error('Error getting course name:', error);
+    return null;
+  }
+};
+
 // Mendapatkan semua question set
 exports.getAllQuestionSets = async (req, res) => {
   try {
@@ -42,7 +63,7 @@ exports.getAllQuestionSets = async (req, res) => {
         {
           model: User,
           as: "creator",
-          attributes: ["id", "username", "fullName", "email"] // Ubah name menjadi username dan fullName
+          attributes: ["id", "username", "fullName", "email"]
         },
         {
           model: File,
@@ -52,9 +73,21 @@ exports.getAllQuestionSets = async (req, res) => {
       ]
     });
 
-    res.status(200).send(questionSets);
+    // PERBAIKAN: Tambahkan course name untuk setiap question set
+    const questionSetsWithCourseNames = await Promise.all(
+      questionSets.map(async (qs) => {
+        const courseName = await getCourseNameById(qs.subject);
+        return {
+          ...qs.toJSON(),
+          courseName: courseName,
+          subjectName: courseName // Alias untuk backward compatibility
+        };
+      })
+    );
+
+    res.status(200).send(questionSetsWithCourseNames);
   } catch (error) {
-    console.error("Error in getAllQuestionSets:", error); // Tambahkan log detail error
+    console.error("Error in getAllQuestionSets:", error);
     res.status(500).send({ message: error.message });
   }
 };
@@ -67,7 +100,7 @@ exports.getQuestionSetById = async (req, res) => {
         {
           model: User,
           as: "creator",
-          attributes: ["id", "username", "fullName", "email"] // Ubah name menjadi username dan fullName
+          attributes: ["id", "username", "fullName", "email"]
         },
         {
           model: File,
@@ -87,25 +120,161 @@ exports.getQuestionSetById = async (req, res) => {
       await questionSet.save();
     }
 
-    res.status(200).send(questionSet);
+    // PERBAIKAN: Tambahkan course name
+    const courseName = await getCourseNameById(questionSet.subject);
+    const responseData = {
+      ...questionSet.toJSON(),
+      courseName: courseName,
+      subjectName: courseName
+    };
+
+    res.status(200).send(responseData);
   } catch (error) {
-    console.error("Error in getQuestionSetById:", error); // Tambahkan log detail error
+    console.error("Error in getQuestionSetById:", error);
     res.status(500).send({ message: error.message });
   }
 };
 
-// Mengupdate question set
+// UPDATE SEDERHANA TANPA FILE - UNTUK FRONTEND EDIT MODAL
+exports.updateQuestionSetSimple = async (req, res) => {
+  try {
+    console.log("Simple update request received");
+    console.log("Request params ID:", req.params.id);
+    console.log("Request body:", JSON.stringify(req.body, null, 2));
+    console.log("User ID from token:", req.userId);
+
+    const questionSet = await QuestionSet.findByPk(req.params.id);
+
+    if (!questionSet) {
+      console.log("Question set not found for ID:", req.params.id);
+      return res.status(404).send({ 
+        message: "Question set tidak ditemukan!",
+        success: false 
+      });
+    }
+
+    console.log("Found question set:", {
+      id: questionSet.id,
+      title: questionSet.title,
+      createdBy: questionSet.created_by || questionSet.createdBy
+    });
+
+    // Validasi input
+    if (!req.body.title || !req.body.subject) {
+      console.log("Missing required fields");
+      return res.status(400).send({ 
+        message: "Judul dan mata kuliah harus diisi!",
+        success: false 
+      });
+    }
+
+    // Debug topics data
+    console.log("=== TOPICS DEBUG ===");
+    console.log("req.body.topics type:", typeof req.body.topics);
+    console.log("req.body.topics value:", req.body.topics);
+    console.log("Array.isArray(req.body.topics):", Array.isArray(req.body.topics));
+
+    // Handle topics conversion dengan lebih hati-hati
+    let processedTopics;
+    if (Array.isArray(req.body.topics)) {
+      processedTopics = req.body.topics.join(', ');
+      console.log("Converted array to string:", processedTopics);
+    } else if (typeof req.body.topics === 'string') {
+      processedTopics = req.body.topics;
+      console.log("Using string as is:", processedTopics);
+    } else if (req.body.topics === null || req.body.topics === undefined) {
+      processedTopics = questionSet.topics || '';
+      console.log("Using existing topics:", processedTopics);
+    } else {
+      // Fallback: convert apapun ke string
+      processedTopics = String(req.body.topics || '');
+      console.log("Fallback conversion:", processedTopics);
+    }
+
+    // Prepare update data
+    const updateData = {
+      title: req.body.title.trim(),
+      description: req.body.description ? req.body.description.trim() : questionSet.description,
+      subject: req.body.subject,
+      year: parseInt(req.body.year) || questionSet.year,
+      level: req.body.difficulty || questionSet.level,
+      lecturer: req.body.lecturer ? req.body.lecturer.trim() : questionSet.lecturer,
+      topics: processedTopics,
+      last_updated: new Date()
+    };
+
+    console.log("Final updateData topics:", typeof updateData.topics, updateData.topics);
+    console.log("Updating with data:", updateData);
+
+    // Update data
+    await questionSet.update(updateData);
+    console.log("Question set updated successfully");
+
+    // Fetch updated data dengan associations
+    const updatedQuestionSet = await QuestionSet.findByPk(req.params.id, {
+      include: [
+        {
+          model: User,
+          as: "creator",
+          attributes: ["id", "username", "fullName", "email"]
+        },
+        {
+          model: File,
+          as: "files",
+          attributes: ["id", "originalname", "filetype", "filecategory"]
+        }
+      ]
+    });
+
+    // PERBAIKAN: Ambil course name dari database atau dari req.body.subjectName
+    let courseName = req.body.subjectName || null; // Gunakan yang dikirim dari frontend terlebih dahulu
+    
+    if (!courseName) {
+      // Jika tidak ada di request body, ambil dari database
+      courseName = await getCourseNameById(updatedQuestionSet.subject);
+    }
+
+    console.log("Course name resolved:", courseName);
+
+    // PERBAIKAN: Response data dengan course name yang benar
+    const responseData = {
+      ...updatedQuestionSet.toJSON(),
+      courseName: courseName,
+      subjectName: courseName, // Untuk backward compatibility
+      // Pastikan subject tetap berupa ID
+      subject: updatedQuestionSet.subject
+    };
+
+    console.log("Final response data:", {
+      id: responseData.id,
+      title: responseData.title,
+      subject: responseData.subject,
+      courseName: responseData.courseName,
+      subjectName: responseData.subjectName
+    });
+
+    res.status(200).send({ 
+      message: "Question set berhasil diperbarui!",
+      success: true,
+      data: responseData
+    });
+
+  } catch (error) {
+    console.error("Error in updateQuestionSetSimple:", error);
+    res.status(500).send({ 
+      message: error.message,
+      success: false 
+    });
+  }
+};
+
+// Mengupdate question set (original method - untuk backward compatibility)
 exports.updateQuestionSet = async (req, res) => {
   try {
     const questionSet = await QuestionSet.findByPk(req.params.id);
 
     if (!questionSet) {
       return res.status(404).send({ message: "Question set tidak ditemukan!" });
-    }
-
-    // Cek apakah user adalah pembuat question set
-    if (questionSet.createdBy !== req.userId) {
-      return res.status(403).send({ message: "Anda tidak memiliki akses untuk mengubah question set ini!" });
     }
 
     // Update data
@@ -116,11 +285,88 @@ exports.updateQuestionSet = async (req, res) => {
       year: req.body.year || questionSet.year,
       level: req.body.difficulty || questionSet.level,
       lecturer: req.body.lecturer || questionSet.lecturer,
-      topics: req.body.topics || questionSet.topics,
+      topics: Array.isArray(req.body.topics) 
+        ? req.body.topics.join(', ') 
+        : (req.body.topics || questionSet.topics),
       last_updated: new Date()
     });
 
-    res.status(200).send({ message: "Question set berhasil diperbarui!" });
+    // PERBAIKAN: Include course name in response
+    const courseName = await getCourseNameById(questionSet.subject);
+    const responseData = {
+      ...questionSet.toJSON(),
+      courseName: courseName,
+      subjectName: courseName
+    };
+
+    res.status(200).send({ 
+      message: "Question set berhasil diperbarui!",
+      data: responseData
+    });
+  } catch (error) {
+    res.status(500).send({ message: error.message });
+  }
+};
+
+exports.updateQuestionSetWithFiles = async (req, res) => {
+  try {
+    const questionSet = await QuestionSet.findByPk(req.params.id);
+
+    if (!questionSet) {
+      return res.status(404).send({ message: "Question set tidak ditemukan!" });
+    }
+
+    // Update data question set
+    await questionSet.update({
+      title: req.body.title || questionSet.title,
+      description: req.body.description || questionSet.description,
+      subject: req.body.subject || questionSet.subject,
+      year: req.body.year || questionSet.year,
+      level: req.body.difficulty || questionSet.level,
+      lecturer: req.body.lecturer || questionSet.lecturer,
+      topics: Array.isArray(req.body.topics) 
+        ? req.body.topics.join(', ') 
+        : (req.body.topics || questionSet.topics),
+      last_updated: new Date()
+    });   
+    
+    // Handle file uploads
+    const fileCategories = ["soal", "kunci", "test"];     
+    for (const category of fileCategories) {
+      if (req.files && req.files[category]) {
+        // Hapus file lama jika ada
+        const oldFile = await File.findOne({ where: { question_set_id: questionSet.id, filecategory: category } });
+        if (oldFile) {
+          if (fs.existsSync(oldFile.filepath)) {
+            fs.unlinkSync(oldFile.filepath);
+          }
+          await oldFile.destroy();
+        }
+        
+        // Simpan file baru
+        const uploadedFile = req.files[category][0];
+        await File.create({
+          originalname: uploadedFile.originalname,
+          filetype: uploadedFile.mimetype,
+          filepath: uploadedFile.path,
+          filecategory: category,
+          question_set_id: questionSet.id
+        });
+      }
+    }
+
+    // PERBAIKAN: Include course name in response
+    const courseName = await getCourseNameById(questionSet.subject);
+    const responseData = {
+      ...questionSet.toJSON(),
+      courseName: courseName,
+      subjectName: courseName
+    };
+    
+    res.status(200).send({ 
+      message: "Question set dan file berhasil diperbarui!",
+      questionSet: responseData
+    });
   } catch (error) {
     res.status(500).send({ message: error.message });
   }
@@ -133,11 +379,6 @@ exports.deleteQuestionSet = async (req, res) => {
 
     if (!questionSet) {
       return res.status(404).send({ message: "Question set tidak ditemukan!" });
-    }
-
-    // Cek apakah user adalah pembuat question set atau admin
-    if (questionSet.createdBy !== req.userId && !req.userRoles.includes("admin")) {
-      return res.status(403).send({ message: "Anda tidak memiliki akses untuk menghapus question set ini!" });
     }
 
     // Hapus file terkait

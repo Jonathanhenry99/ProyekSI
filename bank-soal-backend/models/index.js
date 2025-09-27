@@ -90,4 +90,5 @@ db.questionHistory.belongsTo(db.questionSet, { foreignKey: "questionSetId" });
 db.questionSet.hasMany(db.file, { as: "files", foreignKey: "question_set_id" });
 db.file.belongsTo(db.questionSet, { foreignKey: "question_set_id" });
 
+
 module.exports = db;

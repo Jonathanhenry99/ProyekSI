@@ -297,7 +297,9 @@ const UploadPage = ({ currentUser }) => {
 
   const handleSubmit = async () => {
     // Validasi input
+    window.scrollTo({top:0,behavior: "smooth"});
     if (!files.questions) {
+      // window.scrollTo({top:0,behavior: "smooth"});
       setError("Silakan upload file soal terlebih dahulu!");
       return;
     }
@@ -366,7 +368,7 @@ const UploadPage = ({ currentUser }) => {
       }
       
       await Promise.all(uploadPromises);
-      
+      window.scrollTo({top:0,behavior: "smooth"});
       setSuccess("Soal berhasil diupload!");
       
       // Reset form

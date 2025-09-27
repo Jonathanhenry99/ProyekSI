@@ -1,5 +1,7 @@
 const { authJwt } = require("../middlewares");
 const controller = require("../controllers/questionSet.controller");
+const fileController = require("../controllers/file.controller"); // TAMBAHKAN INI
+
 
 module.exports = function(app) {
   app.use(function(req, res, next) {
@@ -35,5 +37,16 @@ module.exports = function(app) {
     "/api/questionsets/:id",
     [authJwt.verifyToken],
     controller.deleteQuestionSet
+  );
+
+  
+
+  // ===== TAMBAHAN UNTUK RECYCLE BIN =====
+  
+  // Get deleted files untuk question set tertentu
+  app.get(
+    "/api/questionsets/:id/deleted-files",
+    [authJwt.verifyToken],
+    fileController.getDeletedFiles
   );
 };

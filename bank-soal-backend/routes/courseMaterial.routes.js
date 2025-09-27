@@ -184,44 +184,45 @@ module.exports = (app) => {
         }
     });
 
-    // 4. Remove material assignment from course
-    app.delete("/api/course-material-assignments/course/:courseId/material/:materialId", async (req, res) => {
-        try {
-            const { courseId, materialId } = req.params;
-            console.log(`📥 DELETE assignment - Course: ${courseId}, Material: ${materialId}`);
-            
-            const deleteResult = await db.sequelize.query(
-                'DELETE FROM course_material_assignments WHERE course_tag_id = $1 AND material_tag_id = $2 RETURNING *',
-                {
-                    bind: [courseId, materialId],
-                    type: db.sequelize.QueryTypes.DELETE
-                }
-            );
-            
-            if (deleteResult[1].rowCount === 0) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Assignment tidak ditemukan'
-                });
+// Alternative approach - single query with proper result handling
+app.delete("/api/course-material-assignments/course/:courseId/material/:materialId", async (req, res) => {
+    try {
+        const { courseId, materialId } = req.params;
+        console.log(`📥 DELETE assignment - Course: ${courseId}, Material: ${materialId}`);
+        
+        // Use a direct delete and check affected rows
+        const [results, metadata] = await db.sequelize.query(
+            'DELETE FROM course_material_assignments WHERE course_tag_id = $1 AND material_tag_id = $2',
+            {
+                bind: [courseId, materialId],
+                type: db.sequelize.QueryTypes.DELETE
             }
-            
-            console.log(`✅ Assignment removed successfully`);
-            
-            res.json({
-                success: true,
-                message: 'Materi berhasil dihapus dari mata kuliah'
-            });
-            
-        } catch (error) {
-            console.error('❌ Error removing material assignment:', error);
-            res.status(500).json({
+        );
+        
+        // Check if any rows were affected
+        if (metadata === 0) {
+            return res.status(404).json({
                 success: false,
-                message: 'Gagal menghapus assignment materi',
-                error: error.message
+                message: 'Assignment tidak ditemukan'
             });
         }
-    });
-
+        
+        console.log(`✅ Assignment removed successfully - ${metadata} row(s) affected`);
+        
+        res.json({
+            success: true,
+            message: 'Materi berhasil dihapus dari mata kuliah'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error removing material assignment:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Gagal menghapus assignment materi',
+            error: error.message
+        });
+    }
+});
     // 5. Get materials for upload form (untuk halaman upload soal)
     app.get("/api/course-material-assignments/course/:courseId/materials-for-upload", async (req, res) => {
         try {
