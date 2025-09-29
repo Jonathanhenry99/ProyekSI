@@ -9,6 +9,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import EnhancedMarkdownEditor from '../components/EnhancedMarkdownEditor';
 import { Link } from "react-router-dom";
 import Header from '../components/Header';
+import { useEffect } from 'react';
 
 // Sample data for question bank
 const sampleQuestions = [
@@ -56,6 +57,7 @@ const FormCreatorPage = ({ currentUser }) => {
     const [markdownContent, setMarkdownContent] = useState("");
     const [filteredQuestions, setFilteredQuestions] = useState(sampleQuestions);
     const markdownEditorRef = useRef(null);
+    const [selectedFormId, setSelectedFormId] = useState(null);
     
     // State untuk tag mata kuliah
     const [selectedCourseTags, setSelectedCourseTags] = useState([]);
@@ -136,18 +138,20 @@ const FormCreatorPage = ({ currentUser }) => {
         setDraggedItemIndex(null);
         setDragOverItemIndex(null);
     };
+
     // Handle question selection from bank
     const handleAddQuestion = (question) => {
         setSelectedQuestions([...selectedQuestions, question]);
 
-        // Add a small notification animation
+        // notif animasi
         const notification = document.createElement('div');
-        notification.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+        notification.className =
+        'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
         notification.textContent = 'Soal berhasil ditambahkan!';
         document.body.appendChild(notification);
 
         setTimeout(() => {
-            notification.remove();
+        notification.remove();
         }, 2000);
     };
 
@@ -190,7 +194,7 @@ const FormCreatorPage = ({ currentUser }) => {
     // Download all selected questions
     const handleDownload = () => {
         const questionsText = selectedQuestions.map((q, index) =>
-            `${index + 1}. ${q.question}\n   Mata Kuliah: ${q.subject}\n   Tingkat Kesulitan: ${q.difficulty}\n   Dosen: ${q.lecturer}\n\n`
+            `${index + 1}. ${q.title}\n   Mata Kuliah: ${q.subject}\n   Tingkat Kesulitan: ${q.level}\n   Dosen: ${q.lecturer}\n\n`
         ).join('');
 
         const blob = new Blob([`${formTitle}\n${formDescription}\n\nDAFTAR SOAL:\n\n${questionsText}`], { type: 'text/plain' });
@@ -213,6 +217,55 @@ const FormCreatorPage = ({ currentUser }) => {
             notification.remove();
         }, 2000);
     };
+
+    const [questions, setQuestions] = useState([]);
+
+    useEffect(() => {
+    fetch("http://localhost:8080/api/questionSets")
+        .then((res) => res.json())
+        .then((data) => {
+        console.log("Data dari backend:", data); // cek dulu bentuknya
+        setQuestions(data);
+        })
+        .catch((err) => console.error("Error fetch question sets:", err));
+    }, []);
+    
+
+    const handleDownloadZipBundle = () => {
+        
+        // 1. Kumpulkan semua Question Set ID
+        const questionIds = selectedQuestions
+            .map(q => q.question_set_id || q.id) 
+            .filter(id => id) 
+            .join(',');
+
+        if (!questionIds) {
+            alert("Harap tambahkan setidaknya satu soal untuk mengaktifkan download ZIP.");
+            return;
+        }
+
+        // 2. Ambil Judul Form dan bersihkan dari karakter khusus
+        const cleanFormTitle = formTitle.trim() === "" 
+            ? "Form_Tanpa_Judul" 
+            : formTitle.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_'); // Membersihkan karakter
+
+        // 3. Tentukan URL untuk ZIP download (menggunakan query parameter 'ids' dan 'title')
+        const url = `http://localhost:8080/api/files/download-bundle?ids=${questionIds}&formTitle=${cleanFormTitle}`; // <<< TAMBAH QUERY PARAMETER BARU
+        
+        // 4. Trigger Download
+        window.location.href = url;
+
+        // Optional: Notifikasi
+        const notification = document.createElement('div');
+        notification.className = 'fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+        notification.textContent = 'Download Bundle ZIP Soal dimulai...';
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+    };
+
 
     return (
         <div className="min-h-screen bg-white text-gray-800">
@@ -270,8 +323,8 @@ const FormCreatorPage = ({ currentUser }) => {
                                     </div>
                                     <div className="flex-grow">
                                         <div className="flex justify-between">
-                                            <h3 className="font-medium">{question.question}</h3>
-                                            <div className="text-xs bg-gray-100 px-2 py-1 rounded">• {question.difficulty}</div>
+                                            <h3 className="font-medium">{question.title}</h3>
+                                            <div className="text-xs bg-gray-100 px-2 py-1 rounded">• {question.level}</div>
                                         </div>
                                         <div className="text-sm text-gray-600 mt-1">
                                             {question.subject}
@@ -296,15 +349,15 @@ const FormCreatorPage = ({ currentUser }) => {
                         </div>
                         {/* Download button */}
                         {selectedQuestions.length > 0 && (
-                            <motion.button
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
-                                className="mt-8 bg-blue-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 ml-auto"
-                                onClick={handleDownload}
+                        <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            className="mt-8 bg-blue-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 ml-auto"
+                            onClick={handleDownloadZipBundle} 
                             >
-                                <Download className="w-5 h-5" />
-                                Download Soal
-                            </motion.button>
+                            <Download className="w-5 h-5" />
+                            Download Kumpulan Soal
+                        </motion.button>
                         )}
                     </motion.div>
 
@@ -341,182 +394,41 @@ const FormCreatorPage = ({ currentUser }) => {
 
                             {/* Question Grid Layout */}
                             <div className="grid grid-cols-2 gap-4 mb-4">
-                                {/* Watering Grass */}
-                                <motion.div 
+                                {questions.map((q) => (
+                                    <motion.div
+                                    key={q.id}
                                     className="border border-gray-200 rounded-lg p-4"
                                     whileHover={{ scale: 1.02, boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)" }}
                                     transition={{ duration: 0.2 }}
-                                >
+                                    >
                                     <div className="flex justify-between items-start mb-1">
-                                        <h3 className="font-medium text-gray-900 text-base">Watering Grass</h3>
-                                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Mudah</span>
+                                        <h3 className="font-medium text-gray-900 text-base">{q.title}</h3>
+                                        <span
+                                        className={`text-xs px-2 py-1 rounded ${
+                                            q.level === "Mudah"
+                                            ? "bg-green-100 text-green-800"
+                                            : q.level === "Sedang"
+                                            ? "bg-yellow-100 text-yellow-800"
+                                            : "bg-red-100 text-red-800"
+                                        }`}
+                                        >
+                                        {q.level}
+                                        </span>
                                     </div>
-                                    <div className="text-sm text-gray-700 mb-1">Greedy</div>
-                                    <div className="text-xs text-gray-500 mb-2">Dosen 1</div>
-                                    <motion.button 
+                                    <div className="text-sm text-gray-700 mb-1">{q.subject}</div>
+                                    <div className="text-xs text-gray-500 mb-2">{q.lecturer}</div>
+                                    <motion.button
                                         className="w-full bg-blue-600 text-white py-1.5 px-3 rounded text-sm font-medium"
                                         whileHover={{ scale: 1.02, backgroundColor: "#2563EB" }}
                                         whileTap={{ scale: 0.98 }}
-                                        onClick={() => handleAddQuestion({
-                                            id: 101,
-                                            question: "Watering Grass",
-                                            subject: "Greedy",
-                                            difficulty: "Mudah",
-                                            type: "Essay",
-                                            lecturer: "Dosen 1"
-                                        })}
+                                        onClick={() => handleAddQuestion(q)}
                                     >
                                         Tambah
                                     </motion.button>
-                                </motion.div>
-
-                                {/* Balanced Tree */}
-                                <motion.div 
-                                    className="border border-gray-200 rounded-lg p-4"
-                                    whileHover={{ scale: 1.02, boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)" }}
-                                    transition={{ duration: 0.2 }}
-                                >
-                                    <div className="flex justify-between items-start mb-1">
-                                        <h3 className="font-medium text-gray-900 text-base">Balanced Tree</h3>
-                                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Mudah</span>
-                                    </div>
-                                    <div className="text-sm text-gray-700 mb-1">Binary Search Tree</div>
-                                    <div className="text-xs text-gray-500 mb-2">Dosen 4</div>
-                                    <motion.button 
-                                        className="w-full bg-blue-600 text-white py-1.5 px-3 rounded text-sm font-medium"
-                                        whileHover={{ scale: 1.02, backgroundColor: "#2563EB" }}
-                                        whileTap={{ scale: 0.98 }}
-                                        onClick={() => handleAddQuestion({
-                                            id: 102,
-                                            question: "Balanced Tree",
-                                            subject: "Binary Search Tree",
-                                            difficulty: "Mudah",
-                                            type: "Essay",
-                                            lecturer: "Dosen 4"
-                                        })}
-                                    >
-                                        Tambah
-                                    </motion.button>
-                                </motion.div>
-
-                                {/* Minites Minggu 6 */}
-                                <motion.div 
-                                    className="border border-gray-200 rounded-lg p-4"
-                                    whileHover={{ scale: 1.02, boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)" }}
-                                    transition={{ duration: 0.2 }}
-                                >
-                                    <div className="flex justify-between items-start mb-1">
-                                        <h3 className="font-medium text-gray-900 text-base">Minites Minggu 6</h3>
-                                        <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Sulit</span>
-                                    </div>
-                                    <div className="text-sm text-gray-700 mb-1">Generic</div>
-                                    <div className="text-xs text-gray-500 mb-2">Dosen 2</div>
-                                    <motion.button 
-                                        className="w-full bg-blue-600 text-white py-1.5 px-3 rounded text-sm font-medium"
-                                        whileHover={{ scale: 1.02, backgroundColor: "#2563EB" }}
-                                        whileTap={{ scale: 0.98 }}
-                                        onClick={() => handleAddQuestion({
-                                            id: 103,
-                                            question: "Minites Minggu 6",
-                                            subject: "Generic",
-                                            difficulty: "Sulit",
-                                            type: "Essay",
-                                            lecturer: "Dosen 2"
-                                        })}
-                                    >
-                                        Tambah
-                                    </motion.button>
-                                </motion.div>
-
-                                {/* Minites Minggu 7 */}
-                                <motion.div 
-                                    className="border border-gray-200 rounded-lg p-4"
-                                    whileHover={{ scale: 1.02, boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)" }}
-                                    transition={{ duration: 0.2 }}
-                                >
-                                    <div className="flex justify-between items-start mb-1">
-                                        <h3 className="font-medium text-gray-900 text-base">Minites Minggu 7</h3>
-                                        <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Sulit</span>
-                                    </div>
-                                    <div className="text-sm text-gray-700 mb-1">Inheritance</div>
-                                    <div className="text-xs text-gray-500 mb-2">Dosen 2</div>
-                                    <motion.button 
-                                        className="w-full bg-blue-600 text-white py-1.5 px-3 rounded text-sm font-medium"
-                                        whileHover={{ scale: 1.02, backgroundColor: "#2563EB" }}
-                                        whileTap={{ scale: 0.98 }}
-                                        onClick={() => handleAddQuestion({
-                                            id: 104,
-                                            question: "Minites Minggu 7",
-                                            subject: "Inheritance",
-                                            difficulty: "Sulit",
-                                            type: "Essay",
-                                            lecturer: "Dosen 2"
-                                        })}
-                                    >
-                                        Tambah
-                                    </motion.button>
-                                </motion.div>
-
-                                {/* Memory Maze Game */}
-                                <motion.div 
-                                    className="border border-gray-200 rounded-lg p-4"
-                                    whileHover={{ scale: 1.02, boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)" }}
-                                    transition={{ duration: 0.2 }}
-                                >
-                                    <div className="flex justify-between items-start mb-1">
-                                        <h3 className="font-medium text-gray-900 text-base">Memory Maze Game</h3>
-                                        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Sedang</span>
-                                    </div>
-                                    <div className="text-sm text-gray-700 mb-1">Array 1D</div>
-                                    <div className="text-xs text-gray-500 mb-2">Dosen 3</div>
-                                    <motion.button 
-                                        className="w-full bg-blue-600 text-white py-1.5 px-3 rounded text-sm font-medium"
-                                        whileHover={{ scale: 1.02, backgroundColor: "#2563EB" }}
-                                        whileTap={{ scale: 0.98 }}
-                                        onClick={() => handleAddQuestion({
-                                            id: 105,
-                                            question: "Memory Maze Game",
-                                            subject: "Array 1D",
-                                            difficulty: "Sedang",
-                                            type: "Essay",
-                                            lecturer: "Dosen 3"
-                                        })}
-                                    >
-                                        Tambah
-                                    </motion.button>
-                                </motion.div>
-
-                                {/* Jadwal Bentrok */}
-                                <motion.div 
-                                    className="border border-gray-200 rounded-lg p-4"
-                                    whileHover={{ scale: 1.02, boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)" }}
-                                    transition={{ duration: 0.2 }}
-                                >
-                                    <div className="flex justify-between items-start mb-1">
-                                        <h3 className="font-medium text-gray-900 text-base">Jadwal Bentrok</h3>
-                                        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Sedang</span>
-                                    </div>
-                                    <div className="text-sm text-gray-700 mb-1">Array 1D</div>
-                                    <div className="text-xs text-gray-500 mb-2">Dosen 3</div>
-                                    <motion.button 
-                                        className="w-full bg-blue-600 text-white py-1.5 px-3 rounded text-sm font-medium"
-                                        whileHover={{ scale: 1.02, backgroundColor: "#2563EB" }}
-                                        whileTap={{ scale: 0.98 }}
-                                        onClick={() => handleAddQuestion({
-                                            id: 106,
-                                            question: "Jadwal Bentrok",
-                                            subject: "Array 1D",
-                                            difficulty: "Sedang",
-                                            type: "Essay",
-                                            lecturer: "Dosen 3"
-                                        })}
-                                    >
-                                        Tambah
-                                    </motion.button>
-                                </motion.div>
-                            </div>
+                                    </motion.div>
+                                ))}
+                                </div>
                         </div>
-
                         {/* Tag Selection Section */}
                         <div className="grid grid-cols-2 gap-4">
                             {/* Tag Mata Kuliah */}
@@ -655,8 +567,8 @@ const FormCreatorPage = ({ currentUser }) => {
                         const newQuestion = {
                             id: Date.now(),
                             question: content,
-                            subject: "Custom Question",
-                            difficulty: "Custom",
+                            title: "Custom Question",
+                            level: "Custom",
                             type: "Markdown",
                             lecturer: "User Created"
                         };
@@ -699,17 +611,17 @@ const AnimatedQuestionList = ({ questions, onAddQuestion }) => {
                         className="bg-gray-50 rounded-lg p-3 mb-3 hover:bg-blue-50 transition-colors border border-gray-200"
                     >
                         <div className="flex justify-between">
-                            <span className="text-sm font-medium text-gray-700">{question.subject}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${question.difficulty === 'Mudah'
+                            <span className="text-sm font-medium text-gray-700">{question.title}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${question.level === 'Mudah'
                                 ? 'bg-green-100 text-green-800'
-                                : question.difficulty === 'Sedang'
+                                : question.level === 'Sedang'
                                     ? 'bg-yellow-100 text-yellow-800'
                                     : 'bg-red-100 text-red-800'
                                 }`}>
-                                {question.difficulty}
+                                {question.level}
                             </span>
                         </div>
-                        <p className="text-sm text-gray-800 mt-1 line-clamp-2">{question.question}</p>
+                        <p className="text-sm text-gray-800 mt-1 line-clamp-2">{question.title}</p>
                         <div className="flex justify-between items-center mt-2">
                             <span className="text-xs text-gray-500">{question.lecturer}</span>
                             <motion.button

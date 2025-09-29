@@ -42,4 +42,7 @@ module.exports = function(app) {
 
   // Rute untuk mengunduh template soal
   app.get("/api/files/download-template", controller.downloadTemplate);
+
+  // Download bundle ZIP berisi file soal, kunci jawaban, dan test case (publik)
+  app.get("/api/files/download-bundle", controller.downloadZipBundle); 
 };
