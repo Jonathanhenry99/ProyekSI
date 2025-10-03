@@ -13,6 +13,7 @@
     "license": "ISC",
     "type": "commonjs",
     "dependencies": {
+        "archiver": "^7.0.1",
         "bank-soal-backend": "file:",
         "bcryptjs": "^3.0.2",
         "cors": "^2.8.5",

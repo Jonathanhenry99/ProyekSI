@@ -38,3 +38,4 @@ SELECT
 FROM information_schema.columns 
 WHERE table_name = 'files' 
 AND column_name IN ('uploaded_by', 'is_deleted', 'deleted_at', 'deleted_by');
+

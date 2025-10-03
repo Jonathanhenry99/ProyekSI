@@ -2,7 +2,7 @@ const db = require("../models");
 const QuestionSet = db.questionSet;
 const File = db.file;
 const User = db.user;
-const Course = db.course; // Pastikan model Course diimport
+const CourseTag = db.courseTag; // Change this line - use courseTag instead of course_tags
 const fs = require("fs");
 
 // Membuat question set baru
@@ -38,20 +38,25 @@ exports.createQuestionSet = async (req, res) => {
 };
 
 // Helper function untuk mendapatkan nama course berdasarkan ID
-const getCourseNameById = async (courseId) => {
+const getCourseNameById = async (subjectName) => {
   try {
-    if (!courseId) return null;
+    if (!subjectName) return null;
     
-    // Asumsikan ada model Course atau tabel course
-    // Jika menggunakan endpoint course-material-stats
-    const course = await Course.findByPk(courseId, {
+    // Add debug logging
+    console.log('Looking up course tag for subject:', subjectName);
+    console.log('CourseTag model available:', !!CourseTag);
+    
+    const courseTag = await CourseTag.findOne({
+      where: { name: subjectName },
       attributes: ['id', 'name']
     });
     
-    return course ? course.name : null;
+    console.log('Found course tag:', courseTag);
+    return courseTag ? courseTag.name : subjectName;
   } catch (error) {
     console.error('Error getting course name:', error);
-    return null;
+    // Return the original subject name as fallback
+    return subjectName;
   }
 };
 
