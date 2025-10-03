@@ -313,11 +313,11 @@ const CombinedPDFViewer = ({ questionSetId, type = 'questions', isAuthenticated,
   const getUploadCategory = (type) => {
     switch (type) {
       case 'questions':
-        return 'soal'; // atau 'questions' sesuai dengan backend
+        return 'questions'; // atau 'questions' sesuai dengan backend
       case 'answers':
-        return 'kunci'; // atau 'answers' sesuai dengan backend
+        return 'answers'; // atau 'answers' sesuai dengan backend
       default:
-        return 'soal';
+        return 'testCases';
     }
   };
 

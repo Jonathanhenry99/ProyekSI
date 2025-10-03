@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, CheckCircle, ChevronDown, FileText, BarChart2, Plus, Check, BookOpen } from 'lucide-react';
+import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, CheckCircle, ChevronDown, FileText, BarChart2, Plus, Check, BookOpen, Trash2, AlertTriangle, Archive, RefreshCw, Trash } from 'lucide-react';
 import Footer from '../components/Footer';
 import Header from '../components/Header';
 import { Link, useNavigate } from 'react-router-dom';
@@ -21,6 +21,17 @@ const SearchPage = ({ currentUser }) => {
   const [filteredData, setFilteredData] = useState([]);
   const [courseOptions, setCourseOptions] = useState([]);
 
+  // State untuk soft delete
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // State untuk recycle bin
+  const [showRecycleBinModal, setShowRecycleBinModal] = useState(false);
+  const [recycleBinData, setRecycleBinData] = useState([]);
+  const [isLoadingRecycleBin, setIsLoadingRecycleBin] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+
   // State untuk dropdown
   const [showLevelDropdown, setShowLevelDropdown] = useState(false);
   const [showCourseTagDropdown, setShowCourseTagDropdown] = useState(false);
@@ -38,15 +49,15 @@ const SearchPage = ({ currentUser }) => {
   const [dropdownLoading, setDropdownLoading] = useState(false);
   const [dropdownError, setDropdownError] = useState(null);
 
-  // PERBAIKAN: Helper function untuk mendapatkan nama mata kuliah berdasarkan ID
+  // Helper function untuk mendapatkan nama mata kuliah berdasarkan ID
   const getSubjectNameById = (subjectId) => {
-    if (!subjectId || !courseOptions.length) return subjectId; // Return ID as fallback
+    if (!subjectId || !courseOptions.length) return subjectId;
     
     const course = courseOptions.find(course => 
       course.id.toString() === subjectId.toString()
     );
     
-    return course ? course.name : subjectId; // Return name if found, otherwise return ID
+    return course ? course.name : subjectId;
   };
 
   // Helper function to get auth token
@@ -72,7 +83,236 @@ const SearchPage = ({ currentUser }) => {
     return token;
   };
 
-  // PERBAIKAN: Fungsi untuk mengambil data course options
+  // Fungsi untuk soft delete question set
+  const handleSoftDelete = async (id) => {
+    setIsDeleting(true);
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        alert('Token autentikasi tidak ditemukan. Silakan login kembali.');
+        return;
+      }
+
+      console.log(`🗑️ Performing soft delete for question set ID: ${id}`);
+      
+      const response = await axios.patch(`${API_URL}/questionsets/${id}/soft-delete`, {}, {
+        headers: { 
+          "x-access-token": token,
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (response.data.success) {
+        console.log('✅ Question set soft deleted successfully');
+        
+        // Remove dari state lokal
+        setQuestionSets(prev => prev.filter(item => item.id !== id));
+        setFilteredData(prev => prev.filter(item => item.id !== id));
+        
+        // Tampilkan notifikasi sukses
+        alert('Soal berhasil dipindahkan ke recycle bin');
+        
+        // Tutup modal
+        setShowDeleteModal(false);
+        setItemToDelete(null);
+      } else {
+        throw new Error(response.data.message || 'Gagal menghapus soal');
+      }
+    } catch (error) {
+      console.error("❌ Error soft deleting question set:", error);
+      
+      if (error.response?.status === 401) {
+        alert('Sesi telah berakhir. Silakan login kembali.');
+        // Redirect ke login jika diperlukan
+      } else if (error.response?.status === 403) {
+        alert('Anda tidak memiliki izin untuk menghapus soal ini.');
+      } else if (error.response?.status === 404) {
+        alert('Soal tidak ditemukan.');
+      } else {
+        alert('Gagal menghapus soal. Silakan coba lagi.');
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Fungsi untuk mengambil data recycle bin
+  const fetchRecycleBinData = async () => {
+    setIsLoadingRecycleBin(true);
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        alert('Token autentikasi tidak ditemukan. Silakan login kembali.');
+        return;
+      }
+
+      console.log('🔄 Fetching recycle bin data...');
+      
+      const response = await axios.get(`${API_URL}/questionsets/recycle-bin`, {
+        headers: { 
+          "x-access-token": token,
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (response.data.success) {
+        // Transform data sama seperti question sets biasa
+        const transformedData = response.data.data.map(item => {
+          let subjectName = item.subject;
+          
+          if (item.courseName || item.subjectName) {
+            subjectName = item.courseName || item.subjectName;
+          } else if (courseOptions.length > 0) {
+            const course = courseOptions.find(course => 
+              course.id.toString() === item.subject.toString()
+            );
+            subjectName = course ? course.name : item.subject;
+          }
+          
+          return {
+            id: item.id,
+            fileName: item.title,
+            subject: subjectName,
+            subjectId: item.subject,
+            year: item.year,
+            lecturer: item.lecturer || (item.creator ? (item.creator.fullName || item.creator.username) : 'Unknown'),
+            level: item.level,
+            lastUpdated: new Date(item.lastupdated || item.updated_at).toISOString(),
+            deletedAt: new Date(item.deleted_at).toISOString(),
+            deletedBy: item.deletedBy || null,
+            topics: item.topics ? item.topics.split(',').map(topic => topic.trim()) : [],
+            downloads: item.downloads || 0,
+            description: item.description || '',
+            hasAnswerKey: Array.isArray(item.files) && item.files.some(file => 
+              file.filecategory === 'kunci' || file.filecategory === 'answers'
+            ),
+            hasTestCase: Array.isArray(item.files) && item.files.some(file => 
+              file.filecategory === 'test' || file.filecategory === 'testCases'
+            )
+          };
+        });
+        
+        setRecycleBinData(transformedData);
+        console.log(`✅ Loaded ${transformedData.length} deleted question sets`);
+      } else {
+        throw new Error(response.data.message || 'Failed to fetch recycle bin data');
+      }
+    } catch (error) {
+      console.error("❌ Error fetching recycle bin data:", error);
+      
+      if (error.response?.status === 401) {
+        alert('Sesi telah berakhir. Silakan login kembali.');
+      } else if (error.response?.status === 403) {
+        alert('Anda tidak memiliki izin untuk mengakses recycle bin.');
+      } else {
+        alert('Gagal memuat data recycle bin. Silakan coba lagi.');
+      }
+    } finally {
+      setIsLoadingRecycleBin(false);
+    }
+  };
+
+  // Fungsi untuk restore dari recycle bin
+  const handleRestore = async (id) => {
+    setIsRestoring(true);
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        alert('Token autentikasi tidak ditemukan. Silakan login kembali.');
+        return;
+      }
+
+      console.log(`♻️ Restoring question set ID: ${id}`);
+      
+      const response = await axios.patch(`${API_URL}/questionsets/${id}/restore`, {}, {
+        headers: { 
+          "x-access-token": token,
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (response.data.success) {
+        console.log('✅ Question set restored successfully');
+        
+        // Remove dari recycle bin data
+        setRecycleBinData(prev => prev.filter(item => item.id !== id));
+        
+        // Refresh question sets list
+        const courses = await fetchCourseOptions();
+        await fetchQuestionSets(courses);
+        
+        alert('Soal berhasil dipulihkan dari recycle bin');
+      } else {
+        throw new Error(response.data.message || 'Gagal memulihkan soal');
+      }
+    } catch (error) {
+      console.error("❌ Error restoring question set:", error);
+      
+      if (error.response?.status === 401) {
+        alert('Sesi telah berakhir. Silakan login kembali.');
+      } else if (error.response?.status === 403) {
+        alert('Anda tidak memiliki izin untuk memulihkan soal ini.');
+      } else if (error.response?.status === 404) {
+        alert('Soal tidak ditemukan di recycle bin.');
+      } else {
+        alert('Gagal memulihkan soal. Silakan coba lagi.');
+      }
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
+  // Fungsi untuk permanent delete
+  const handlePermanentDelete = async (id) => {
+    if (!confirm('Apakah Anda yakin ingin menghapus soal ini secara permanen? Aksi ini tidak dapat dibatalkan.')) {
+      return;
+    }
+
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        alert('Token autentikasi tidak ditemukan. Silakan login kembali.');
+        return;
+      }
+
+      console.log(`🗑️ Permanently deleting question set ID: ${id}`);
+      
+      const response = await axios.delete(`${API_URL}/questionsets/${id}/permanent`, {
+        headers: { 
+          "x-access-token": token,
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (response.data.success) {
+        console.log('✅ Question set permanently deleted');
+        
+        // Remove dari recycle bin data
+        setRecycleBinData(prev => prev.filter(item => item.id !== id));
+        
+        alert('Soal berhasil dihapus secara permanen');
+      } else {
+        throw new Error(response.data.message || 'Gagal menghapus soal secara permanen');
+      }
+    } catch (error) {
+      console.error("❌ Error permanently deleting question set:", error);
+      alert('Gagal menghapus soal secara permanen. Silakan coba lagi.');
+    }
+  };
+
+  // Fungsi untuk membuka recycle bin modal
+  const openRecycleBinModal = () => {
+    setShowRecycleBinModal(true);
+    fetchRecycleBinData();
+  };
+
+  // Fungsi untuk konfirmasi delete
+  const confirmDelete = (item) => {
+    setItemToDelete(item);
+    setShowDeleteModal(true);
+  };
+
+  // Fungsi untuk mengambil data course options
   const fetchCourseOptions = async () => {
     try {
       const token = getAuthToken();
@@ -121,7 +361,6 @@ const SearchPage = ({ currentUser }) => {
       if (response.data.success) {
         const { courseTags: courseTagsData, materialTags: materialTagsData, difficultyLevels: difficultyData } = response.data.data;
         
-        // Map data dari API ke format yang dibutuhkan
         setCourseTags(courseTagsData.map(tag => tag.name));
         setMaterialTags(materialTagsData.map(tag => tag.name));
         setDifficultyLevels(difficultyData.map(level => level.level));
@@ -166,16 +405,13 @@ const SearchPage = ({ currentUser }) => {
   // Fungsi untuk mendownload file
   const handleDownload = async (id) => {
     try {
-      // Ambil detail question set
       const response = await axios.get(`${API_URL}/questionsets/${id}?download=true`);
       
-      // Ambil file soal (asumsi file pertama dengan kategori 'soal' atau 'questions')
       const questionFile = response.data.files.find(file => 
         file.filecategory === 'soal' || file.filecategory === 'questions'
       );
       
       if (questionFile) {
-        // Buka link download di tab baru
         window.open(`${API_URL}/files/download/${questionFile.id}`, '_blank');
       } else {
         alert('File soal tidak ditemukan');
@@ -191,13 +427,12 @@ const SearchPage = ({ currentUser }) => {
     navigate(`/preview/${id}`);
   };
 
-  // Filter function - PERBAIKAN: Filter berdasarkan nama mata kuliah, bukan ID
+  // Filter function
   const filterData = () => {
     setIsLoading(true);
     
     let filtered = [...questionSets];
     
-    // Filter berdasarkan search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(item => {
@@ -211,12 +446,10 @@ const SearchPage = ({ currentUser }) => {
       });
     }
     
-    // Filter berdasarkan level
     if (selectedLevel.length > 0) {
       filtered = filtered.filter(item => selectedLevel.includes(item.level));
     }
     
-    // PERBAIKAN: Filter berdasarkan tag mata kuliah menggunakan nama, bukan ID
     if (selectedCourseTags.length > 0) {
       filtered = filtered.filter(item => {
         const subjectName = getSubjectNameById(item.subject).toLowerCase();
@@ -224,7 +457,6 @@ const SearchPage = ({ currentUser }) => {
       });
     }
     
-    // Filter berdasarkan material tags
     if (selectedMaterialTags.length > 0) {
       filtered = filtered.filter(item => {
         return selectedMaterialTags.some(tag =>
@@ -233,7 +465,6 @@ const SearchPage = ({ currentUser }) => {
       });
     }
     
-    // Filter berdasarkan tanggal
     if (dateRange.start && dateRange.end) {
       const startDate = new Date(dateRange.start);
       const endDate = new Date(dateRange.end);
@@ -322,7 +553,7 @@ const SearchPage = ({ currentUser }) => {
     }
   };
 
-  // PERBAIKAN: Fungsi untuk mengambil data dari API dengan konversi subject ID ke nama
+  // Fungsi untuk mengambil data dari API dengan konversi subject ID ke nama
   const fetchQuestionSets = async (courses = []) => {
     setIsLoading(true);
     try {
@@ -330,16 +561,12 @@ const SearchPage = ({ currentUser }) => {
       
       console.log('🔄 Processing question sets data...');
       
-      // Transform data dengan konversi subject ID ke nama
       const transformedData = response.data.map(item => {
-        // PERBAIKAN: Gunakan courseName jika tersedia dari backend, atau konversi dari ID
         let subjectName = item.subject;
         
         if (item.courseName || item.subjectName) {
-          // Jika backend sudah mengirim nama mata kuliah
           subjectName = item.courseName || item.subjectName;
         } else if (courses.length > 0) {
-          // Jika tidak, konversi dari ID menggunakan course options
           const course = courses.find(course => 
             course.id.toString() === item.subject.toString()
           );
@@ -349,8 +576,8 @@ const SearchPage = ({ currentUser }) => {
         return {
           id: item.id,
           fileName: item.title,
-          subject: subjectName, // PERBAIKAN: Gunakan nama mata kuliah, bukan ID
-          subjectId: item.subject, // Simpan ID asli untuk kebutuhan internal
+          subject: subjectName,
+          subjectId: item.subject,
           year: item.year,
           lecturer: item.lecturer || (item.creator ? (item.creator.fullName || item.creator.username) : 'Unknown'),
           level: item.level,
@@ -378,19 +605,17 @@ const SearchPage = ({ currentUser }) => {
     }
   };
   
-  // PERBAIKAN: Update useEffect untuk mengambil course options terlebih dahulu
+  // Update useEffect untuk mengambil course options terlebih dahulu
   useEffect(() => {
     const initializeData = async () => {
       try {
         console.log('🔄 Initializing SearchPage data...');
         
-        // Ambil course options terlebih dahulu
         const courses = await fetchCourseOptions();
         
-        // Ambil data dropdown dan question sets secara bersamaan
         await Promise.all([
           fetchDropdownData(),
-          fetchQuestionSets(courses) // Pass courses ke fetchQuestionSets
+          fetchQuestionSets(courses)
         ]);
         
         console.log('✅ SearchPage data initialization complete');
@@ -439,9 +664,24 @@ const SearchPage = ({ currentUser }) => {
         <div className="p-6">
           <div className="flex justify-between items-start mb-4">
             <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">{item.fileName}</h3>
-            <span className={`px-2 py-1 text-xs rounded-full ${getLevelColor(item.level)}`}>
-              {item.level}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className={`px-2 py-1 text-xs rounded-full ${getLevelColor(item.level)}`}>
+                {item.level}
+              </span>
+              {/* Tombol Delete */}
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                className="p-1.5 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  confirmDelete(item);
+                }}
+                title="Hapus ke Recycle Bin"
+              >
+                <Trash2 className="w-4 h-4" />
+              </motion.button>
+            </div>
           </div>
 
           {/* Indikator Kelengkapan Soal */}
@@ -475,7 +715,6 @@ const SearchPage = ({ currentUser }) => {
           <div className="space-y-2 mb-4">
             <div className="flex items-center text-sm text-gray-600">
               <BookOpen className="w-4 h-4 mr-2" />
-              {/* PERBAIKAN: Tampilkan nama mata kuliah yang sudah dikonversi */}
               <span title={`Subject ID: ${item.subjectId}`}>{item.subject}</span>
             </div>
             <div className="flex items-center text-sm text-gray-600">
@@ -511,7 +750,7 @@ const SearchPage = ({ currentUser }) => {
               whileTap={{ scale: 0.95 }}
               className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
               onClick={(e) => {
-                e.stopPropagation(); // Mencegah event bubbling ke parent div
+                e.stopPropagation();
                 handleDownload(item.id);
               }}
             >
@@ -929,6 +1168,16 @@ const SearchPage = ({ currentUser }) => {
                 Menampilkan <span className="font-medium">{filteredData.length}</span> hasil pencarian
               </p>
               <div className="flex gap-2">
+                {/* Recycle Bin Button */}
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="p-2 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                  onClick={openRecycleBinModal}
+                  title="Recycle Bin"
+                >
+                  <Archive className="w-5 h-5" />
+                </motion.button>
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
@@ -1015,7 +1264,6 @@ const SearchPage = ({ currentUser }) => {
                           {item.fileName}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700" title={`Subject ID: ${item.subjectId}`}>
-                          {/* PERBAIKAN: Tampilkan nama mata kuliah di table juga */}
                           {item.subject}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -1033,15 +1281,26 @@ const SearchPage = ({ currentUser }) => {
                           {formatDate(item.lastUpdated)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center">
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            className="inline-flex items-center px-3 py-1 rounded-lg text-sm text-white bg-blue-600 hover:bg-blue-700"
-                            onClick={() => handleDownload(item.id)}
-                          >
-                            <Download className="w-3 h-3 mr-1" />
-                            Download
-                          </motion.button>
+                          <div className="flex items-center justify-center gap-2">
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              className="inline-flex items-center px-3 py-1 rounded-lg text-sm text-white bg-blue-600 hover:bg-blue-700"
+                              onClick={() => handleDownload(item.id)}
+                            >
+                              <Download className="w-3 h-3 mr-1" />
+                              Download
+                            </motion.button>
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              className="inline-flex items-center px-3 py-1 rounded-lg text-sm text-white bg-red-600 hover:bg-red-700"
+                              onClick={() => confirmDelete(item)}
+                            >
+                              <Trash2 className="w-3 h-3 mr-1" />
+                              Hapus
+                            </motion.button>
+                          </div>
                         </td>
                       </motion.tr>
                     ))}
@@ -1073,6 +1332,266 @@ const SearchPage = ({ currentUser }) => {
           )}
         </div>
       )}
+
+      {/* Recycle Bin Modal */}
+      <AnimatePresence>
+        {showRecycleBinModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowRecycleBinModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl max-w-6xl w-full max-h-[90vh] shadow-2xl overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gray-50">
+                <div className="flex items-center gap-3">
+                  <Archive className="w-6 h-6 text-gray-600" />
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Recycle Bin</h3>
+                    <p className="text-sm text-gray-500">
+                      {recycleBinData.length} soal dihapus
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowRecycleBinModal(false)}
+                  className="text-gray-500 hover:text-gray-700 p-2 rounded-full hover:bg-gray-200 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
+                {isLoadingRecycleBin ? (
+                  <div className="flex items-center justify-center py-12">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"
+                    />
+                    <p className="ml-3 text-gray-600">Memuat data recycle bin...</p>
+                  </div>
+                ) : recycleBinData.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Archive className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <h4 className="text-lg font-medium text-gray-900 mb-2">Recycle Bin Kosong</h4>
+                    <p className="text-gray-500">Tidak ada soal yang dihapus</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {recycleBinData.map((item) => (
+                      <motion.div
+                        key={item.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-gray-50 rounded-lg p-4 border border-gray-200"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="flex items-start justify-between mb-3">
+                              <h4 className="text-lg font-semibold text-gray-900 mb-1">
+                                {item.fileName}
+                              </h4>
+                              <span className={`px-2 py-1 text-xs rounded-full ${getLevelColor(item.level)}`}>
+                                {item.level}
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                              <div className="space-y-2">
+                                <div className="flex items-center text-sm text-gray-600">
+                                  <BookOpen className="w-4 h-4 mr-2" />
+                                  <span>{item.subject}</span>
+                                </div>
+                                <div className="flex items-center text-sm text-gray-600">
+                                  <User className="w-4 h-4 mr-2" />
+                                  <span>{item.lecturer}</span>
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <div className="flex items-center text-sm text-gray-600">
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  <span>Dihapus: {formatDate(item.deletedAt)}</span>
+                                </div>
+                                <div className="flex items-center text-sm text-gray-600">
+                                  <Clock className="w-4 h-4 mr-2" />
+                                  <span>Dibuat: {formatDate(item.lastUpdated)}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Topics */}
+                            {item.topics?.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mb-3">
+                                {item.topics.map((topic, index) => (
+                                  <span
+                                    key={index}
+                                    className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
+                                  >
+                                    {topic}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Completeness Indicator */}
+                            <div className="mb-4">
+                              <div className="flex items-center gap-4">
+                                <span className={`text-xs flex items-center gap-1 ${item.hasAnswerKey ? 'text-green-600' : 'text-gray-400'}`}>
+                                  <Check className="w-3 h-3" /> Kunci Jawaban
+                                </span>
+                                <span className={`text-xs flex items-center gap-1 ${item.hasTestCase ? 'text-green-600' : 'text-gray-400'}`}>
+                                  <Check className="w-3 h-3" /> Test Case
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div className="flex flex-col gap-2 ml-4">
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              className="px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                              onClick={() => handleRestore(item.id)}
+                              disabled={isRestoring}
+                            >
+                              {isRestoring ? (
+                                <motion.div
+                                  animate={{ rotate: 360 }}
+                                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                  className="w-3 h-3 border-2 border-white border-t-transparent rounded-full"
+                                />
+                              ) : (
+                                <RefreshCw className="w-3 h-3" />
+                              )}
+                              Pulihkan
+                            </motion.button>
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              className="px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+                              onClick={() => handlePermanentDelete(item.id)}
+                            >
+                              <Trash className="w-3 h-3" />
+                              Hapus Permanen
+                            </motion.button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              {recycleBinData.length > 0 && (
+                <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-between items-center">
+                  <p className="text-sm text-gray-500">
+                    💡 Tips: Soal yang dihapus akan disimpan selama 30 hari
+                  </p>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-2"
+                    onClick={() => fetchRecycleBinData()}
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Refresh
+                  </motion.button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {showDeleteModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowDeleteModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center mb-4">
+                <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-red-600" />
+                </div>
+                <div className="ml-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Konfirmasi Hapus</h3>
+                  <p className="text-sm text-gray-500">Aksi ini akan memindahkan soal ke recycle bin</p>
+                </div>
+              </div>
+
+              {itemToDelete && (
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-600">Anda akan menghapus:</p>
+                  <p className="font-medium text-gray-900">{itemToDelete.fileName}</p>
+                  <p className="text-sm text-gray-500">Mata Kuliah: {itemToDelete.subject}</p>
+                  <p className="text-sm text-gray-500">Dosen: {itemToDelete.lecturer}</p>
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-3">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="px-4 py-2 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setItemToDelete(null);
+                  }}
+                  disabled={isDeleting}
+                >
+                  Batal
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => handleSoftDelete(itemToDelete.id)}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <>
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                      />
+                      Menghapus...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      Hapus ke Recycle Bin
+                    </>
+                  )}
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Filter Modal */}
       <AnimatePresence>
