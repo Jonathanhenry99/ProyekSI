@@ -39,3 +39,29 @@ FROM information_schema.columns
 WHERE table_name = 'files' 
 AND column_name IN ('uploaded_by', 'is_deleted', 'deleted_at', 'deleted_by');
 
+-- nambahin kolom untuk soft delete question set
+
+ALTER TABLE question_sets 
+ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL,
+ADD COLUMN IF NOT EXISTS deleted_by INTEGER REFERENCES users(id);
+
+-- Buat index untuk performa query
+CREATE INDEX IF NOT EXISTS idx_question_sets_is_deleted ON question_sets(is_deleted);
+CREATE INDEX IF NOT EXISTS idx_question_sets_deleted_at ON question_sets(deleted_at);
+
+-- Update existing data
+UPDATE question_sets SET is_deleted = FALSE WHERE is_deleted IS NULL;
+
+
+-- 1. Cek struktur database
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_name = 'question_sets'
+AND column_name IN ('is_deleted', 'deleted_at', 'deleted_by');
+
+
+UPDATE question_sets 
+SET is_deleted = FALSE 
+WHERE is_deleted IS NULL;
+

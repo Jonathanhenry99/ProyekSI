@@ -667,19 +667,7 @@ exports.softDeleteFile = async (req, res) => {
       }
     }
 
-    // Check authorization
-    const createdBy = questionSet?.created_by || questionSet?.createdBy || questionSet?.dataValues?.created_by;
-    const isOwner = createdBy && createdBy === userId;
-    const isAdmin = req.userRole === 'ROLE_ADMIN' || req.userRole === 'admin';
 
-    // TEMPORARY: Allow any authenticated user (remove in production)
-    const allowAnyUser = true;
-    
-    if (!isOwner && !isAdmin && !allowAnyUser) {
-      return res.status(403).json({ 
-        message: "Anda tidak memiliki izin untuk menghapus file ini" 
-      });
-    }
 
     // Update status file menjadi deleted
     await file.update({

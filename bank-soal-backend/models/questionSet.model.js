@@ -30,7 +30,7 @@ module.exports = (sequelize, Sequelize) => {
     },
     topics: {
       type: Sequelize.TEXT,
-       // Disimpan sebagai string dengan pemisah koma
+      // Disimpan sebagai string dengan pemisah koma
     },
     downloads: {
       type: Sequelize.INTEGER,
@@ -47,6 +47,24 @@ module.exports = (sequelize, Sequelize) => {
         model: 'users',
         key: 'id'
       }
+    },
+    // ==================== SOFT DELETE FIELDS ====================
+    is_deleted: {
+      type: Sequelize.BOOLEAN,
+      defaultValue: false,
+      allowNull: false
+    },
+    deleted_at: {
+      type: Sequelize.DATE,
+      allowNull: true
+    },
+    deleted_by: {
+      type: Sequelize.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'users',
+        key: 'id'
+      }
     }
   }, {
     tableName: 'question_sets', // Eksplisit nama tabel sesuai database
@@ -55,14 +73,8 @@ module.exports = (sequelize, Sequelize) => {
     updatedAt: 'updated_at'
   });
 
-  // Define associations if needed
-  QuestionSet.associate = function(models) {
-    // Jika ada relasi dengan User model
-    QuestionSet.belongsTo(models.User, {
-      foreignKey: 'created_by',
-      as: 'creator'
-    });
-  };
+  // NOTE: Associations are defined in models/index.js
+  // No need for .associate function here
 
   return QuestionSet;
 };
