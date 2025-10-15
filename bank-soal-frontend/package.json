@@ -32,7 +32,7 @@
     "react-dropzone": "^14.3.6",
     "react-markdown": "^10.0.0",
     "react-router-dom": "^7.2.0",
-    "sequelize": "^6.37.6",
+    "sequelize": "^1.2.1",
     "tailwindcss": "^4.0.8"
   },
   "devDependencies": {
