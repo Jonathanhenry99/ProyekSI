@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, CheckCircle, ChevronDown, FileText, BarChart2, Plus, Check, BookOpen } from 'lucide-react';
+import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, CheckCircle, ChevronDown, FileText, BarChart2, Plus, Check, BookOpen, Trash2, AlertTriangle, Archive, RefreshCw, Trash } from 'lucide-react';
 import Footer from '../components/Footer';
 import Header from '../components/Header';
 import { Link, useNavigate } from 'react-router-dom';
@@ -19,6 +19,18 @@ const SearchPage = ({ currentUser }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [questionSets, setQuestionSets] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
+  const [courseOptions, setCourseOptions] = useState([]);
+
+  // State untuk soft delete
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // State untuk recycle bin
+  const [showRecycleBinModal, setShowRecycleBinModal] = useState(false);
+  const [recycleBinData, setRecycleBinData] = useState([]);
+  const [isLoadingRecycleBin, setIsLoadingRecycleBin] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
 
   // State untuk dropdown
   const [showLevelDropdown, setShowLevelDropdown] = useState(false);
@@ -30,14 +42,383 @@ const SearchPage = ({ currentUser }) => {
   const [selectedCourseTags, setSelectedCourseTags] = useState([]);
   const [selectedMaterialTags, setSelectedMaterialTags] = useState([]);
 
-  // PERUBAHAN: Data dropdown sekarang menjadi state yang akan diisi dari API
+  // Data dropdown state
   const [difficultyLevels, setDifficultyLevels] = useState([]);
   const [courseTags, setCourseTags] = useState([]);
   const [materialTags, setMaterialTags] = useState([]);
   const [dropdownLoading, setDropdownLoading] = useState(false);
   const [dropdownError, setDropdownError] = useState(null);
 
-  // TAMBAHAN: Fungsi untuk mengambil data dropdown dari API
+  // Helper function untuk mendapatkan nama mata kuliah berdasarkan ID
+  const getSubjectNameById = (subjectId) => {
+    if (!subjectId || !courseOptions.length) return subjectId;
+    
+    const course = courseOptions.find(course => 
+      course.id.toString() === subjectId.toString()
+    );
+    
+    return course ? course.name : subjectId;
+  };
+
+  // Helper function to get auth token
+  const getAuthToken = () => {
+    let token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    
+    if (!token && currentUser?.accessToken) {
+      token = currentUser.accessToken;
+    }
+    
+    if (!token) {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          token = user.accessToken;
+        } catch (e) {
+          console.error('Error parsing user from localStorage:', e);
+        }
+      }
+    }
+    
+    return token;
+  };
+
+  // FIXED: Fungsi untuk soft delete question set
+  const handleSoftDelete = async (id) => {
+    setIsDeleting(true);
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        alert('Token autentikasi tidak ditemukan. Silakan login kembali.');
+        return;
+      }
+
+      console.log(`🗑️ Performing soft delete for question set ID: ${id}`);
+      
+      const response = await axios.patch(
+        `${API_URL}/questionsets/${id}/soft-delete`, 
+        {}, 
+        {
+          headers: { 
+            "x-access-token": token,
+            "Content-Type": "application/json"
+          }
+        }
+      );
+
+      if (response.data.success) {
+        console.log('✅ Question set soft deleted successfully');
+        
+        // Remove from local state
+        setQuestionSets(prev => prev.filter(item => item.id !== id));
+        setFilteredData(prev => prev.filter(item => item.id !== id));
+        
+        alert('Soal berhasil dipindahkan ke Recycle Bin');
+        setShowDeleteModal(false);
+        setItemToDelete(null);
+      } else {
+        throw new Error(response.data.message || 'Delete operation failed');
+      }
+      
+    } catch (error) {
+      console.error("❌ Error deleting question set:", error);
+      
+      if (error.response?.status === 401) {
+        alert('Sesi telah berakhir. Silakan login kembali.');
+      } else if (error.response?.status === 403) {
+        alert('Anda tidak memiliki izin untuk menghapus soal ini.');
+      } else if (error.response?.status === 404) {
+        alert('⚠️ Endpoint soft delete belum tersedia di backend.\n\nPastikan backend sudah diupdate dengan:\n1. Route: PATCH /api/questionsets/:id/soft-delete\n2. Database column: is_deleted, deleted_at, deleted_by');
+      } else {
+        alert(`Gagal menghapus soal: ${error.response?.data?.message || error.message}`);
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // FIXED: Fungsi untuk mengambil data recycle bin
+const fetchRecycleBinData = async () => {
+  setIsLoadingRecycleBin(true);
+  try {
+    const token = getAuthToken();
+    if (!token) {
+      alert('Token autentikasi tidak ditemukan. Silakan login kembali.');
+      setIsLoadingRecycleBin(false);
+      return;
+    }
+
+    console.log('🔄 Fetching recycle bin data...');
+    console.log('📍 Full URL:', `${API_URL}/questionsets/recycle-bin/all`);
+    console.log('🔑 Token preview:', token ? `${token.substring(0, 30)}...` : 'missing');
+    
+    const response = await axios.get(`${API_URL}/questionsets/recycle-bin/all`, {
+      headers: { 
+        "x-access-token": token,
+        "Content-Type": "application/json"
+      }
+    });
+    
+    console.log('✅ Recycle bin response status:', response.status);
+    console.log('✅ Recycle bin response data:', response.data);
+    
+    const data = response.data?.data || response.data || [];
+    console.log('📦 Parsed data:', data.length, 'items');
+    
+    // Transform data
+    const transformedData = data.map(item => {
+      let subjectName = item.subject;
+      
+      if (item.courseName || item.subjectName) {
+        subjectName = item.courseName || item.subjectName;
+      } else if (courseOptions.length > 0) {
+        const course = courseOptions.find(course => 
+          course.id.toString() === item.subject.toString()
+        );
+        subjectName = course ? course.name : item.subject;
+      }
+      
+      return {
+        id: item.id,
+        fileName: item.title,
+        subject: subjectName,
+        subjectId: item.subject,
+        year: item.year,
+        lecturer: item.lecturer || (item.creator ? (item.creator.fullName || item.creator.username) : 'Unknown'),
+        level: item.level,
+        lastUpdated: new Date(item.last_updated || item.updated_at || item.createdAt).toISOString(),
+        deletedAt: new Date(item.deleted_at || item.deletedAt || new Date()).toISOString(),
+        deletedBy: item.deletedBy || item.deleted_by || null,
+        topics: item.topics ? item.topics.split(',').map(topic => topic.trim()) : [],
+        downloads: item.downloads || 0,
+        description: item.description || '',
+        hasAnswerKey: Array.isArray(item.files) && item.files.some(file => 
+          file.filecategory === 'kunci' || file.filecategory === 'answers'
+        ),
+        hasTestCase: Array.isArray(item.files) && item.files.some(file => 
+          file.filecategory === 'test' || file.filecategory === 'testCases'
+        )
+      };
+    });
+    
+    setRecycleBinData(transformedData);
+    console.log(`✅ Loaded ${transformedData.length} deleted question sets`);
+    
+  } catch (error) {
+    console.error("❌ Error fetching recycle bin data:", error);
+    console.error("❌ Error details:", {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      url: error.config?.url
+    });
+    
+    if (error.response?.status === 401) {
+      alert('Sesi telah berakhir. Silakan login kembali.');
+      setRecycleBinData([]);
+    } else if (error.response?.status === 403) {
+      alert('Anda tidak memiliki izin untuk mengakses recycle bin.');
+      setRecycleBinData([]);
+    } else if (error.response?.status === 404) {
+      console.log('⚠️ Endpoint not found. Possible issues:');
+      console.log('1. Backend routes not registered correctly');
+      console.log('2. Route order issue (generic /:id catching /recycle-bin/all)');
+      console.log('3. Server not restarted after route changes');
+      alert('⚠️ Fitur Recycle Bin belum tersedia.\n\nKemungkinan:\n1. Backend belum diupdate\n2. Server belum direstart\n3. Route order salah\n\nSilakan hubungi administrator.');
+      setRecycleBinData([]);
+    } else if (error.response?.status === 500) {
+      console.error('⚠️ Server Error (500) - Backend issue');
+      console.error('Backend error message:', error.response?.data?.error);
+      console.error('Backend error details:', error.response?.data?.details);
+      
+      const errorMsg = error.response?.data?.error || error.message;
+      
+      if (errorMsg.includes('column') || errorMsg.includes('does not exist')) {
+        alert('⚠️ Database Error!\n\nKolom "is_deleted", "deleted_at", atau "deleted_by" belum ada di database.\n\nSilakan jalankan migration SQL terlebih dahulu.');
+      } else if (errorMsg.includes('association') || errorMsg.includes('deletedByUser')) {
+        alert('⚠️ Model Error!\n\nAssociation "deletedByUser" belum terdaftar.\n\nSilakan update models/index.js dengan associations yang benar.');
+      } else {
+        alert(`❌ Server Error:\n${errorMsg}\n\nCek console server untuk detail lengkap.`);
+      }
+      
+      setRecycleBinData([]);
+    } else {
+      alert(`Gagal memuat recycle bin: ${error.response?.data?.message || error.message}`);
+      setRecycleBinData([]);
+    }
+  } finally {
+    setIsLoadingRecycleBin(false);
+  }
+};
+  // FIXED: Fungsi untuk restore dari recycle bin
+  const handleRestore = async (id) => {
+    setIsRestoring(true);
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        alert('Token autentikasi tidak ditemukan. Silakan login kembali.');
+        return;
+      }
+
+      console.log(`♻️ Restoring question set ID: ${id}`);
+      
+      let response;
+      let restoreSuccess = false;
+      
+      // Try restore endpoint first
+      try {
+        response = await axios.patch(`${API_URL}/questionsets/${id}/restore`, {}, {
+          headers: { 
+            "x-access-token": token,
+            "Content-Type": "application/json"
+          }
+        });
+        restoreSuccess = true;
+      } catch (error) {
+        if (error.response?.status === 404) {
+          // Fallback: try update with isDeleted = false
+          try {
+            response = await axios.patch(`${API_URL}/questionsets/${id}`, {
+              isDeleted: false,
+              deletedAt: null
+            }, {
+              headers: { 
+                "x-access-token": token,
+                "Content-Type": "application/json"
+              }
+            });
+            restoreSuccess = true;
+          } catch (updateError) {
+            throw updateError;
+          }
+        } else {
+          throw error;
+        }
+      }
+
+      if (restoreSuccess && (response.status === 200 || response.status === 204)) {
+        console.log('✅ Question set restored successfully');
+        
+        // Remove from recycle bin data
+        setRecycleBinData(prev => prev.filter(item => item.id !== id));
+        
+        // Refresh question sets list
+        const courses = await fetchCourseOptions();
+        await fetchQuestionSets(courses);
+        
+        alert('Soal berhasil dipulihkan');
+      } else {
+        throw new Error('Restore operation failed');
+      }
+    } catch (error) {
+      console.error("❌ Error restoring question set:", error);
+      
+      if (error.response?.status === 401) {
+        alert('Sesi telah berakhir. Silakan login kembali.');
+      } else if (error.response?.status === 403) {
+        alert('Anda tidak memiliki izin untuk memulihkan soal ini.');
+      } else if (error.response?.status === 404) {
+        alert('Fitur restore belum tersedia atau soal tidak ditemukan.');
+      } else {
+        alert('Gagal memulihkan soal. Silakan coba lagi.');
+      }
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
+  // Fungsi untuk permanent delete
+  const handlePermanentDelete = async (id) => {
+    if (!confirm('Apakah Anda yakin ingin menghapus soal ini secara permanen? Aksi ini tidak dapat dibatalkan.')) {
+      return;
+    }
+
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        alert('Token autentikasi tidak ditemukan. Silakan login kembali.');
+        return;
+      }
+
+      console.log(`🗑️ Permanently deleting question set ID: ${id}`);
+      
+      const response = await axios.delete(`${API_URL}/questionsets/${id}`, {
+        headers: { 
+          "x-access-token": token,
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (response.status === 200 || response.status === 204) {
+        console.log('✅ Question set permanently deleted');
+        
+        // Remove from recycle bin data
+        setRecycleBinData(prev => prev.filter(item => item.id !== id));
+        
+        alert('Soal berhasil dihapus secara permanen');
+      } else {
+        throw new Error('Permanent delete failed');
+      }
+    } catch (error) {
+      console.error("❌ Error permanently deleting question set:", error);
+      if (error.response?.status === 404) {
+        // Item already deleted, remove from UI
+        setRecycleBinData(prev => prev.filter(item => item.id !== id));
+        alert('Soal sudah terhapus.');
+      } else {
+        alert('Gagal menghapus soal secara permanen. Silakan coba lagi.');
+      }
+    }
+  };
+
+  // Helper functions
+  const openRecycleBinModal = () => {
+    setShowRecycleBinModal(true);
+    fetchRecycleBinData();
+  };
+
+  const confirmDelete = (item) => {
+    setItemToDelete(item);
+    setShowDeleteModal(true);
+  };
+
+  // Data fetching functions
+  const fetchCourseOptions = async () => {
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        console.warn("No auth token found for fetching courses");
+        return [];
+      }
+      
+      console.log('🔄 Fetching course options...');
+      
+      const response = await axios.get(`${API_URL}/course-material-stats`, {
+        headers: { 
+          "x-access-token": token,
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (response.data && Array.isArray(response.data)) {
+        const courses = response.data.map(course => ({
+          id: course.id,
+          name: course.name
+        }));
+        
+        setCourseOptions(courses);
+        console.log(`✅ Loaded ${courses.length} course options`);
+        return courses;
+      } else {
+        console.warn("Invalid course data format received");
+        return [];
+      }
+    } catch (error) {
+      console.error("❌ Error fetching course options:", error);
+      return [];
+    }
+  };
+
   const fetchDropdownData = async () => {
     setDropdownLoading(true);
     setDropdownError(null);
@@ -49,16 +430,11 @@ const SearchPage = ({ currentUser }) => {
       if (response.data.success) {
         const { courseTags: courseTagsData, materialTags: materialTagsData, difficultyLevels: difficultyData } = response.data.data;
         
-        // Map data dari API ke format yang dibutuhkan
         setCourseTags(courseTagsData.map(tag => tag.name));
         setMaterialTags(materialTagsData.map(tag => tag.name));
         setDifficultyLevels(difficultyData.map(level => level.level));
         
-        console.log('✅ Dropdown data loaded successfully:', {
-          courseTags: courseTagsData.length,
-          materialTags: materialTagsData.length,
-          difficultyLevels: difficultyData.length
-        });
+        console.log('✅ Dropdown data loaded successfully');
       } else {
         throw new Error(response.data.message || 'Failed to fetch dropdown data');
       }
@@ -67,41 +443,91 @@ const SearchPage = ({ currentUser }) => {
       console.error("❌ Error fetching dropdown data:", error);
       setDropdownError(error.message);
       
-      // Fallback ke data default jika API gagal
+      // Fallback data
       console.log('🔄 Using fallback data for dropdowns');
       setDifficultyLevels(['Mudah', 'Sedang', 'Sulit']);
       setCourseTags([
-        'Algoritma dan Pemrograman',
-        'Struktur Data', 
-        'Basis Data',
-        'Pemrograman Web',
-        'Pemrograman Mobile',
-        'Jaringan Komputer',
-        'Sistem Operasi',
-        'Rekayasa Perangkat Lunak'
+        'Algoritma dan Pemrograman', 'Struktur Data', 'Basis Data',
+        'Pemrograman Web', 'Pemrograman Mobile', 'Jaringan Komputer',
+        'Sistem Operasi', 'Rekayasa Perangkat Lunak'
       ]);
       setMaterialTags([
-        'Array', 'Linked List', 'Stack', 'Queue', 'Tree', 
-        'Graph', 'Sorting', 'Searching', 'SQL', 'NoSQL',
-        'HTML', 'CSS', 'JavaScript', 'React', 'Node.js',
-        'PHP', 'Python', 'Java'
+        'Array', 'Linked List', 'Stack', 'Queue', 'Tree', 'Graph',
+        'Sorting', 'Searching', 'SQL', 'NoSQL', 'HTML', 'CSS',
+        'JavaScript', 'React', 'Node.js', 'PHP', 'Python', 'Java'
       ]);
     } finally {
       setDropdownLoading(false);
     }
   };
 
-  // Fungsi untuk mendownload file
+  const fetchQuestionSets = async (courses = []) => {
+    setIsLoading(true);
+    try {
+      const response = await axios.get(`${API_URL}/questionsets`);
+      
+      console.log('🔄 Processing question sets data...');
+      
+      // Filter only active data (not deleted)
+      const activeData = response.data.filter(item => 
+        !item.isDeleted && 
+        !item.deleted_at && 
+        !item.deletedAt
+      );
+      
+      const transformedData = activeData.map(item => {
+        let subjectName = item.subject;
+        
+        if (item.courseName || item.subjectName) {
+          subjectName = item.courseName || item.subjectName;
+        } else if (courses.length > 0) {
+          const course = courses.find(course => 
+            course.id.toString() === item.subject.toString()
+          );
+          subjectName = course ? course.name : item.subject;
+        }
+        
+        return {
+          id: item.id,
+          fileName: item.title,
+          subject: subjectName,
+          subjectId: item.subject,
+          year: item.year,
+          lecturer: item.lecturer || (item.creator ? (item.creator.fullName || item.creator.username) : 'Unknown'),
+          level: item.level,
+          lastUpdated: new Date(item.lastupdated || item.updated_at).toISOString(),
+          topics: item.topics ? item.topics.split(',').map(topic => topic.trim()) : [],
+          downloads: item.downloads || 0,
+          description: item.description || '',
+          hasAnswerKey: Array.isArray(item.files) && item.files.some(file => 
+            file.filecategory === 'kunci' || file.filecategory === 'answers'
+          ),
+          hasTestCase: Array.isArray(item.files) && item.files.some(file => 
+            file.filecategory === 'test' || file.filecategory === 'testCases'
+          )
+        };
+      });
+      
+      console.log(`✅ Processed ${transformedData.length} active question sets`);
+      
+      setQuestionSets(transformedData);
+      setFilteredData(transformedData);
+    } catch (error) {
+      console.error("❌ Error fetching question sets:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleDownload = async (id) => {
     try {
-      // Ambil detail question set
       const response = await axios.get(`${API_URL}/questionsets/${id}?download=true`);
       
-      // Ambil file soal (asumsi file pertama dengan kategori 'questions')
-      const questionFile = response.data.files.find(file => file.filecategory === 'questions');
+      const questionFile = response.data.files.find(file => 
+        file.filecategory === 'soal' || file.filecategory === 'questions'
+      );
       
       if (questionFile) {
-        // Buka link download di tab baru
         window.open(`${API_URL}/files/download/${questionFile.id}`, '_blank');
       } else {
         alert('File soal tidak ditemukan');
@@ -112,43 +538,40 @@ const SearchPage = ({ currentUser }) => {
     }
   };
   
-  // Fungsi untuk navigasi ke halaman preview
   const handleCardClick = (id) => {
     navigate(`/preview/${id}`);
   };
 
-  // Filter function
+  // Filter and search functions
   const filterData = () => {
     setIsLoading(true);
     
     let filtered = [...questionSets];
     
-    // Filter berdasarkan search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(item => {
+        const subjectName = getSubjectNameById(item.subject).toLowerCase();
         return (
           item.fileName.toLowerCase().includes(query) ||
-          item.subject.toLowerCase().includes(query) ||
+          subjectName.includes(query) ||
           item.lecturer.toLowerCase().includes(query) ||
           (item.topics && item.topics.some(topic => topic.toLowerCase().includes(query)))
         );
       });
     }
     
-    // Filter berdasarkan level
     if (selectedLevel.length > 0) {
       filtered = filtered.filter(item => selectedLevel.includes(item.level));
     }
     
-    // Filter berdasarkan tag mata kuliah
     if (selectedCourseTags.length > 0) {
       filtered = filtered.filter(item => {
-        return selectedCourseTags.some(tag => item.subject.toLowerCase().includes(tag.toLowerCase()));
+        const subjectName = getSubjectNameById(item.subject).toLowerCase();
+        return selectedCourseTags.some(tag => subjectName.includes(tag.toLowerCase()));
       });
     }
     
-    // Filter berdasarkan material tags
     if (selectedMaterialTags.length > 0) {
       filtered = filtered.filter(item => {
         return selectedMaterialTags.some(tag =>
@@ -157,7 +580,6 @@ const SearchPage = ({ currentUser }) => {
       });
     }
     
-    // Filter berdasarkan tanggal
     if (dateRange.start && dateRange.end) {
       const startDate = new Date(dateRange.start);
       const endDate = new Date(dateRange.end);
@@ -173,7 +595,7 @@ const SearchPage = ({ currentUser }) => {
     return filtered;
   };
 
-  // Filter dropdown data berdasarkan input pencarian
+  // Filter dropdown data
   const filteredLevels = difficultyLevels.filter(level =>
     level.toLowerCase().includes(levelSearch.toLowerCase())
   );
@@ -186,43 +608,26 @@ const SearchPage = ({ currentUser }) => {
     tag.toLowerCase().includes(materialTagSearch.toLowerCase())
   );
 
-  // Fungsi untuk menambah/menghapus level
+  // Toggle functions
   const toggleLevel = (level) => {
-    if (selectedLevel.includes(level)) {
-      setSelectedLevel(prev => prev.filter(l => l !== level));
-    } else {
-      setSelectedLevel(prev => [...prev, level]);
-    }
-  }
-
-  // Fungsi untuk menambah/menghapus course tag
-  const toggleCourseTag = (tag) => {
-    if (selectedCourseTags.includes(tag)) {
-      setSelectedCourseTags(prev => prev.filter(t => t !== tag));
-    } else {
-      setSelectedCourseTags(prev => [...prev, tag]);
-    }
-  }
-
-  // Fungsi untuk menambah/menghapus material tag
-  const toggleMaterialTag = (tag) => {
-    if (selectedMaterialTags.includes(tag)) {
-      setSelectedMaterialTags(prev => prev.filter(t => t !== tag));
-    } else {
-      setSelectedMaterialTags(prev => [...prev, tag]);
-    }
-  }
-
-  // Animation variants
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1 }
-    }
+    setSelectedLevel(prev => 
+      prev.includes(level) ? prev.filter(l => l !== level) : [...prev, level]
+    );
   };
 
-  // Helper function to format date
+  const toggleCourseTag = (tag) => {
+    setSelectedCourseTags(prev => 
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+    );
+  };
+
+  const toggleMaterialTag = (tag) => {
+    setSelectedMaterialTags(prev => 
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+    );
+  };
+
+  // Helper functions for UI
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('id-ID', {
@@ -232,7 +637,6 @@ const SearchPage = ({ currentUser }) => {
     });
   };
   
-  // Helper function to get level color
   const getLevelColor = (level) => {
     switch(level) {
       case 'Mudah':
@@ -246,62 +650,69 @@ const SearchPage = ({ currentUser }) => {
     }
   };
 
-  // Fungsi untuk mengambil data dari API
-  const fetchQuestionSets = async () => {
-   setIsLoading(true);
-   try {
-    const response = await axios.get(`${API_URL}/questionsets`);
-    // Cek jika response.data adalah array dan setiap item memiliki files
-    const transformedData = response.data.map(item => ({
-      id: item.id,
-      fileName: item.title,
-      subject: item.subject,
-      year: item.year,
-      lecturer: item.lecturer || (item.creator ? (item.creator.fullName || item.creator.username) : 'Unknown'),
-      level: item.level,
-      lastUpdated: new Date(item.lastupdated || item.updated_at).toISOString(),
-      topics: item.topics ? item.topics.split(',').map(topic => topic.trim()) : [],
-      downloads: item.downloads || 0,
-      description: item.description || '',
-      hasAnswerKey: Array.isArray(item.files) && item.files.some(file => file.filecategory === 'answers'),
-      hasTestCase: Array.isArray(item.files) && item.files.some(file => file.filecategory === 'testCases')
-    }));
-    setQuestionSets(transformedData);
-    setFilteredData(transformedData);
-   } catch (error) {
-    console.error("Error fetching question sets:", error);
-   } finally {
-    setIsLoading(false);
-   }
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
   };
-  
-  // PERUBAHAN: Update useEffect untuk mengambil data dropdown dan question sets
-  useEffect(() => {
-    const initializeData = async () => {
-      try {
-        // Ambil data dropdown dan question sets secara bersamaan
-        await Promise.all([
-          fetchDropdownData(),
-          fetchQuestionSets()
-        ]);
-      } catch (error) {
-        console.error('Error initializing data:', error);
-      }
-    };
-    
-    initializeData();
-  }, []);
 
-  // TAMBAHAN: Auto-filter saat ada perubahan
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (questionSets.length > 0 && !dropdownLoading) {
-        filterData();
-      }
-    }, 300);
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: { y: 0, opacity: 1 }
+  };
 
-    return () => clearTimeout(timeoutId);
-  }, [searchQuery, selectedLevel, selectedCourseTags, selectedMaterialTags, dateRange, questionSets, dropdownLoading]);
+  const dropdownVariants = {
+    hidden: { opacity: 0, y: -10, height: 0 },
+    visible: { opacity: 1, y: 0, height: 'auto' }
+  };
+
+  // Components
+  const LoadingAnimation = () => (
+    <div className="fixed inset-0 flex items-center justify-center bg-white bg-opacity-90 z-50">
+      <motion.div
+        animate={{
+          scale: [1, 1.2, 1],
+          rotate: [0, 180, 360]
+        }}
+        transition={{
+          duration: 2,
+          repeat: Infinity,
+          ease: "easeInOut"
+        }}
+        className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full"
+      />
+      <motion.p
+        animate={{ opacity: [0.5, 1, 0.5] }}
+        transition={{
+          duration: 1.5,
+          repeat: Infinity
+        }}
+        className="ml-4 text-lg font-medium text-blue-600"
+      >
+        {dropdownLoading && courseOptions.length === 0 ? 'Memuat Data Mata Kuliah...' :
+         dropdownLoading ? 'Memuat Filter Data...' : 
+         'Memuat Data...'}
+      </motion.p>
+    </div>
+  );
+
+  const DropdownStatusIndicator = () => {
+    if (dropdownError && !dropdownLoading) {
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-2 rounded-lg mb-4 text-sm max-w-6xl mx-auto"
+        >
+          ⚠️ Menggunakan data filter default. Server mungkin sedang bermasalah. ({dropdownError})
+        </motion.div>
+      );
+    }
+    return null;
+  };
 
   const renderCard = (item) => {
     const hasAnswerKey = item.hasAnswerKey ?? false;
@@ -322,6 +733,7 @@ const SearchPage = ({ currentUser }) => {
 
     return (
       <motion.div
+        key={item.id}
         variants={itemVariants}
         className={`bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow cursor-pointer ${viewMode === 'grid' ? 'h-full' : ''}`}
         onClick={() => handleCardClick(item.id)}
@@ -329,12 +741,25 @@ const SearchPage = ({ currentUser }) => {
         <div className="p-6">
           <div className="flex justify-between items-start mb-4">
             <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">{item.fileName}</h3>
-            <span className={`px-2 py-1 text-xs rounded-full ${getLevelColor(item.level)}`}>
-              {item.level}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className={`px-2 py-1 text-xs rounded-full ${getLevelColor(item.level)}`}>
+                {item.level}
+              </span>
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                className="p-1.5 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  confirmDelete(item);
+                }}
+                title="Hapus Soal"
+              >
+                <Trash2 className="w-4 h-4" />
+              </motion.button>
+            </div>
           </div>
 
-          {/* Indikator Kelengkapan Soal */}
           <div className="mb-4">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-medium text-gray-600">Kelengkapan Soal</span>
@@ -365,7 +790,7 @@ const SearchPage = ({ currentUser }) => {
           <div className="space-y-2 mb-4">
             <div className="flex items-center text-sm text-gray-600">
               <BookOpen className="w-4 h-4 mr-2" />
-              <span>{item.subject}</span>
+              <span title={`Subject ID: ${item.subjectId}`}>{item.subject}</span>
             </div>
             <div className="flex items-center text-sm text-gray-600">
               <User className="w-4 h-4 mr-2" />
@@ -400,7 +825,7 @@ const SearchPage = ({ currentUser }) => {
               whileTap={{ scale: 0.95 }}
               className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
               onClick={(e) => {
-                e.stopPropagation(); // Mencegah event bubbling ke parent div
+                e.stopPropagation();
                 handleDownload(item.id);
               }}
             >
@@ -412,73 +837,66 @@ const SearchPage = ({ currentUser }) => {
     );
   };
 
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: { y: 0, opacity: 1 }
-  };
+  // Effects
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        console.log('🔄 Initializing SearchPage data...');
+        
+        const courses = await fetchCourseOptions();
+        
+        await Promise.all([
+          fetchDropdownData(),
+          fetchQuestionSets(courses)
+        ]);
+        
+        console.log('✅ SearchPage data initialization complete');
+      } catch (error) {
+        console.error('❌ Error initializing data:', error);
+      }
+    };
+    
+    initializeData();
+  }, []);
 
-  // PERUBAHAN: Loading animation dengan informasi dropdown loading
-  const LoadingAnimation = () => (
-    <div className="fixed inset-0 flex items-center justify-center bg-white bg-opacity-90 z-50">
-      <motion.div
-        animate={{
-          scale: [1, 1.2, 1],
-          rotate: [0, 180, 360]
-        }}
-        transition={{
-          duration: 2,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-        className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full"
-      />
-      <motion.p
-        animate={{ opacity: [0.5, 1, 0.5] }}
-        transition={{
-          duration: 1.5,
-          repeat: Infinity
-        }}
-        className="ml-4 text-lg font-medium text-blue-600"
-      >
-        {dropdownLoading ? 'Memuat Filter Data...' : 'Memuat Data...'}
-      </motion.p>
-    </div>
-  );
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (questionSets.length >= 0 && !dropdownLoading && courseOptions.length >= 0) {
+        filterData();
+      }
+    }, 300);
 
-  // TAMBAHAN: Indikator jika menggunakan data fallback
-  const DropdownStatusIndicator = () => {
-    if (dropdownError && !dropdownLoading) {
-      return (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-2 rounded-lg mb-4 text-sm max-w-6xl mx-auto"
-        >
-          ⚠️ Menggunakan data filter default. Server mungkin sedang bermasalah. ({dropdownError})
-        </motion.div>
-      );
-    }
-    return null;
-  };
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, selectedLevel, selectedCourseTags, selectedMaterialTags, dateRange, questionSets, dropdownLoading, courseOptions]);
 
-  // Dropdown animation variants
-  const dropdownVariants = {
-    hidden: { opacity: 0, y: -10, height: 0 },
-    visible: { opacity: 1, y: 0, height: 'auto' }
-  };
+  // Handle outside clicks for dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.dropdown-container')) {
+        setShowLevelDropdown(false);
+        setShowCourseTagDropdown(false);
+        setShowMaterialTagDropdown(false);
+      }
+    };
 
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Main render
   return (
     <div className="min-h-screen bg-white">
       <Header currentUser={currentUser} />
 
-      {/* TAMBAHAN: Status indicator */}
       <DropdownStatusIndicator />
 
-      {isLoading || dropdownLoading ? (
+      {isLoading || dropdownLoading || courseOptions.length === 0 ? (
         <LoadingAnimation />
       ) : (
         <div className="w-full px-4 md:px-8 py-8 md:py-12">
-          {/* Header Section with Animated Background */}
+          {/* Header Section */}
           <div className="relative overflow-hidden">
             <motion.div
               className="absolute inset-0 -z-10"
@@ -565,7 +983,7 @@ const SearchPage = ({ currentUser }) => {
             {/* Dropdown Filters */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
               {/* Tingkat Kesulitan Dropdown */}
-              <div className="relative">
+              <div className="relative dropdown-container">
                 <label className="block text-sm font-medium mb-2 text-gray-700">Pilih Tingkat Kesulitan</label>
                 <div className="relative">
                   <input
@@ -584,7 +1002,6 @@ const SearchPage = ({ currentUser }) => {
                   </button>
                 </div>
 
-                {/* Dropdown Menu */}
                 <AnimatePresence>
                   {showLevelDropdown && (
                     <motion.div
@@ -599,9 +1016,7 @@ const SearchPage = ({ currentUser }) => {
                           <div
                             key={level}
                             className="flex items-center px-4 py-2 hover:bg-blue-50 cursor-pointer"
-                            onClick={() => {
-                              toggleLevel(level);
-                            }}
+                            onClick={() => toggleLevel(level)}
                           >
                             <div className={`w-5 h-5 border rounded mr-2 flex items-center justify-center ${selectedLevel.includes(level) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}`}>
                               {selectedLevel.includes(level) && <Check className="w-4 h-4 text-white" />}
@@ -618,7 +1033,7 @@ const SearchPage = ({ currentUser }) => {
               </div>
 
               {/* Tag Mata Kuliah Dropdown */}
-              <div className="relative">
+              <div className="relative dropdown-container">
                 <label className="block text-sm font-medium mb-2 text-gray-700">Pilih Tag Mata Kuliah</label>
                 <div className="relative">
                   <input
@@ -637,7 +1052,6 @@ const SearchPage = ({ currentUser }) => {
                   </button>
                 </div>
 
-                {/* Dropdown Menu */}
                 <AnimatePresence>
                   {showCourseTagDropdown && (
                     <motion.div
@@ -652,9 +1066,7 @@ const SearchPage = ({ currentUser }) => {
                           <div
                             key={tag}
                             className="flex items-center px-4 py-2 hover:bg-blue-50 cursor-pointer"
-                            onClick={() => {
-                              toggleCourseTag(tag);
-                            }}
+                            onClick={() => toggleCourseTag(tag)}
                           >
                             <div className={`w-5 h-5 border rounded mr-2 flex items-center justify-center ${selectedCourseTags.includes(tag) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}`}>
                               {selectedCourseTags.includes(tag) && <Check className="w-4 h-4 text-white" />}
@@ -671,7 +1083,7 @@ const SearchPage = ({ currentUser }) => {
               </div>
 
               {/* Tag Materi Dropdown */}
-              <div className="relative">
+              <div className="relative dropdown-container">
                 <label className="block text-sm font-medium mb-2 text-gray-700">Pilih Tag Materi</label>
                 <div className="relative">
                   <input
@@ -690,7 +1102,6 @@ const SearchPage = ({ currentUser }) => {
                   </button>
                 </div>
 
-                {/* Dropdown Menu */}
                 <AnimatePresence>
                   {showMaterialTagDropdown && (
                     <motion.div
@@ -705,9 +1116,7 @@ const SearchPage = ({ currentUser }) => {
                           <div
                             key={tag}
                             className="flex items-center px-4 py-2 hover:bg-blue-50 cursor-pointer"
-                            onClick={() => {
-                              toggleMaterialTag(tag);
-                            }}
+                            onClick={() => toggleMaterialTag(tag)}
                           >
                             <div className={`w-5 h-5 border rounded mr-2 flex items-center justify-center ${selectedMaterialTags.includes(tag) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}`}>
                               {selectedMaterialTags.includes(tag) && <Check className="w-4 h-4 text-white" />}
@@ -819,6 +1228,15 @@ const SearchPage = ({ currentUser }) => {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
+                  className="p-2 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                  onClick={openRecycleBinModal}
+                  title="Recycle Bin"
+                >
+                  <Archive className="w-5 h-5" />
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   className={`p-2 rounded ${viewMode === 'grid' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}
                   onClick={() => setViewMode('grid')}
                 >
@@ -846,9 +1264,7 @@ const SearchPage = ({ currentUser }) => {
                 animate="visible"
                 key="grid-view"
               >
-                {filteredData.map((item, index) => (
-                  renderCard(item)
-                ))}
+                {filteredData.map((item) => renderCard(item))}
               </motion.div>
             ) : (
               <motion.div
@@ -901,14 +1317,11 @@ const SearchPage = ({ currentUser }) => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {item.fileName}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700" title={`Subject ID: ${item.subjectId}`}>
                           {item.subject}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-3 py-1 rounded-full text-xs ${item.level === 'Mudah' ? 'bg-green-100 text-green-700' :
-                            item.level === 'Sedang' ? 'bg-yellow-100 text-yellow-700' :
-                              'bg-red-100 text-red-700'
-                            }`}>
+                          <span className={`px-3 py-1 rounded-full text-xs ${getLevelColor(item.level)}`}>
                             {item.level}
                           </span>
                         </td>
@@ -919,15 +1332,26 @@ const SearchPage = ({ currentUser }) => {
                           {formatDate(item.lastUpdated)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center">
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            className="inline-flex items-center px-3 py-1 rounded-lg text-sm text-white bg-blue-600 hover:bg-blue-700"
-                            onClick={() => handleDownload(item.id)}
-                          >
-                            <Download className="w-3 h-3 mr-1" />
-                            Download
-                          </motion.button>
+                          <div className="flex items-center justify-center gap-2">
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              className="inline-flex items-center px-3 py-1 rounded-lg text-sm text-white bg-blue-600 hover:bg-blue-700"
+                              onClick={() => handleDownload(item.id)}
+                            >
+                              <Download className="w-3 h-3 mr-1" />
+                              Download
+                            </motion.button>
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              className="inline-flex items-center px-3 py-1 rounded-lg text-sm text-white bg-red-600 hover:bg-red-700"
+                              onClick={() => confirmDelete(item)}
+                            >
+                              <Trash2 className="w-3 h-3 mr-1" />
+                              Hapus
+                            </motion.button>
+                          </div>
                         </td>
                       </motion.tr>
                     ))}
@@ -960,35 +1384,287 @@ const SearchPage = ({ currentUser }) => {
         </div>
       )}
 
-      {/* Filter Modal */}
+      {/* Modals */}
+     {/* Recycle Bin Modal */}
+     <AnimatePresence>
+        {showRecycleBinModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 backdrop-blur-md bg-white/30 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowRecycleBinModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl max-w-6xl w-full max-h-[90vh] shadow-2xl overflow-hidden backdrop-blur-sm border border-white/20"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gray-50/80 backdrop-blur-sm">
+                <div className="flex items-center gap-3">
+                  <Archive className="w-6 h-6 text-gray-600" />
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Recycle Bin</h3>
+                    <p className="text-sm text-gray-500">
+                      {recycleBinData.length} soal dihapus
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowRecycleBinModal(false)}
+                  className="text-gray-500 hover:text-gray-700 p-2 rounded-full hover:bg-gray-200/50 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)] bg-white/90 backdrop-blur-sm">
+                {isLoadingRecycleBin ? (
+                  <div className="flex items-center justify-center py-12">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"
+                    />
+                    <p className="ml-3 text-gray-600">Memuat data recycle bin...</p>
+                  </div>
+                ) : recycleBinData.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Archive className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <h4 className="text-lg font-medium text-gray-900 mb-2">Recycle Bin Kosong</h4>
+                    <p className="text-gray-500">Tidak ada soal yang dihapus</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {recycleBinData.map((item) => (
+                      <motion.div
+                        key={item.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-gray-50/60 backdrop-blur-sm rounded-lg p-4 border border-gray-200/50"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="flex items-start justify-between mb-3">
+                              <h4 className="text-lg font-semibold text-gray-900 mb-1">
+                                {item.fileName}
+                              </h4>
+                              <span className={`px-2 py-1 text-xs rounded-full ${getLevelColor(item.level)}`}>
+                                {item.level}
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                              <div className="space-y-2">
+                                <div className="flex items-center text-sm text-gray-600">
+                                  <BookOpen className="w-4 h-4 mr-2" />
+                                  <span>{item.subject}</span>
+                                </div>
+                                <div className="flex items-center text-sm text-gray-600">
+                                  <User className="w-4 h-4 mr-2" />
+                                  <span>{item.lecturer}</span>
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <div className="flex items-center text-sm text-gray-600">
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  <span>Dihapus: {formatDate(item.deletedAt)}</span>
+                                </div>
+                                <div className="flex items-center text-sm text-gray-600">
+                                  <Clock className="w-4 h-4 mr-2" />
+                                  <span>Dibuat: {formatDate(item.lastUpdated)}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {item.topics?.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mb-3">
+                                {item.topics.map((topic, index) => (
+                                  <span
+                                    key={index}
+                                    className="px-2 py-1 bg-blue-100/70 text-blue-800 text-xs rounded-full backdrop-blur-sm"
+                                  >
+                                    {topic}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            <div className="mb-4">
+                              <div className="flex items-center gap-4">
+                                <span className={`text-xs flex items-center gap-1 ${item.hasAnswerKey ? 'text-green-600' : 'text-gray-400'}`}>
+                                  <Check className="w-3 h-3" /> Kunci Jawaban
+                                </span>
+                                <span className={`text-xs flex items-center gap-1 ${item.hasTestCase ? 'text-green-600' : 'text-gray-400'}`}>
+                                  <Check className="w-3 h-3" /> Test Case
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col gap-2 ml-4">
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              className="px-3 py-2 bg-green-600/90 backdrop-blur-sm text-white text-sm rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                              onClick={() => handleRestore(item.id)}
+                              disabled={isRestoring}
+                            >
+                              {isRestoring ? (
+                                <motion.div
+                                  animate={{ rotate: 360 }}
+                                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                  className="w-3 h-3 border-2 border-white border-t-transparent rounded-full"
+                                />
+                              ) : (
+                                <RefreshCw className="w-3 h-3" />
+                              )}
+                              Pulihkan
+                            </motion.button>
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              className="px-3 py-2 bg-red-600/90 backdrop-blur-sm text-white text-sm rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+                              onClick={() => handlePermanentDelete(item.id)}
+                            >
+                              <Trash className="w-3 h-3" />
+                              Hapus Permanen
+                            </motion.button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {recycleBinData.length > 0 && (
+                <div className="p-4 border-t border-gray-200/50 bg-gray-50/80 backdrop-blur-sm flex justify-between items-center">
+                  <p className="text-sm text-gray-500">
+                    💡 Tips: Soal yang dihapus akan disimpan selama 30 hari
+                  </p>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="px-4 py-2 text-gray-600 hover:bg-gray-200/50 rounded-lg transition-colors flex items-center gap-2 backdrop-blur-sm"
+                    onClick={() => fetchRecycleBinData()}
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Refresh
+                  </motion.button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Delete Confirmation Modal */}
       <AnimatePresence>
+        {showDeleteModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 backdrop-blur-md bg-white/30 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowDeleteModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 max-w-md w-full shadow-2xl border border-white/20"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center mb-4">
+                <div className="flex-shrink-0 w-10 h-10 bg-red-100/80 backdrop-blur-sm rounded-full flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-red-600" />
+                </div>
+                <div className="ml-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Konfirmasi Hapus</h3>
+                  <p className="text-sm text-gray-500">Soal akan dihapus dari daftar utama</p>
+                </div>
+              </div>
+
+              {itemToDelete && (
+                <div className="mb-6 p-4 bg-gray-50/60 backdrop-blur-sm rounded-lg border border-gray-200/50">
+                  <p className="text-sm text-gray-600">Anda akan menghapus:</p>
+                  <p className="font-medium text-gray-900">{itemToDelete.fileName}</p>
+                  <p className="text-sm text-gray-500">Mata Kuliah: {itemToDelete.subject}</p>
+                  <p className="text-sm text-gray-500">Dosen: {itemToDelete.lecturer}</p>
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-3">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="px-4 py-2 text-gray-700 bg-gray-200/70 hover:bg-gray-300/70 backdrop-blur-sm rounded-lg transition-colors"
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setItemToDelete(null);
+                  }}
+                  disabled={isDeleting}
+                >
+                  Batal
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="px-4 py-2 bg-red-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => handleSoftDelete(itemToDelete.id)}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <>
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                      />
+                      Menghapus...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      Hapus Soal
+                    </>
+                  )}
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+     {/* Filter Modal */}
+     <AnimatePresence>
         {showFilterModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 backdrop-blur-md bg-white/30 flex items-center justify-center z-50 p-4"
             onClick={() => setShowFilterModal(false)}
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl"
+              className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 max-w-md w-full shadow-2xl border border-white/20"
               onClick={e => e.stopPropagation()}
             >
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-bold text-gray-900">Filter Pencarian</h3>
                 <button
                   onClick={() => setShowFilterModal(false)}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-gray-500 hover:text-gray-700 p-2 rounded-full hover:bg-gray-200/50 transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <div className="space-y-6">
-                {/* Level Filter */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Tingkat Kesulitan
@@ -1000,13 +1676,7 @@ const SearchPage = ({ currentUser }) => {
                           type="checkbox"
                           className="form-checkbox h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                           checked={selectedLevel.includes(level)}
-                          onChange={() => {
-                            if (selectedLevel.includes(level)) {
-                              setSelectedLevel(prev => prev.filter(l => l !== level));
-                            } else {
-                              setSelectedLevel(prev => [...prev, level]);
-                            }
-                          }}
+                          onChange={() => toggleLevel(level)}
                         />
                         <span className="text-gray-700">{level}</span>
                       </label>
@@ -1014,7 +1684,6 @@ const SearchPage = ({ currentUser }) => {
                   </div>
                 </div>
 
-                {/* Date Range Filter */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Rentang Tanggal
@@ -1024,7 +1693,7 @@ const SearchPage = ({ currentUser }) => {
                       <label className="block text-xs text-gray-500 mb-1">Dari</label>
                       <input
                         type="date"
-                        className="w-full p-2 border border-gray-300 rounded-lg"
+                        className="w-full p-2 border border-gray-300/50 rounded-lg bg-white/70 backdrop-blur-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                         value={dateRange.start}
                         onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
                       />
@@ -1033,7 +1702,7 @@ const SearchPage = ({ currentUser }) => {
                       <label className="block text-xs text-gray-500 mb-1">Sampai</label>
                       <input
                         type="date"
-                        className="w-full p-2 border border-gray-300 rounded-lg"
+                        className="w-full p-2 border border-gray-300/50 rounded-lg bg-white/70 backdrop-blur-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                         value={dateRange.end}
                         onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
                       />
@@ -1041,10 +1710,9 @@ const SearchPage = ({ currentUser }) => {
                   </div>
                 </div>
 
-                {/* Action Buttons */}
                 <div className="flex justify-end space-x-3 pt-2">
                   <button
-                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition"
+                    className="px-4 py-2 text-gray-700 hover:bg-gray-100/70 backdrop-blur-sm rounded-lg transition"
                     onClick={() => {
                       setSelectedLevel([]);
                       setDateRange({ start: '', end: '' });
@@ -1055,7 +1723,7 @@ const SearchPage = ({ currentUser }) => {
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                    className="px-6 py-2 bg-blue-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-blue-700 transition"
                     onClick={() => setShowFilterModal(false)}
                   >
                     Terapkan Filter
@@ -1067,7 +1735,7 @@ const SearchPage = ({ currentUser }) => {
         )}
       </AnimatePresence>
 
-      {/* Floating Buttons for Sorting and Views (Mobile Friendly) */}
+      {/* Mobile Filter Button */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -1083,6 +1751,7 @@ const SearchPage = ({ currentUser }) => {
           <Filter className="w-5 h-5" />
         </motion.button>
       </motion.div>
+
       <Footer />
     </div>
   );

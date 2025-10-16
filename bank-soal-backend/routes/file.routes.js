@@ -18,7 +18,7 @@ module.exports = function(app) {
     controller.uploadFile
   );
 
-  // Download file (publik)
+  // Download file tunggal (publik)
   app.get("/api/files/download/:id", controller.downloadFile);
 
   // Hapus file (harus login dan pemilik atau admin)
@@ -28,18 +28,24 @@ module.exports = function(app) {
     controller.deleteFile
   );
 
-  // Preview file (publik)
+  // Preview file tunggal (publik)
   app.get("/api/files/preview/:id", controller.previewFile);
 
   // Get file as BLOB (publik)
   app.get("/api/files/blob/:id", controller.getFileAsBlob);
 
-  // Route untuk menggabungkan file dari satu question set
+  // Gabungkan file dari satu question set untuk preview (publik)
   app.get("/api/files/combine-preview/:id", controller.combineFilesForPreview);
+
+  // Gabungkan file dari banyak question set untuk download (publik)
+  app.get("/api/files/combine-download", controller.combineFilesForDownload);
 
   // Indikator kelengkapan soal berdasarkan questionSetId (publik)
   app.get("/api/files/completeness/:questionSetId", controller.getFileCompleteness);
 
-  // Rute untuk mengunduh template soal
+  // Download template soal (publik)
   app.get("/api/files/download-template", controller.downloadTemplate);
+
+  // Download bundle ZIP berisi file soal, kunci jawaban, dan test case (publik)
+  app.get("/api/files/download-bundle", controller.downloadZipBundle);
 };

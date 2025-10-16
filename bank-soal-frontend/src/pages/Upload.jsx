@@ -27,8 +27,6 @@ const handleDownloadTemplate = async () => {
   }
 };
 
-
-
 const UploadPage = ({ currentUser }) => {
   const [files, setFiles] = useState({
     questions: null,
@@ -45,17 +43,20 @@ const UploadPage = ({ currentUser }) => {
   const [metadata, setMetadata] = useState({
     title: '',
     subject: '',
-    topics: [], // Changed to array for multiple selection
+    selectedCourseId: null,
+    topics: [],
     difficulty: '',
     description: '',
     year: new Date().getFullYear(),
-    lecturer: currentUser?.username || '' // Use username instead of name
+    lecturer: currentUser?.username || ''
   });
 
-  // New states for database data
+  // States for database data
   const [courseTags, setCourseTags] = useState([]);
   const [materialTags, setMaterialTags] = useState([]);
+  const [filteredMaterialTags, setFilteredMaterialTags] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [loadingMaterials, setLoadingMaterials] = useState(false);
   
   // States for searchable dropdown
   const [courseSearchTerm, setCourseSearchTerm] = useState('');
@@ -81,14 +82,10 @@ const UploadPage = ({ currentUser }) => {
           'x-access-token': token
         };
 
-        // Fetch course tags and material tags
-        const [courseTagsResponse, materialTagsResponse] = await Promise.all([
-          axios.get(`${API_URL}/course-tags`, { headers }),
-          axios.get(`${API_URL}/material-tags`, { headers })
-        ]);
+        // Fetch course tags only (material tags will be fetched based on selected course)
+        const courseTagsResponse = await axios.get(`${API_URL}/course-tags`, { headers });
 
         setCourseTags(courseTagsResponse.data || []);
-        setMaterialTags(materialTagsResponse.data || []);
         setFilteredCourseTags(courseTagsResponse.data || []);
         
         // Set lecturer to current user's username
@@ -107,6 +104,64 @@ const UploadPage = ({ currentUser }) => {
 
     fetchData();
   }, [currentUser]);
+
+  // Fixed function to fetch materials by course
+  const fetchMaterialTagsByCourse = async (courseId) => {
+    if (!courseId) {
+      setFilteredMaterialTags([]);
+      return;
+    }
+
+    setLoadingMaterials(true);
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (!user || !user.accessToken) {
+        setError("Token tidak valid. Silakan login kembali.");
+        return;
+      }
+
+      const token = user.accessToken;
+      const headers = {
+        'x-access-token': token,
+        'Content-Type': 'application/json'
+      };
+      
+      console.log('Fetching materials for course:', courseId);
+      
+      // Updated endpoint to match your routes
+      const response = await axios.get(`${API_URL}/course-material-assignments/course/${courseId}/materials-for-upload`, {
+        headers
+      });
+      
+      console.log('Materials response:', response.data);
+      
+      // Your API returns {success: true, data: [...]}
+      const materials = response.data.success ? response.data.data : [];
+      setFilteredMaterialTags(materials);
+      
+      // Reset selected topics when course changes
+      setMetadata(prev => ({
+        ...prev,
+        topics: []
+      }));
+      
+    } catch (error) {
+      console.error('Error fetching course materials:', error);
+      
+      if (error.response?.status === 404) {
+        // No materials found for this course
+        setFilteredMaterialTags([]);
+      } else if (error.response?.status === 403) {
+        setError("Akses ditolak. Silakan login kembali.");
+      } else {
+        setError("Gagal memuat materi untuk mata kuliah ini.");
+      }
+      
+      setFilteredMaterialTags([]);
+    } finally {
+      setLoadingMaterials(false);
+    }
+  };
 
   // Filter course tags based on search term
   useEffect(() => {
@@ -164,19 +219,31 @@ const UploadPage = ({ currentUser }) => {
     setCourseSearchTerm(value);
     setMetadata(prev => ({
       ...prev,
-      subject: value
+      subject: value,
+      selectedCourseId: null // Reset course ID when typing
     }));
     setShowCourseDropdown(true);
+    
+    // Clear materials when searching
+    setFilteredMaterialTags([]);
   };
 
   // Handle course selection from dropdown
-  const handleCourseSelect = (courseName) => {
+  const handleCourseSelect = (courseName, courseId = null) => {
     setMetadata(prev => ({
       ...prev,
-      subject: courseName
+      subject: courseName,
+      selectedCourseId: courseId
     }));
     setCourseSearchTerm(courseName);
     setShowCourseDropdown(false);
+    
+    // Fetch materials for selected course
+    if (courseId) {
+      fetchMaterialTagsByCourse(courseId);
+    } else {
+      setFilteredMaterialTags([]);
+    }
   };
 
   // Handle focus and blur for course input
@@ -198,9 +265,10 @@ const UploadPage = ({ currentUser }) => {
     } else if (e.key === 'Enter' && showCourseDropdown) {
       e.preventDefault();
       if (filteredCourseTags.length > 0) {
-        handleCourseSelect(filteredCourseTags[0].name);
+        const firstCourse = filteredCourseTags[0];
+        handleCourseSelect(firstCourse.name, firstCourse.id);
       } else if (courseSearchTerm) {
-        handleCourseSelect(courseSearchTerm);
+        handleCourseSelect(courseSearchTerm, null);
       }
     }
   };
@@ -229,7 +297,9 @@ const UploadPage = ({ currentUser }) => {
 
   const handleSubmit = async () => {
     // Validasi input
+    window.scrollTo({top:0,behavior: "smooth"});
     if (!files.questions) {
+      // window.scrollTo({top:0,behavior: "smooth"});
       setError("Silakan upload file soal terlebih dahulu!");
       return;
     }
@@ -298,7 +368,7 @@ const UploadPage = ({ currentUser }) => {
       }
       
       await Promise.all(uploadPromises);
-      
+      window.scrollTo({top:0,behavior: "smooth"});
       setSuccess("Soal berhasil diupload!");
       
       // Reset form
@@ -317,12 +387,16 @@ const UploadPage = ({ currentUser }) => {
       setMetadata({
         title: '',
         subject: '',
+        selectedCourseId: null,
         topics: [],
         difficulty: '',
         description: '',
         year: new Date().getFullYear(),
         lecturer: currentUser?.username || user.username || ''
       });
+      
+      setFilteredMaterialTags([]);
+      setCourseSearchTerm('');
       
     } catch (error) {
       console.error("Upload error:", error);
@@ -499,9 +573,9 @@ const UploadPage = ({ currentUser }) => {
                   />
                   {/* Icon indicator */}
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center">
-                    {metadata.subject && courseTags.some(tag => tag.name === metadata.subject) ? (
+                    {metadata.selectedCourseId && (
                       <CheckCircle className="w-5 h-5 text-green-500 mr-1" />
-                    ) : null}
+                    )}
                     <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${showCourseDropdown ? 'rotate-180' : ''}`} />
                   </div>
                   
@@ -513,7 +587,7 @@ const UploadPage = ({ currentUser }) => {
                           <div
                             key={courseTag.id}
                             className="px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors border-b border-gray-100 last:border-b-0"
-                            onMouseDown={() => handleCourseSelect(courseTag.name)}
+                            onMouseDown={() => handleCourseSelect(courseTag.name, courseTag.id)}
                           >
                             <span className="text-gray-900">{courseTag.name}</span>
                           </div>
@@ -523,7 +597,7 @@ const UploadPage = ({ currentUser }) => {
                           <div className="text-gray-500 text-sm mb-2">Mata kuliah tidak ditemukan</div>
                           <div
                             className="px-3 py-2 bg-blue-50 text-blue-700 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors"
-                            onMouseDown={() => handleCourseSelect(courseSearchTerm)}
+                            onMouseDown={() => handleCourseSelect(courseSearchTerm, null)}
                           >
                             <span className="text-sm">Gunakan: "<strong>{courseSearchTerm}</strong>"</span>
                           </div>
@@ -541,22 +615,30 @@ const UploadPage = ({ currentUser }) => {
                 </p>
               </div>
 
-              {/* Material Tags Multi-Select */}
+              {/* Material Tags Multi-Select - Filtered by selected course */}
               <div>
-                <label className="block text-sm font-medium mb-2 text-gray-700">Topik</label>
-                <div className="bg-gray-50 rounded-xl border border-gray-300 p-3 min-h-[50px]">
+                <label className="block text-sm font-medium mb-2 text-gray-700">
+                  Topik Materi
+                  {metadata.selectedCourseId && (
+                    <span className="text-xs text-blue-600 ml-2">
+                      (untuk {metadata.subject})
+                    </span>
+                  )}
+                </label>
+                <div className="bg-gray-50 rounded-xl border border-gray-300 p-3 min-h-[100px]">
                   {/* Selected Topics */}
                   <div className="flex flex-wrap gap-2 mb-2">
                     {metadata.topics.map((topic) => (
                       <span
                         key={topic.id}
-                        className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-lg text-sm"
+                        className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-3 py-1 rounded-lg text-sm font-medium"
                       >
+                        <Tag className="w-3 h-3" />
                         {topic.name}
                         <button
                           type="button"
                           onClick={() => handleTopicChange(topic.id, topic.name)}
-                          className="text-blue-600 hover:text-blue-800"
+                          className="text-blue-600 hover:text-blue-800 ml-1"
                         >
                           <X className="w-3 h-3" />
                         </button>
@@ -565,23 +647,56 @@ const UploadPage = ({ currentUser }) => {
                   </div>
                   
                   {/* Available Topics */}
-                  <div className="border-t border-gray-200 pt-2">
-                    <p className="text-xs text-gray-500 mb-2">Klik topik untuk menambahkan:</p>
-                    <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
-                      {materialTags
-                        .filter(tag => !metadata.topics.some(topic => topic.id === tag.id))
-                        .map((tag) => (
-                          <button
-                            key={tag.id}
-                            type="button"
-                            onClick={() => handleTopicChange(tag.id, tag.name)}
-                            className="inline-flex items-center gap-1 bg-gray-200 hover:bg-blue-100 text-gray-700 hover:text-blue-800 px-2 py-1 rounded-lg text-sm transition-colors"
-                          >
-                            <Tag className="w-3 h-3" />
-                            {tag.name}
-                          </button>
-                        ))}
-                    </div>
+                  <div className="border-t border-gray-200 pt-3">
+                    {!metadata.selectedCourseId ? (
+                      <div className="text-center py-6">
+                        <Tag className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                        <p className="text-sm text-gray-500">
+                          Pilih mata kuliah terlebih dahulu untuk menampilkan topik yang tersedia
+                        </p>
+                      </div>
+                    ) : loadingMaterials ? (
+                      <div className="text-center py-6">
+                        <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                        <p className="text-sm text-gray-500">Memuat topik untuk {metadata.subject}...</p>
+                      </div>
+                    ) : filteredMaterialTags.length === 0 ? (
+                      <div className="text-center py-6">
+                        <AlertCircle className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                        <p className="text-sm text-gray-500 mb-2">
+                          Belum ada topik yang tersedia untuk mata kuliah "{metadata.subject}"
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          Hubungi admin untuk menambahkan topik ke mata kuliah ini
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-xs text-gray-500 mb-3 font-medium">
+                          Pilih topik untuk mata kuliah "{metadata.subject}":
+                        </p>
+                        <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
+                          {filteredMaterialTags
+                            .filter(tag => !metadata.topics.some(topic => topic.id === tag.id))
+                            .map((tag) => (
+                              <button
+                                key={tag.id}
+                                type="button"
+                                onClick={() => handleTopicChange(tag.id, tag.name)}
+                                className="inline-flex items-center gap-1 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-300 text-gray-700 hover:text-blue-800 px-3 py-2 rounded-lg text-sm transition-all duration-200 hover:shadow-sm"
+                              >
+                                <Tag className="w-3 h-3" />
+                                {tag.name}
+                              </button>
+                            ))}
+                        </div>
+                        {metadata.topics.length > 0 && (
+                          <p className="text-xs text-green-600 mt-2 font-medium">
+                            ✓ {metadata.topics.length} topik dipilih
+                          </p>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -646,7 +761,7 @@ const UploadPage = ({ currentUser }) => {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="w-full mt-8 bg-blue-600 text-white py-4 rounded-xl font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+              className="w-full mt-8 bg-blue-600 text-white py-4 rounded-xl font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={handleSubmit}
               disabled={loading}
             >
