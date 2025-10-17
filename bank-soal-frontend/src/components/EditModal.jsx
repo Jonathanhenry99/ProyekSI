@@ -381,7 +381,7 @@ export default function EditModal({ isOpen, onClose, questionSet = {}, currentUs
   
             console.log("📤 Submitting update with payload:", JSON.stringify(payload, null, 2));
             console.log("📤 Current subjectName state:", subjectName);
-            console.log("📤 Updating question set ID:", questionSet.id);
+     
     
             const requestHeaders = {
                 "Content-Type": "application/json",
@@ -491,7 +491,7 @@ export default function EditModal({ isOpen, onClose, questionSet = {}, currentUs
                         <p className="text-gray-500">Ubah data soal sesuai kebutuhan</p>
                         {/* Debug info - hapus di production */}
                         <p className="text-xs text-blue-600 mt-1">
-                            Current subject: {subjectName || 'Not selected'} (ID: {metadata.subject})
+                            Current subject: {subjectName || 'Not selected'} 
                         </p>
                     </div>
                     <button 
