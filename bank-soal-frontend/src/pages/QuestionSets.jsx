@@ -4,6 +4,8 @@ import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, C
 import Footer from '../components/Footer';
 import Header from '../components/Header';
 import { Link } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 const QuestionSetsPage = ({ currentUser }) => {
   const [activeTab, setActiveTab] = useState('semua');
@@ -11,7 +13,7 @@ const QuestionSetsPage = ({ currentUser }) => {
   const [selectedLevel, setSelectedLevel] = useState([]);
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [viewMode, setViewMode] = useState('grid');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   
   // State untuk dropdown
@@ -23,6 +25,9 @@ const QuestionSetsPage = ({ currentUser }) => {
   const [materialTagSearch, setMaterialTagSearch] = useState('');
   const [selectedCourseTags, setSelectedCourseTags] = useState([]);
   const [selectedMaterialTags, setSelectedMaterialTags] = useState([]);
+
+ const [packages, setPackages] = useState([]);
+ const [loading, setLoading] = useState(true);
 
   // Data untuk dropdown
   const difficultyLevels = ['Mudah', 'Sedang', 'Sulit'];
@@ -99,45 +104,54 @@ const QuestionSetsPage = ({ currentUser }) => {
     },
   ];
 
-  // Filter function
-  const filterData = () => {
-    return mockData.filter(item => {
-      // Filter by search query
-      const matchesSearch =
-        searchQuery === '' ||
-        item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.lecturer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.topics.some(topic => topic.toLowerCase().includes(searchQuery.toLowerCase()));
+  // Filter function untuk paket soal (QuestionPackage)
+const filterData = () => {
+  return packages.filter(pkg => {
+    // Filter by search query (judul atau deskripsi)
+    const matchesSearch =
+      searchQuery === '' ||
+      pkg.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      pkg.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      pkg.course?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      pkg.items?.some(item =>
+        item.question?.title?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
 
-      // Filter by level
-      const matchesLevel =
-        selectedLevel.length === 0 ||
-        selectedLevel.includes(item.level);
-        
-      // Filter by course tags
-      const matchesCourseTags =
-        selectedCourseTags.length === 0 ||
-        selectedCourseTags.some(tag => item.title.toLowerCase().includes(tag.toLowerCase()));
-        
-      // Filter by material tags
-      const matchesMaterialTags =
-        selectedMaterialTags.length === 0 ||
-        selectedMaterialTags.some(tag => 
-          item.topics.some(topic => topic.toLowerCase().includes(tag.toLowerCase()))
-        );
+    // Filter by level (gunakan level dari soal di dalam paket)
+    const matchesLevel =
+      selectedLevel.length === 0 ||
+      pkg.items?.some(item =>
+        selectedLevel.includes(item.question?.level)
+      );
 
-      // Filter by date
-      const itemDate = new Date(item.lastUpdated);
-      const matchesDate =
-        (dateRange.start === '' || new Date(dateRange.start) <= itemDate) &&
-        (dateRange.end === '' || new Date(dateRange.end) >= itemDate);
+    // Filter by course tags (mata kuliah)
+    const matchesCourseTags =
+      selectedCourseTags.length === 0 ||
+      selectedCourseTags.some(tag =>
+        pkg.course?.name?.toLowerCase().includes(tag.toLowerCase())
+      );
 
-      return matchesSearch && matchesLevel && matchesCourseTags && matchesMaterialTags && matchesDate;
-    });
-  };
+    // Filter by material tags (topik dari deskripsi soal)
+    const matchesMaterialTags =
+      selectedMaterialTags.length === 0 ||
+      pkg.items?.some(item =>
+        selectedMaterialTags.some(tag =>
+          item.question?.description?.toLowerCase().includes(tag.toLowerCase())
+        )
+      );
 
-  const filteredData = filterData();
+    // Filter by date
+    const itemDate = new Date(pkg.created_at);
+    const matchesDate =
+      (dateRange.start === '' || new Date(dateRange.start) <= itemDate) &&
+      (dateRange.end === '' || new Date(dateRange.end) >= itemDate);
+
+    return matchesSearch && matchesLevel && matchesCourseTags && matchesMaterialTags && matchesDate;
+  });
+};
+
+const filteredData = filterData();
+const navigate = useNavigate();
   
   // Filter dropdown data berdasarkan input pencarian
   const filteredLevels = difficultyLevels.filter(level => 
@@ -198,6 +212,39 @@ const QuestionSetsPage = ({ currentUser }) => {
     hidden: { opacity: 0, y: -10, height: 0 },
     visible: { opacity: 1, y: 0, height: 'auto' }
   };
+
+  useEffect(() => {
+    const fetchPackages = async () => {
+      const token = localStorage.getItem("token");
+
+        try {
+          const response = await fetch("http://localhost:8080/api/question-packages", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          }
+
+        });
+
+        if (!response.ok) {
+          throw new Error("Gagal mengambil paket soal");
+        }
+
+        const data = await response.json();
+        setPackages(data);
+      } catch (err) {
+        console.error(err);
+        alert(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPackages();
+  }, []); // [] berarti cuma dijalankan sekali saat mount
+
+  if (loading) return <p>Loading...</p>;
 
   return (
     <div className="min-h-screen bg-white">
@@ -536,8 +583,6 @@ const QuestionSetsPage = ({ currentUser }) => {
             </motion.div>
           )}
 
-          
-
           {/* View Toggle and Results Count */}
           <div className="flex justify-between items-center mt-6">
             <p className="text-gray-600 text-sm">
@@ -585,13 +630,13 @@ const QuestionSetsPage = ({ currentUser }) => {
                         <div className="bg-blue-100 p-2 rounded-lg mr-3">
                           <Book className="w-6 h-6 text-blue-600" />
                         </div>
-                        <span className={`px-2 py-1 text-xs rounded-full ${
+                        {/* <span className={`px-2 py-1 text-xs rounded-full ${
                           item.level === 'Mudah' ? 'bg-green-100 text-green-800' :
                           item.level === 'Sedang' ? 'bg-yellow-100 text-yellow-800' :
                           'bg-red-100 text-red-800'
                         }`}>
                           {item.level}
-                        </span>
+                        </span> */}
                       </div>
                       <div className="flex items-center text-gray-500 text-sm">
                         <Download className="w-4 h-4 mr-1" />
@@ -604,7 +649,7 @@ const QuestionSetsPage = ({ currentUser }) => {
                     
                     <div className="flex items-center text-sm text-gray-500 mb-3">
                       <User className="w-4 h-4 mr-1" />
-                      <span>{item.lecturer}</span>
+                      <span>{item.creator?.full_name || "Tidak diketahui"}</span>
                     </div>
                     
                     <div className="flex items-center text-sm text-gray-500 mb-4">
@@ -612,36 +657,31 @@ const QuestionSetsPage = ({ currentUser }) => {
                       <span>{item.questionCount} soal</span>
                     </div>
                     
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {item.topics.slice(0, 3).map((topic, index) => (
-                        <span key={index} className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
-                          {topic}
-                        </span>
-                      ))}
-                      {item.topics.length > 3 && (
-                        <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
-                          +{item.topics.length - 3}
-                        </span>
-                      )}
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-medium">
+                        {item.course?.name || "Tanpa Mata Kuliah"}
+                      </span>
                     </div>
-                    
+
                     <div className="flex justify-between items-center">
                       <div className="text-xs text-gray-500 flex items-center">
                         <Clock className="w-3 h-3 mr-1" />
-                        {new Date(item.lastUpdated).toLocaleDateString('id-ID', {
+                        {new Date(item.created_at).toLocaleDateString('id-ID', {
                           year: 'numeric',
                           month: 'short',
                           day: 'numeric'
                         })}
                       </div>
                       
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium"
-                      >
-                        Lihat Detail
-                      </motion.button>
+                     <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => navigate(`/question-packages/${item.id}`)}
+                      className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium"
+                    >
+                      Lihat Detail
+                    </motion.button>
+
                     </div>
                   </div>
                 </motion.div>
@@ -705,7 +745,7 @@ const QuestionSetsPage = ({ currentUser }) => {
                       </div>
                       
                       <div className="flex flex-wrap gap-2 mt-3">
-                        {item.topics.map((topic, index) => (
+                        {(item.topics ?? []).map((topic, index) => (
                           <span key={index} className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
                             {topic}
                           </span>
@@ -717,10 +757,18 @@ const QuestionSetsPage = ({ currentUser }) => {
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium"
-                      >
+                        // Pastikan item.id adalah angka yang valid (1, 2, atau 3), bukan undefined.
+                        onClick={() => {
+                            if (!item.id) {
+                                console.error("ID paket soal kosong pada item ini!");
+                                return; // Hentikan navigasi jika ID kosong
+                            }
+                            navigate(`/question-packages/${item.id}`)
+                        }}
+                        className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium"
+                    >
                         Lihat Detail
-                      </motion.button>
+                    </motion.button>
                     </div>
                   </div>
                 </motion.div>

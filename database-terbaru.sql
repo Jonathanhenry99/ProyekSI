@@ -18,6 +18,8 @@ DROP TABLE IF EXISTS user_roles CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS roles CASCADE;
 DROP TABLE IF EXISTS question_sets CASCADE;
+DROP TABLE IF EXISTS question_package_items CASCADE;
+DROP TABLE IF EXISTS question_packages CASCADE;
 
 -- ========================================
 -- CORE TABLES
@@ -77,14 +79,8 @@ CREATE TABLE question_sets (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     description TEXT,
-    subject VARCHAR(255) NOT NULL,
-    year INTEGER,
-    level VARCHAR(50) CHECK (level IN ('Mudah', 'Sedang', 'Sulit')),
-    lecturer VARCHAR(255),
-    topics TEXT,
-    downloads INTEGER DEFAULT 0,
-    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by INTEGER REFERENCES users(id),
+    subject VARCHAR(100),
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -114,6 +110,33 @@ CREATE TABLE questions (
     course_id INTEGER REFERENCES courses(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE question_packages (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    course_id INTEGER NOT NULL REFERENCES course_tags(id) ON DELETE CASCADE,
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE question_package_items (
+    id SERIAL PRIMARY KEY,
+    question_package_id INTEGER NOT NULL REFERENCES question_packages(id) ON DELETE CASCADE,
+    question_id INTEGER NOT NULL REFERENCES question_sets(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (question_package_id, question_id)
+);
+
+
+-- tabel penghubung question_set_items
+CREATE TABLE question_set_items (
+    id SERIAL PRIMARY KEY,
+    question_set_id INTEGER NOT NULL REFERENCES question_sets(id) ON DELETE CASCADE,
+    question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (question_set_id, question_id)
 );
 
 -- Question-Course tags junction table
@@ -176,6 +199,9 @@ CREATE INDEX idx_questions_created_by ON questions(created_by);
 CREATE INDEX idx_questions_course_id ON questions(course_id);
 CREATE INDEX idx_questions_difficulty_level ON questions(difficulty_level);
 
+
+CREATE INDEX idx_qpi_package_id ON question_package_items(question_package_id);
+CREATE INDEX idx_qpi_question_id ON question_package_items(question_id);
 -- ========================================
 -- TRIGGERS AND FUNCTIONS
 -- ========================================
@@ -242,7 +268,7 @@ INSERT INTO course_tags (name) VALUES
 ('Algoritma dan Pemrograman'),
 ('Dasar Pemrograman'),
 ('Desain dan Analisis Pemrograman'),
-('Algoritma dan Struktur Data'),;
+('Algoritma dan Struktur Data');
 
 -- Insert material tags
 INSERT INTO material_tags (name) VALUES 
@@ -269,11 +295,11 @@ INSERT INTO material_tags (name) VALUES
 ('Machine Learning'),
 ('Neural Networks');
 
--- Insert sample question sets
-INSERT INTO question_sets (title, description, subject, year, level, lecturer, topics, created_by) VALUES 
-('UAS Algoritma Semester 1', 'Ujian Akhir Semester Algoritma dan Pemrograman', 'Algoritma dan Pemrograman', 2023, 'Sedang', 'Dosen 1', 'Array, Sorting, Searching', 1),
-('UTS Struktur Data', 'Ujian Tengah Semester Struktur Data', 'Struktur Data', 2023, 'Sulit', 'Dosen 2', 'Linked List, Stack, Queue', 1),
-('Quiz Basis Data', 'Quiz Basis Data Dasar', 'Basis Data', 2023, 'Mudah', 'Dosen 3', 'SQL, Normalisasi', 1);
+-- -- Insert sample question sets
+-- INSERT INTO question_sets (title, description, subject, year, level, lecturer, topics, created_by) VALUES 
+-- ('UAS Algoritma Semester 1', 'Ujian Akhir Semester Algoritma dan Pemrograman', 'Algoritma dan Pemrograman', 2023, 'Sedang', 'Dosen 1', 'Array, Sorting, Searching', 1),
+-- ('UTS Struktur Data', 'Ujian Tengah Semester Struktur Data', 'Struktur Data', 2023, 'Sulit', 'Dosen 2', 'Linked List, Stack, Queue', 1),
+-- ('Quiz Basis Data', 'Quiz Basis Data Dasar', 'Basis Data', 2023, 'Mudah', 'Dosen 3', 'SQL, Normalisasi', 1);
 
 -- ========================================
 -- COURSE-MATERIAL ASSIGNMENTS

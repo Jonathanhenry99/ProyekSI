@@ -117,6 +117,9 @@ const FormCreatorPage = ({ currentUser }) => {
     const [searchTerm, setSearchTerm] = useState("");
     const [isSearching, setIsSearching] = useState(false);
     const [filteredQuestions, setFilteredQuestions] = useState([]);
+    const [formSubject, setFormSubject] = useState("");
+    const [courseList, setCourseList] = useState([]);
+    const [isCourseLoading, setIsCourseLoading] = useState(true);
     
     // State untuk questions dari API
     const [questions, setQuestions] = useState([]);
@@ -325,12 +328,12 @@ const FormCreatorPage = ({ currentUser }) => {
     }, [searchTerm, selectedCourseTags, selectedMaterialTags, selectedDifficulty, questions]);
 
     const handleDownloadZipBundle = () => {
-        const questionIds = selectedQuestions
+        const questionSetIds = selectedQuestions
             .map(q => q.question_set_id || q.id) 
             .filter(id => id) 
             .join(',');
 
-        if (!questionIds) {
+        if (!questionSetIds) {
             alert("Harap tambahkan setidaknya satu soal untuk mengaktifkan download ZIP.");
             return;
         }
@@ -339,7 +342,7 @@ const FormCreatorPage = ({ currentUser }) => {
             ? "Form_Tanpa_Judul" 
             : formTitle.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_');
 
-        const url = `http://localhost:8080/api/files/download-bundle?ids=${questionIds}&formTitle=${cleanFormTitle}`;
+        const url = `http://localhost:8080/api/files/download-bundle?ids=${questionSetIds}&formTitle=${cleanFormTitle}`;
         
         window.location.href = url;
 
@@ -363,6 +366,109 @@ const FormCreatorPage = ({ currentUser }) => {
             day: 'numeric'
         });
     };
+
+useEffect(() => {
+  const fetchCourses = async () => {
+    try {
+      setIsCourseLoading(true);
+      const token = localStorage.getItem("token");
+      console.log("Token:", token);
+
+      const response = await fetch("http://localhost:8080/api/course-tags", {
+        headers: {
+          "x-access-token": token,
+        },
+      });
+
+      console.log("Response status:", response.status);
+      const data = await response.json();
+      console.log("Data mata kuliah:", data);
+
+      setCourseList(data);
+    } catch (error) {
+      console.error("Error mengambil daftar mata kuliah:", error);
+    } finally {
+      setIsCourseLoading(false);
+    }
+  };
+
+  fetchCourses();
+}, []);
+
+
+const handleSaveQuestionPackage = async () => {
+  const token = localStorage.getItem("token");
+  if (!token) return alert("Token tidak ditemukan, silakan login ulang");
+
+  try {
+    const payload = {
+      title: formTitle,
+      description: formDescription,
+      course_id: formSubject, // ✅ perbaiki di sini
+      questionSetIds: selectedQuestions.map(q => q.id)
+    };
+
+    console.log("Payload dikirim ke backend:", payload);
+
+    const response = await fetch("http://localhost:8080/api/question-packages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-access-token": token
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || "Gagal menyimpan paket soal");
+    }
+
+    const savedPackage = await response.json();
+    alert("Paket soal berhasil disimpan!");
+    console.log(savedPackage);
+
+    setFormTitle("");
+    setFormDescription("");
+    setFormSubject("");
+    setSelectedQuestions([]);
+  } catch (err) {
+    console.error("Error saving question package:", err);
+    alert(`Error saving question package: ${err.message}`);
+  }
+};
+
+
+
+useEffect(() => {
+    const fetchCourses = async () => {
+        setIsCourseLoading(true);
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) throw new Error("Token tidak ditemukan. Harap login.");
+            
+            // Mengambil data dari endpoint yang sudah dibuat sebelumnya
+            const response = await fetch('http://localhost:8080/api/course-tags', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-access-token': token, 
+                },
+            });
+
+            if (!response.ok) throw new Error('Gagal memuat daftar mata kuliah.');
+
+            const data = await response.json();
+            setCourseList(data);
+        } catch (error) {
+            console.error("Error fetching courses:", error.message);
+        } finally {
+            setIsCourseLoading(false);
+        }
+    };
+
+    fetchCourses();
+}, []);
 
     return (
         <div className="min-h-screen bg-gray-50 text-gray-800">
@@ -617,6 +723,27 @@ const FormCreatorPage = ({ currentUser }) => {
                                 placeholder="Deskripsi form (opsional)"
                                 rows="2"
                             />
+
+                            <label className="block text-sm font-medium text-gray-700 mt-4 mb-2">
+                            Mata Kuliah Paket Soal (Wajib)
+                            </label>
+
+                            <select
+                            value={formSubject}
+                            onChange={(e) => setFormSubject(e.target.value)}
+                            className="w-full text-base border-b border-gray-300 focus:border-blue-500 focus:outline-none pb-2 transition-colors cursor-pointer bg-white"
+                            disabled={isCourseLoading}
+                            >
+                            <option value="">
+                                {isCourseLoading ? "Memuat mata kuliah..." : "Pilih mata kuliah..."}
+                            </option>
+
+                            {courseList.map((course) => (
+                                <option key={course.id} value={course.id}> {/* ✅ pakai id bukan name */}
+                                {course.name}
+                                </option>
+                            ))}
+                            </select>
                         </div>
 
                         {/* Questions list - draggable */}
@@ -691,6 +818,19 @@ const FormCreatorPage = ({ currentUser }) => {
                                 ))
                             )}
                         </div>
+
+                        {/* Download button */}
+                        {selectedQuestions.length > 0 && (
+                        <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            className="w-full bg-green-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2 mb-3"
+                            onClick={handleSaveQuestionPackage}
+                        >
+                            <Check className="w-5 h-5" />
+                            Simpan Paket Soal 
+                        </motion.button>
+                        )}
                         
                         {/* Download button */}
                         {selectedQuestions.length > 0 && (
@@ -701,7 +841,7 @@ const FormCreatorPage = ({ currentUser }) => {
                                 onClick={handleDownloadZipBundle} 
                             >
                                 <Download className="w-5 h-5" />
-                                Download Kumpulan Soal ({selectedQuestions.length} soal)
+                                Download Paket Soal
                             </motion.button>
                         )}
                     </motion.div>
