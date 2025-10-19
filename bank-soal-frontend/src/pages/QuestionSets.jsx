@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, CheckCircle, ChevronDown, FileText, BarChart2, Plus, Book, Check } from 'lucide-react';
+import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, CheckCircle, ChevronDown, FileText, BarChart2, Plus, Book, Check, Trash2, AlertTriangle } from 'lucide-react';
 import Footer from '../components/Footer';
 import Header from '../components/Header';
 import { Link } from 'react-router-dom';
@@ -44,6 +44,10 @@ const QuestionSetsPage = ({ currentUser }) => {
   // State untuk download progress
   const [downloadingItems, setDownloadingItems] = useState(new Set());
 
+  // State untuk delete modal
+  const [deleteModal, setDeleteModal] = useState({ show: false, packageId: null, packageTitle: '' });
+  const [deleting, setDeleting] = useState(false);
+
   // Helper function to get auth token
   const getAuthToken = () => {
     let token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -65,6 +69,61 @@ const QuestionSetsPage = ({ currentUser }) => {
     }
     
     return token;
+  };
+
+  // Fungsi untuk membuka modal konfirmasi delete
+  const openDeleteModal = (e, packageId, packageTitle) => {
+    e.stopPropagation(); // Prevent card click
+    setDeleteModal({ show: true, packageId, packageTitle });
+  };
+
+  // Fungsi untuk menutup modal
+  const closeDeleteModal = () => {
+    setDeleteModal({ show: false, packageId: null, packageTitle: '' });
+  };
+
+  // Fungsi untuk delete paket soal
+  const handleDeletePackage = async () => {
+    if (!deleteModal.packageId) return;
+
+    setDeleting(true);
+    try {
+      const token = getAuthToken();
+      const res = await fetch(`${API_URL}/question-packages/${deleteModal.packageId}`, {
+        method: 'DELETE',
+        headers: { 
+          "x-access-token": token,
+          "Content-Type": "application/json"
+        },
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Gagal menghapus paket soal');
+      }
+
+      // Update state untuk remove paket yang dihapus
+      setPackages(prev => prev.filter(pkg => pkg.id !== deleteModal.packageId));
+
+      closeDeleteModal();
+      
+      // Tampilkan notifikasi sukses
+      alert('Paket soal berhasil dihapus!');
+
+    } catch (err) {
+      console.error("❌ Error deleting package:", err);
+      alert(err.message || 'Gagal menghapus paket soal. Silakan coba lagi.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // Cek apakah user bisa delete (pembuat atau admin)
+  const canDelete = (packageCreatorId) => {
+    return currentUser && (
+      currentUser.id === packageCreatorId || 
+      currentUser.role === 'ROLE_ADMIN'
+    );
   };
 
   // Function untuk download paket soal sebagai ZIP
@@ -970,7 +1029,7 @@ Universitas Katolik Parahyangan
           </div>
         </motion.div>
 
-        {/* Results Section - UPDATED untuk clickable cards */}
+        {/* Results Section - UPDATED dengan tombol delete */}
         <AnimatePresence mode="wait">
           {viewMode === 'grid' ? (
             <motion.div
@@ -981,6 +1040,8 @@ Universitas Katolik Parahyangan
             >
               {filteredData.map((item) => {
                 const isDownloading = downloadingItems.has(item.id);
+                const userCanDelete = canDelete(item.created_by);
+                
                 return (
                   <motion.div
                     key={item.id}
@@ -995,9 +1056,20 @@ Universitas Katolik Parahyangan
                             <Book className="w-6 h-6 text-blue-600" />
                           </div>
                         </div>
-                        <div className="flex items-center text-gray-500 text-sm">
-                          <Download className="w-4 h-4 mr-1" />
-                          {item.downloads || 0}
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center text-gray-500 text-sm">
+                            <Download className="w-4 h-4 mr-1" />
+                            {item.downloads || 0}
+                          </div>
+                          {userCanDelete && (
+                            <button
+                              onClick={(e) => openDeleteModal(e, item.id, item.title)}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Hapus paket soal"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
                       
@@ -1034,7 +1106,7 @@ Universitas Katolik Parahyangan
                           whileHover={{ scale: isDownloading ? 1 : 1.05 }}
                           whileTap={{ scale: isDownloading ? 1 : 0.95 }}
                           onClick={(e) => {
-                            e.stopPropagation(); // Prevent card click
+                            e.stopPropagation();
                             if (!isDownloading) {
                               handleDownloadPackage(item.id, item.title);
                             }
@@ -1077,6 +1149,8 @@ Universitas Katolik Parahyangan
             >
               {filteredData.map((item) => {
                 const isDownloading = downloadingItems.has(item.id);
+                const userCanDelete = canDelete(item.created_by);
+                
                 return (
                   <motion.div
                     key={item.id}
@@ -1090,7 +1164,16 @@ Universitas Katolik Parahyangan
                           <div className="bg-blue-100 p-2 rounded-lg mr-3 group-hover:bg-blue-200 transition-colors">
                             <Book className="w-6 h-6 text-blue-600" />
                           </div>
-                          <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-700 transition-colors">{item.title}</h3>
+                          <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-700 transition-colors flex-1">{item.title}</h3>
+                          {userCanDelete && (
+                            <button
+                              onClick={(e) => openDeleteModal(e, item.id, item.title)}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors ml-2"
+                              title="Hapus paket soal"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                         
                         <p className="text-gray-600 text-sm mb-3">{item.description}</p>
@@ -1133,7 +1216,7 @@ Universitas Katolik Parahyangan
                           whileHover={{ scale: isDownloading ? 1 : 1.05 }}
                           whileTap={{ scale: isDownloading ? 1 : 0.95 }}
                           onClick={(e) => {
-                            e.stopPropagation(); // Prevent card click
+                            e.stopPropagation();
                             if (!isDownloading) {
                               handleDownloadPackage(item.id, item.title);
                             }
@@ -1181,6 +1264,65 @@ Universitas Katolik Parahyangan
           </motion.button>
         </Link>
       </div>
+
+      {/* Modal Konfirmasi Delete */}
+      {deleteModal.show && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={() => !deleting && closeDeleteModal()}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6"
+          >
+            <div className="flex items-start mb-4">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                <AlertTriangle className="w-6 h-6 text-red-600" />
+              </div>
+              <div className="ml-4 flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Hapus Paket Soal?
+                </h3>
+                <p className="text-sm text-gray-600">
+                  Apakah Anda yakin ingin menghapus paket <strong>"{deleteModal.packageTitle}"</strong>?
+                </p>
+                <p className="text-sm text-red-600 mt-2 font-medium">
+                  ⚠️ Semua soal di dalam paket ini juga akan terhapus!
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={closeDeleteModal}
+                disabled={deleting}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleDeletePackage}
+                disabled={deleting}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+              >
+                {deleting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                    Menghapus...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 mr-1" />
+                    Hapus
+                  </>
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
       
       <Footer />
     </div>
