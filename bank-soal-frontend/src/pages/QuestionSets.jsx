@@ -4,6 +4,12 @@ import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, C
 import Footer from '../components/Footer';
 import Header from '../components/Header';
 import { Link } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
+
+const API_URL = "http://localhost:8080/api";
 
 const QuestionSetsPage = ({ currentUser }) => {
   const [activeTab, setActiveTab] = useState('semua');
@@ -11,7 +17,7 @@ const QuestionSetsPage = ({ currentUser }) => {
   const [selectedLevel, setSelectedLevel] = useState([]);
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [viewMode, setViewMode] = useState('grid');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   
   // State untuk dropdown
@@ -24,111 +30,388 @@ const QuestionSetsPage = ({ currentUser }) => {
   const [selectedCourseTags, setSelectedCourseTags] = useState([]);
   const [selectedMaterialTags, setSelectedMaterialTags] = useState([]);
 
-  // Data untuk dropdown
-  const difficultyLevels = ['Mudah', 'Sedang', 'Sulit'];
-  const courseTags = ['Algoritma dan Struktur Data', 'Pemrograman Web', 'Basis Data', 'Pemrograman Berorientasi Objek', 'Jaringan Komputer', 'Kecerdasan Buatan'];
-  const materialTags = ['Algoritma', 'Struktur Data', 'HTML', 'CSS', 'JavaScript', 'React', 'SQL', 'Normalisasi', 'ERD', 'OOP', 'Java', 'Inheritance', 'Polymorphism', 'TCP/IP', 'Routing', 'Switching', 'Machine Learning', 'Neural Network', 'AI'];
+  const [packages, setPackages] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Generate mock data untuk paket soal
-  const mockData = [
-    {
-      id: 1,
-      title: 'UTS Algoritma dan Struktur Data 2023',
-      description: 'Kumpulan soal untuk UTS mata kuliah Algoritma dan Struktur Data',
-      questionCount: 15,
-      lecturer: 'Dr. Ahmad Fauzi',
-      level: 'Sedang',
-      lastUpdated: '2024-02-20',
-      topics: ['Algoritma', 'Struktur Data', 'Kompleksitas'],
-      downloads: 245
-    },
-    {
-      id: 2,
-      title: 'UAS Pemrograman Web 2023',
-      description: 'Kumpulan soal untuk UAS mata kuliah Pemrograman Web',
-      questionCount: 10,
-      lecturer: 'Prof. Siti Aminah',
-      level: 'Sulit',
-      lastUpdated: '2024-01-15',
-      topics: ['HTML', 'CSS', 'JavaScript', 'React'],
-      downloads: 187
-    },
-    {
-      id: 3,
-      title: 'Quiz Basis Data',
-      description: 'Kumpulan soal quiz untuk mata kuliah Basis Data',
-      questionCount: 8,
-      lecturer: 'Dr. Budi Santoso',
-      level: 'Mudah',
-      lastUpdated: '2024-01-28',
-      topics: ['SQL', 'Normalisasi', 'ERD'],
-      downloads: 156
-    },
-    {
-      id: 4,
-      title: 'UTS Pemrograman Berorientasi Objek',
-      description: 'Kumpulan soal untuk UTS mata kuliah PBO',
-      questionCount: 12,
-      lecturer: 'Dr. Wijaya Kusuma',
-      level: 'Sedang',
-      lastUpdated: '2024-02-10',
-      topics: ['OOP', 'Java', 'Inheritance', 'Polymorphism'],
-      downloads: 325
-    },
-    {
-      id: 5,
-      title: 'UAS Jaringan Komputer',
-      description: 'Kumpulan soal untuk UAS mata kuliah Jaringan Komputer',
-      questionCount: 20,
-      lecturer: 'Dr. Rahmat Hidayat',
-      level: 'Sulit',
-      lastUpdated: '2023-12-05',
-      topics: ['TCP/IP', 'Routing', 'Switching'],
-      downloads: 289
-    },
-    {
-      id: 6,
-      title: 'Quiz Kecerdasan Buatan',
-      description: 'Kumpulan soal quiz untuk mata kuliah Kecerdasan Buatan',
-      questionCount: 10,
-      lecturer: 'Prof. Diana Putri',
-      level: 'Mudah',
-      lastUpdated: '2024-02-15',
-      topics: ['Machine Learning', 'Neural Network', 'AI'],
-      downloads: 178
-    },
-  ];
+  // State untuk dropdown data dari backend
+  const [courseOptions, setCourseOptions] = useState([]);
+  const [difficultyLevels, setDifficultyLevels] = useState([]);
+  const [courseTags, setCourseTags] = useState([]);
+  const [materialTags, setMaterialTags] = useState([]);
+  const [dropdownLoading, setDropdownLoading] = useState(false);
+  const [dropdownError, setDropdownError] = useState(null);
 
-  // Filter function
+  // State untuk download progress
+  const [downloadingItems, setDownloadingItems] = useState(new Set());
+
+  // Helper function to get auth token
+  const getAuthToken = () => {
+    let token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    
+    if (!token && currentUser?.accessToken) {
+      token = currentUser.accessToken;
+    }
+    
+    if (!token) {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          token = user.accessToken;
+        } catch (e) {
+          console.error('Error parsing user from localStorage:', e);
+        }
+      }
+    }
+    
+    return token;
+  };
+
+  // Function untuk download paket soal sebagai ZIP
+  const handleDownloadPackage = async (packageId, packageTitle) => {
+    if (downloadingItems.has(packageId)) {
+      return; // Prevent multiple downloads
+    }
+
+    try {
+      setDownloadingItems(prev => new Set(prev).add(packageId));
+      
+      console.log(`🔄 Starting package download for ID: ${packageId}`);
+      
+      // Get package details with all question sets
+      const response = await axios.get(`${API_URL}/question-packages/${packageId}`);
+      const packageData = response.data;
+      
+      if (!packageData.items || packageData.items.length === 0) {
+        alert('Paket soal kosong atau tidak memiliki soal');
+        return;
+      }
+      
+      console.log(`📁 Found ${packageData.items.length} question sets to process`);
+      
+      // Create a new ZIP instance
+      const zip = new JSZip();
+      
+      // Create main folder for the package
+      const packageFolder = zip.folder(packageTitle.replace(/[<>:"/\\|?*]/g, '_'));
+      
+      let totalDownloadedFiles = 0;
+      const downloadPromises = [];
+      
+      // Process each question set in the package
+      for (const item of packageData.items) {
+        const questionSet = item.question;
+        if (!questionSet) continue;
+        
+        // Create folder for this question set
+        const questionSetName = questionSet.title.replace(/[<>:"/\\|?*]/g, '_');
+        const questionSetFolder = packageFolder.folder(questionSetName);
+        
+        // Create subfolders
+        const soalFolder = questionSetFolder.folder("01_Soal");
+        const jawabanFolder = questionSetFolder.folder("02_Kunci_Jawaban");
+        const testCaseFolder = questionSetFolder.folder("03_Test_Cases");
+        
+        // Get question set details with files
+        const downloadPromise = axios.get(`${API_URL}/questionsets/${questionSet.id}?download=true`)
+          .then(async (qsResponse) => {
+            const qsData = qsResponse.data;
+            
+            if (qsData.files && qsData.files.length > 0) {
+              const fileDownloadPromises = qsData.files.map(async (file) => {
+                let targetFolder = null;
+                let folderName = '';
+                
+                // Determine which folder based on file category
+                switch (file.filecategory) {
+                  case 'soal':
+                  case 'questions':
+                    targetFolder = soalFolder;
+                    folderName = 'Soal';
+                    break;
+                  case 'kunci':
+                  case 'answers':
+                    targetFolder = jawabanFolder;
+                    folderName = 'Kunci Jawaban';
+                    break;
+                  case 'test':
+                  case 'testCases':
+                    targetFolder = testCaseFolder;
+                    folderName = 'Test Cases';
+                    break;
+                  default:
+                    return;
+                }
+                
+                try {
+                  const fileResponse = await axios.get(`${API_URL}/files/download/${file.id}`, {
+                    responseType: 'blob',
+                    timeout: 30000
+                  });
+                  
+                  // Get file extension
+                  let fileExtension = '';
+                  let safeFileName = '';
+                  
+                  if (file.filename && file.filename.includes('.')) {
+                    safeFileName = file.filename;
+                  } else {
+                    const contentType = fileResponse.headers['content-type'] || fileResponse.headers['Content-Type'];
+                    
+                    if (contentType) {
+                      if (contentType.includes('pdf')) fileExtension = '.pdf';
+                      else if (contentType.includes('word') || contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) fileExtension = '.docx';
+                      else if (contentType.includes('text')) fileExtension = '.txt';
+                      else fileExtension = '.pdf'; // default
+                    } else {
+                      fileExtension = '.pdf';
+                    }
+                    
+                    safeFileName = `${folderName}_${file.id}${fileExtension}`;
+                  }
+                  
+                  // Clean filename
+                  safeFileName = safeFileName
+                    .replace(/[<>:"/\\|?*]/g, '_')
+                    .replace(/\s+/g, '_')
+                    .replace(/_+/g, '_');
+                  
+                  targetFolder.file(safeFileName, fileResponse.data);
+                  totalDownloadedFiles++;
+                  
+                  console.log(`✅ Added ${safeFileName} to ${questionSetName}/${folderName}`);
+                } catch (error) {
+                  console.error(`❌ Failed to download file ${file.id}:`, error);
+                }
+              });
+              
+              await Promise.allSettled(fileDownloadPromises);
+            }
+            
+            // Add README for this question set
+            const readmeContent = `
+INFORMASI SOAL
+==============
+
+Judul: ${questionSet.title}
+Mata Kuliah: ${questionSet.subject}
+Tingkat Kesulitan: ${questionSet.level}
+Dosen: ${questionSet.lecturer}
+Tahun: ${questionSet.year}
+Topik: ${questionSet.topics || 'Tidak ada topik'}
+Deskripsi: ${questionSet.description || 'Tidak ada deskripsi'}
+
+---
+Bagian dari Paket: ${packageTitle}
+Diunduh pada: ${new Date().toLocaleString('id-ID')}
+            `.trim();
+            
+            questionSetFolder.file("README.txt", readmeContent);
+          })
+          .catch(error => {
+            console.error(`❌ Failed to process question set ${questionSet.id}:`, error);
+          });
+        
+        downloadPromises.push(downloadPromise);
+      }
+      
+      // Wait for all downloads to complete
+      await Promise.allSettled(downloadPromises);
+      
+      if (totalDownloadedFiles === 0) {
+        alert('Tidak ada file yang berhasil diunduh dari paket soal ini');
+        return;
+      }
+      
+      // Add main README for the package
+      const mainReadmeContent = `
+PAKET SOAL - ${packageTitle.toUpperCase()}
+${'='.repeat(packageTitle.length + 13)}
+
+INFORMASI PAKET:
+- Judul: ${packageData.title}
+- Deskripsi: ${packageData.description || 'Tidak ada deskripsi'}
+- Mata Kuliah: ${packageData.course?.name || 'Tidak ditentukan'}
+- Pembuat: ${packageData.creator?.full_name || 'Tidak diketahui'}
+- Jumlah Soal: ${packageData.items.length} set soal
+- Tanggal Dibuat: ${new Date(packageData.created_at).toLocaleString('id-ID')}
+
+STRUKTUR FOLDER:
+Setiap set soal memiliki struktur folder:
+- 01_Soal/ : File soal utama
+- 02_Kunci_Jawaban/ : File kunci jawaban
+- 03_Test_Cases/ : File test cases
+- README.txt : Informasi detail soal
+
+INFORMASI DOWNLOAD:
+- Total File Diunduh: ${totalDownloadedFiles} file
+- Tanggal Download: ${new Date().toLocaleString('id-ID')}
+- User: ${currentUser?.username || 'Unknown'}
+
+---
+Diunduh dari Bank Soal Informatika
+Universitas Katolik Parahyangan
+© ${new Date().getFullYear()}
+      `.trim();
+      
+      packageFolder.file("README_PAKET.txt", mainReadmeContent);
+      
+      // Generate ZIP file
+      console.log('🔄 Generating package ZIP file...');
+      const zipBlob = await zip.generateAsync({
+        type: "blob",
+        compression: "DEFLATE",
+        compressionOptions: {
+          level: 6
+        }
+      });
+      
+      // Create safe filename for ZIP
+      const safeFileName = packageTitle
+        .replace(/[^a-zA-Z0-9\s-_]/g, '')
+        .replace(/\s+/g, '_')
+        .substring(0, 50);
+      
+      const zipFileName = `Paket_${safeFileName}_${new Date().toISOString().split('T')[0]}.zip`;
+      
+      // Save ZIP file
+      saveAs(zipBlob, zipFileName);
+      
+      console.log(`✅ Package ZIP file "${zipFileName}" download started successfully`);
+      
+      // Show success message
+      alert(`Berhasil mengunduh paket soal "${packageTitle}"!\n\nTotal: ${totalDownloadedFiles} file dalam ${packageData.items.length} set soal`);
+      
+    } catch (error) {
+      console.error("❌ Error downloading package:", error);
+      alert(`Gagal mengunduh paket soal: ${error.message}`);
+    } finally {
+      setDownloadingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(packageId);
+        return newSet;
+      });
+    }
+  };
+
+  // Fetch dropdown data dari backend
+  const fetchDropdownData = async () => {
+    setDropdownLoading(true);
+    setDropdownError(null);
+    
+    try {
+      console.log('🔄 Fetching dropdown data for question packages...');
+      const response = await axios.get(`${API_URL}/dropdown/all-dropdown-data`);
+      
+      if (response.data.success) {
+        const { courseTags: courseTagsData, materialTags: materialTagsData, difficultyLevels: difficultyData } = response.data.data;
+        
+        setCourseTags(courseTagsData.map(tag => tag.name));
+        setMaterialTags(materialTagsData.map(tag => tag.name));
+        setDifficultyLevels(difficultyData.map(level => level.level));
+        
+        console.log('✅ Dropdown data loaded successfully');
+      } else {
+        throw new Error(response.data.message || 'Failed to fetch dropdown data');
+      }
+      
+    } catch (error) {
+      console.error("❌ Error fetching dropdown data:", error);
+      setDropdownError(error.message);
+      
+      // Fallback data jika API gagal
+      console.log('🔄 Using fallback data for dropdowns');
+      setDifficultyLevels(['Mudah', 'Sedang', 'Sulit']);
+      setCourseTags([
+        'Algoritma dan Struktur Data', 'Pemrograman Web', 'Basis Data', 
+        'Pemrograman Berorientasi Objek', 'Jaringan Komputer', 'Kecerdasan Buatan'
+      ]);
+      setMaterialTags([
+        'Algoritma', 'Struktur Data', 'HTML', 'CSS', 'JavaScript', 'React', 
+        'SQL', 'Normalisasi', 'ERD', 'OOP', 'Java', 'Inheritance', 
+        'Polymorphism', 'TCP/IP', 'Routing', 'Switching', 'Machine Learning', 
+        'Neural Network', 'AI'
+      ]);
+    } finally {
+      setDropdownLoading(false);
+    }
+  };
+
+  // Fetch course options
+  const fetchCourseOptions = async () => {
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        console.warn("No auth token found for fetching courses");
+        return [];
+      }
+      
+      console.log('🔄 Fetching course options...');
+      
+      const response = await axios.get(`${API_URL}/course-material-stats`, {
+        headers: { 
+          "x-access-token": token,
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (response.data && Array.isArray(response.data)) {
+        const courses = response.data.map(course => ({
+          id: course.id,
+          name: course.name
+        }));
+        
+        setCourseOptions(courses);
+        console.log(`✅ Loaded ${courses.length} course options`);
+        return courses;
+      } else {
+        console.warn("Invalid course data format received");
+        return [];
+      }
+    } catch (error) {
+      console.error("❌ Error fetching course options:", error);
+      return [];
+    }
+  };
+
+  // Filter function untuk paket soal (QuestionPackage)
   const filterData = () => {
-    return mockData.filter(item => {
-      // Filter by search query
+    return packages.filter(pkg => {
+      // Filter by search query (judul atau deskripsi)
       const matchesSearch =
         searchQuery === '' ||
-        item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.lecturer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.topics.some(topic => topic.toLowerCase().includes(searchQuery.toLowerCase()));
+        pkg.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        pkg.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        pkg.course?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        pkg.items?.some(item =>
+          item.question?.title?.toLowerCase().includes(searchQuery.toLowerCase())
+        );
 
-      // Filter by level
+      // Filter by level (gunakan level dari soal di dalam paket)
       const matchesLevel =
         selectedLevel.length === 0 ||
-        selectedLevel.includes(item.level);
-        
-      // Filter by course tags
+        pkg.items?.some(item =>
+          selectedLevel.includes(item.question?.level)
+        );
+
+      // Filter by course tags (mata kuliah)
       const matchesCourseTags =
         selectedCourseTags.length === 0 ||
-        selectedCourseTags.some(tag => item.title.toLowerCase().includes(tag.toLowerCase()));
-        
-      // Filter by material tags
+        selectedCourseTags.some(tag =>
+          pkg.course?.name?.toLowerCase().includes(tag.toLowerCase())
+        );
+
+      // Filter by material tags (topik dari deskripsi soal)
       const matchesMaterialTags =
         selectedMaterialTags.length === 0 ||
-        selectedMaterialTags.some(tag => 
-          item.topics.some(topic => topic.toLowerCase().includes(tag.toLowerCase()))
+        pkg.items?.some(item =>
+          selectedMaterialTags.some(tag =>
+            item.question?.description?.toLowerCase().includes(tag.toLowerCase())
+          )
         );
 
       // Filter by date
-      const itemDate = new Date(item.lastUpdated);
+      const itemDate = new Date(pkg.created_at);
       const matchesDate =
         (dateRange.start === '' || new Date(dateRange.start) <= itemDate) &&
         (dateRange.end === '' || new Date(dateRange.end) >= itemDate);
@@ -138,6 +421,7 @@ const QuestionSetsPage = ({ currentUser }) => {
   };
 
   const filteredData = filterData();
+  const navigate = useNavigate();
   
   // Filter dropdown data berdasarkan input pencarian
   const filteredLevels = difficultyLevels.filter(level => 
@@ -199,9 +483,133 @@ const QuestionSetsPage = ({ currentUser }) => {
     visible: { opacity: 1, y: 0, height: 'auto' }
   };
 
+  // useEffect untuk fetch packages dan dropdown data
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        console.log('🔄 Initializing QuestionSetsPage data...');
+        
+        // Fetch course options terlebih dahulu
+        const courses = await fetchCourseOptions();
+        
+        // Fetch packages dan dropdown data secara paralel
+        await Promise.all([
+          fetchDropdownData(),
+          fetchPackages()
+        ]);
+        
+        console.log('✅ QuestionSetsPage data initialization complete');
+      } catch (error) {
+        console.error('❌ Error initializing data:', error);
+      }
+    };
+    
+    initializeData();
+  }, []);
+
+  // Function untuk fetch packages
+  const fetchPackages = async () => {
+    const token = getAuthToken();
+
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_URL}/question-packages`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "x-access-token": token || "",
+          "Authorization": token ? `Bearer ${token}` : ""
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error("Gagal mengambil paket soal");
+      }
+
+      const data = await response.json();
+      setPackages(data);
+      console.log('✅ Question packages loaded:', data.length);
+    } catch (err) {
+      console.error('❌ Error fetching packages:', err);
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Loading indicator untuk dropdown
+  const DropdownStatusIndicator = () => {
+    if (dropdownError && !dropdownLoading) {
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-2 rounded-lg mb-4 text-sm max-w-6xl mx-auto"
+        >
+          ⚠️ Menggunakan data filter default. Server mungkin sedang bermasalah. ({dropdownError})
+        </motion.div>
+      );
+    }
+    return null;
+  };
+
+  // Handle outside clicks untuk dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.dropdown-container')) {
+        setShowLevelDropdown(false);
+        setShowCourseTagDropdown(false);
+        setShowMaterialTagDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Handle card click - navigate to detail page
+  const handleCardClick = (packageId) => {
+    if (!packageId) {
+      console.error("ID paket soal kosong!");
+      return;
+    }
+    navigate(`/question-packages/${packageId}`);
+  };
+
+  if (loading || dropdownLoading) return (
+    <div className="min-h-screen bg-white flex items-center justify-center">
+      <motion.div
+        animate={{
+          scale: [1, 1.2, 1],
+          rotate: [0, 180, 360]
+        }}
+        transition={{
+          duration: 2,
+          repeat: Infinity,
+          ease: "easeInOut"
+        }}
+        className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full"
+      />
+      <motion.p
+        animate={{ opacity: [0.5, 1, 0.5] }}
+        transition={{
+          duration: 1.5,
+          repeat: Infinity
+        }}
+        className="ml-4 text-lg font-medium text-blue-600"
+      >
+        {dropdownLoading ? 'Memuat Filter Data...' : 'Memuat Paket Soal...'}
+      </motion.p>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-white">
       <Header currentUser={currentUser} />
+      
+      <DropdownStatusIndicator />
       
       <div className="w-full px-4 md:px-8 py-8 md:py-12">
         {/* Header Section with Animated Background */}
@@ -288,10 +696,10 @@ const QuestionSetsPage = ({ currentUser }) => {
             </motion.button>
           </div>
           
-          {/* Dropdown Filters */}
+          {/* Dropdown Filters dengan dropdown-container class */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
             {/* Tingkat Kesulitan Dropdown */}
-            <div className="relative">
+            <div className="relative dropdown-container">
               <label className="block text-sm font-medium mb-2 text-gray-700">Pilih Tingkat Kesulitan</label>
               <div className="relative">
                 <input
@@ -344,7 +752,7 @@ const QuestionSetsPage = ({ currentUser }) => {
             </div>
             
             {/* Tag Mata Kuliah Dropdown */}
-            <div className="relative">
+            <div className="relative dropdown-container">
               <label className="block text-sm font-medium mb-2 text-gray-700">Pilih Tag Mata Kuliah</label>
               <div className="relative">
                 <input
@@ -397,7 +805,7 @@ const QuestionSetsPage = ({ currentUser }) => {
             </div>
             
             {/* Tag Materi Dropdown */}
-            <div className="relative">
+            <div className="relative dropdown-container">
               <label className="block text-sm font-medium mb-2 text-gray-700">Pilih Tag Materi</label>
               <div className="relative">
                 <input
@@ -536,8 +944,6 @@ const QuestionSetsPage = ({ currentUser }) => {
             </motion.div>
           )}
 
-          
-
           {/* View Toggle and Results Count */}
           <div className="flex justify-between items-center mt-6">
             <p className="text-gray-600 text-sm">
@@ -564,7 +970,7 @@ const QuestionSetsPage = ({ currentUser }) => {
           </div>
         </motion.div>
 
-        {/* Results Section */}
+        {/* Results Section - UPDATED untuk clickable cards */}
         <AnimatePresence mode="wait">
           {viewMode === 'grid' ? (
             <motion.div
@@ -573,79 +979,94 @@ const QuestionSetsPage = ({ currentUser }) => {
               animate="visible"
               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
             >
-              {filteredData.map((item) => (
-                <motion.div
-                  key={item.id}
-                  variants={itemVariants}
-                  className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
-                >
-                  <div className="p-6">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center">
-                        <div className="bg-blue-100 p-2 rounded-lg mr-3">
-                          <Book className="w-6 h-6 text-blue-600" />
+              {filteredData.map((item) => {
+                const isDownloading = downloadingItems.has(item.id);
+                return (
+                  <motion.div
+                    key={item.id}
+                    variants={itemVariants}
+                    className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all cursor-pointer group"
+                    onClick={() => handleCardClick(item.id)}
+                  >
+                    <div className="p-6">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center">
+                          <div className="bg-blue-100 p-2 rounded-lg mr-3 group-hover:bg-blue-200 transition-colors">
+                            <Book className="w-6 h-6 text-blue-600" />
+                          </div>
                         </div>
-                        <span className={`px-2 py-1 text-xs rounded-full ${
-                          item.level === 'Mudah' ? 'bg-green-100 text-green-800' :
-                          item.level === 'Sedang' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {item.level}
-                        </span>
-                      </div>
-                      <div className="flex items-center text-gray-500 text-sm">
-                        <Download className="w-4 h-4 mr-1" />
-                        {item.downloads}
-                      </div>
-                    </div>
-                    
-                    <h3 className="text-lg font-semibold mb-2 text-gray-900">{item.title}</h3>
-                    <p className="text-gray-600 text-sm mb-3 line-clamp-2">{item.description}</p>
-                    
-                    <div className="flex items-center text-sm text-gray-500 mb-3">
-                      <User className="w-4 h-4 mr-1" />
-                      <span>{item.lecturer}</span>
-                    </div>
-                    
-                    <div className="flex items-center text-sm text-gray-500 mb-4">
-                      <Tag className="w-4 h-4 mr-1" />
-                      <span>{item.questionCount} soal</span>
-                    </div>
-                    
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {item.topics.slice(0, 3).map((topic, index) => (
-                        <span key={index} className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
-                          {topic}
-                        </span>
-                      ))}
-                      {item.topics.length > 3 && (
-                        <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
-                          +{item.topics.length - 3}
-                        </span>
-                      )}
-                    </div>
-                    
-                    <div className="flex justify-between items-center">
-                      <div className="text-xs text-gray-500 flex items-center">
-                        <Clock className="w-3 h-3 mr-1" />
-                        {new Date(item.lastUpdated).toLocaleDateString('id-ID', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric'
-                        })}
+                        <div className="flex items-center text-gray-500 text-sm">
+                          <Download className="w-4 h-4 mr-1" />
+                          {item.downloads || 0}
+                        </div>
                       </div>
                       
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium"
-                      >
-                        Lihat Detail
-                      </motion.button>
+                      <h3 className="text-lg font-semibold mb-2 text-gray-900 group-hover:text-blue-700 transition-colors">{item.title}</h3>
+                      <p className="text-gray-600 text-sm mb-3 line-clamp-2">{item.description}</p>
+                      
+                      <div className="flex items-center text-sm text-gray-500 mb-3">
+                        <User className="w-4 h-4 mr-1" />
+                        <span>{item.creator?.full_name || "Tidak diketahui"}</span>
+                      </div>
+                      
+                      <div className="flex items-center text-sm text-gray-500 mb-4">
+                        <Tag className="w-4 h-4 mr-1" />
+                        <span>{item.items?.length || 0} soal</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-medium">
+                          {item.course?.name || "Tanpa Mata Kuliah"}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <div className="text-xs text-gray-500 flex items-center">
+                          <Clock className="w-3 h-3 mr-1" />
+                          {new Date(item.created_at).toLocaleDateString('id-ID', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
+                        </div>
+                        
+                        <motion.button
+                          whileHover={{ scale: isDownloading ? 1 : 1.05 }}
+                          whileTap={{ scale: isDownloading ? 1 : 0.95 }}
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent card click
+                            if (!isDownloading) {
+                              handleDownloadPackage(item.id, item.title);
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
+                            isDownloading 
+                              ? 'bg-gray-400 text-white cursor-not-allowed' 
+                              : 'bg-blue-600 text-white hover:bg-blue-700'
+                          }`}
+                          disabled={isDownloading}
+                        >
+                          {isDownloading ? (
+                            <>
+                              <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                className="w-3 h-3 border-2 border-white border-t-transparent rounded-full"
+                              />
+                              Unduh...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-3 h-3" />
+                              Unduh
+                            </>
+                          )}
+                        </motion.button>
+                      </div>
                     </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </motion.div>
           ) : (
             <motion.div
@@ -654,77 +1075,97 @@ const QuestionSetsPage = ({ currentUser }) => {
               animate="visible"
               className="space-y-4"
             >
-              {filteredData.map((item) => (
-                <motion.div
-                  key={item.id}
-                  variants={itemVariants}
-                  className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow p-4"
-                >
-                  <div className="flex flex-col md:flex-row md:items-center">
-                    <div className="flex-1">
-                      <div className="flex items-center mb-2">
-                        <div className="bg-blue-100 p-2 rounded-lg mr-3">
-                          <Book className="w-6 h-6 text-blue-600" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-gray-900">{item.title}</h3>
-                        <span className={`ml-3 px-2 py-1 text-xs rounded-full ${
-                          item.level === 'Mudah' ? 'bg-green-100 text-green-800' :
-                          item.level === 'Sedang' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {item.level}
-                        </span>
-                      </div>
-                      
-                      <p className="text-gray-600 text-sm mb-3">{item.description}</p>
-                      
-                      <div className="flex flex-wrap gap-4 mb-2">
-                        <div className="flex items-center text-sm text-gray-500">
-                          <User className="w-4 h-4 mr-1" />
-                          <span>{item.lecturer}</span>
+              {filteredData.map((item) => {
+                const isDownloading = downloadingItems.has(item.id);
+                return (
+                  <motion.div
+                    key={item.id}
+                    variants={itemVariants}
+                    className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all p-4 cursor-pointer group"
+                    onClick={() => handleCardClick(item.id)}
+                  >
+                    <div className="flex flex-col md:flex-row md:items-center">
+                      <div className="flex-1">
+                        <div className="flex items-center mb-2">
+                          <div className="bg-blue-100 p-2 rounded-lg mr-3 group-hover:bg-blue-200 transition-colors">
+                            <Book className="w-6 h-6 text-blue-600" />
+                          </div>
+                          <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-700 transition-colors">{item.title}</h3>
                         </div>
                         
-                        <div className="flex items-center text-sm text-gray-500">
-                          <Tag className="w-4 h-4 mr-1" />
-                          <span>{item.questionCount} soal</span>
+                        <p className="text-gray-600 text-sm mb-3">{item.description}</p>
+                        
+                        <div className="flex flex-wrap gap-4 mb-2">
+                          <div className="flex items-center text-sm text-gray-500">
+                            <User className="w-4 h-4 mr-1" />
+                            <span>{item.creator?.full_name || "Tidak diketahui"}</span>
+                          </div>
+                          
+                          <div className="flex items-center text-sm text-gray-500">
+                            <Tag className="w-4 h-4 mr-1" />
+                            <span>{item.items?.length || 0} soal</span>
+                          </div>
+                          
+                          <div className="flex items-center text-sm text-gray-500">
+                            <Clock className="w-4 h-4 mr-1" />
+                            {new Date(item.created_at).toLocaleDateString('id-ID', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric'
+                            })}
+                          </div>
+                          
+                          <div className="flex items-center text-sm text-gray-500">
+                            <Download className="w-4 h-4 mr-1" />
+                            {item.downloads || 0}
+                          </div>
                         </div>
                         
-                        <div className="flex items-center text-sm text-gray-500">
-                          <Clock className="w-4 h-4 mr-1" />
-                          {new Date(item.lastUpdated).toLocaleDateString('id-ID', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric'
-                          })}
-                        </div>
-                        
-                        <div className="flex items-center text-sm text-gray-500">
-                          <Download className="w-4 h-4 mr-1" />
-                          {item.downloads}
-                        </div>
-                      </div>
-                      
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        {item.topics.map((topic, index) => (
-                          <span key={index} className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
-                            {topic}
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-medium">
+                            {item.course?.name || "Tanpa Mata Kuliah"}
                           </span>
-                        ))}
+                        </div>
+                      </div>
+                      
+                      <div className="mt-4 md:mt-0 md:ml-4 flex md:flex-col justify-end">
+                        <motion.button
+                          whileHover={{ scale: isDownloading ? 1 : 1.05 }}
+                          whileTap={{ scale: isDownloading ? 1 : 0.95 }}
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent card click
+                            if (!isDownloading) {
+                              handleDownloadPackage(item.id, item.title);
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
+                            isDownloading 
+                              ? 'bg-gray-400 text-white cursor-not-allowed' 
+                              : 'bg-blue-600 text-white hover:bg-blue-700'
+                          }`}
+                          disabled={isDownloading}
+                        >
+                          {isDownloading ? (
+                            <>
+                              <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                className="w-3 h-3 border-2 border-white border-t-transparent rounded-full"
+                              />
+                              Unduh...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-3 h-3" />
+                              Unduh
+                            </>
+                          )}
+                        </motion.button>
                       </div>
                     </div>
-                    
-                    <div className="mt-4 md:mt-0 md:ml-4 flex md:flex-col justify-end">
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium"
-                      >
-                        Lihat Detail
-                      </motion.button>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </motion.div>
           )}
         </AnimatePresence>

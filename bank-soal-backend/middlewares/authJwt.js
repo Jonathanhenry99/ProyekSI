@@ -20,10 +20,15 @@ verifyToken = (req, res, next) => {
   }
 
   // Remove 'Bearer ' prefix if present in Authorization header
-  if (token.startsWith('Bearer ')) {
-    token = token.slice(7, token.length).trim();
-    console.log("Token after removing Bearer prefix:", token.substring(0, 20) + "...");
-  }
+  // if (token.startsWith('Bearer ')) {
+  //   token = token.slice(7, token.length).trim();
+  //   console.log("Token after removing Bearer prefix:", token.substring(0, 20) + "...");
+  // }
+  if (typeof token === "string" && token.startsWith("Bearer ")) {
+  token = token.slice(7).trim();
+  console.log("Token after removing Bearer prefix:", token.substring(0, 20) + "...");
+}
+
 
   jwt.verify(token, config.secret, (err, decoded) => {
     if (err) {

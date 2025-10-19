@@ -3,9 +3,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, CheckCircle, ChevronDown, FileText, BarChart2, Plus, Check, BookOpen, Trash2, AlertTriangle, Archive, RefreshCw, Trash } from 'lucide-react';
 import Footer from '../components/Footer';
 import Header from '../components/Header';
-import RecycleBinModal from '../components/RecycleBinModal.jsx'; // Import the new component
+import RecycleBinModal from '../components/RecycleBinModal.jsx';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 
 const API_URL = "http://localhost:8080/api";
 
@@ -27,7 +29,7 @@ const SearchPage = ({ currentUser }) => {
   const [itemToDelete, setItemToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // State untuk recycle bin - simplified
+  // State untuk recycle bin
   const [showRecycleBinModal, setShowRecycleBinModal] = useState(false);
 
   // State untuk dropdown
@@ -46,6 +48,9 @@ const SearchPage = ({ currentUser }) => {
   const [materialTags, setMaterialTags] = useState([]);
   const [dropdownLoading, setDropdownLoading] = useState(false);
   const [dropdownError, setDropdownError] = useState(null);
+
+  // State untuk download progress
+  const [downloadingItems, setDownloadingItems] = useState(new Set());
 
   // Helper function untuk mendapatkan nama mata kuliah berdasarkan ID
   const getSubjectNameById = (subjectId) => {
@@ -79,6 +84,284 @@ const SearchPage = ({ currentUser }) => {
     }
     
     return token;
+  };
+
+  // UPDATED: Fungsi untuk download ZIP dengan semua file
+  const handleDownload = async (id, fileName) => {
+    if (downloadingItems.has(id)) {
+      return; // Prevent multiple downloads
+    }
+
+    try {
+      setDownloadingItems(prev => new Set(prev).add(id));
+      
+      console.log(`🔄 Starting ZIP download for question set ID: ${id}`);
+      
+      // Get detailed question set data with files
+      const response = await axios.get(`${API_URL}/questionsets/${id}?download=true`);
+      const questionSet = response.data;
+      
+      if (!questionSet.files || questionSet.files.length === 0) {
+        alert('Tidak ada file yang tersedia untuk diunduh');
+        return;
+      }
+      
+      console.log(`📁 Found ${questionSet.files.length} files to process`);
+      
+      // Create a new ZIP instance
+      const zip = new JSZip();
+      
+      // Create folders in ZIP
+      const soalFolder = zip.folder("01_Soal");
+      const jawabanFolder = zip.folder("02_Kunci_Jawaban");
+      const testCaseFolder = zip.folder("03_Test_Cases");
+      
+      // Track download promises and successful downloads
+      const downloadPromises = [];
+      let hasFiles = false;
+      let downloadedFiles = {
+        soal: 0,
+        jawaban: 0,
+        testcase: 0
+      };
+      
+      // Process each file
+      for (const file of questionSet.files) {
+        let targetFolder = null;
+        let folderName = '';
+        let fileType = '';
+        
+        // Determine which folder based on file category
+        switch (file.filecategory) {
+          case 'soal':
+          case 'questions':
+            targetFolder = soalFolder;
+            folderName = 'Soal';
+            fileType = 'soal';
+            break;
+          case 'kunci':
+          case 'answers':
+            targetFolder = jawabanFolder;
+            folderName = 'Kunci Jawaban';
+            fileType = 'jawaban';
+            break;
+          case 'test':
+          case 'testCases':
+            targetFolder = testCaseFolder;
+            folderName = 'Test Cases';
+            fileType = 'testcase';
+            break;
+          default:
+            console.warn(`⚠️ Unknown file category: ${file.filecategory}`);
+            continue;
+        }
+        
+        // Download file and add to ZIP
+        const downloadPromise = axios.get(`${API_URL}/files/download/${file.id}`, {
+          responseType: 'blob',
+          timeout: 30000 // 30 second timeout
+        }).then(fileResponse => {
+          // Get file extension from original filename or content-type
+          let fileExtension = '';
+          let safeFileName = '';
+          
+          // First try to get extension from original filename
+          if (file.filename && file.filename.includes('.')) {
+            const lastDot = file.filename.lastIndexOf('.');
+            fileExtension = file.filename.substring(lastDot);
+            safeFileName = file.filename;
+          } else {
+            // Fallback: determine extension from content-type
+            const contentType = fileResponse.headers['content-type'] || fileResponse.headers['Content-Type'];
+            console.log(`File ${file.id} content-type:`, contentType);
+            
+            if (contentType) {
+              if (contentType.includes('pdf') || contentType.includes('application/pdf')) {
+                fileExtension = '.pdf';
+              } else if (contentType.includes('word') || contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
+                fileExtension = '.docx';
+              } else if (contentType.includes('msword') || contentType.includes('application/msword')) {
+                fileExtension = '.doc';
+              } else if (contentType.includes('text') || contentType.includes('text/plain')) {
+                fileExtension = '.txt';
+              } else {
+                // Default fallback based on file category
+                switch (file.filecategory) {
+                  case 'soal':
+                  case 'questions':
+                    fileExtension = '.pdf'; // Assume PDF for question files
+                    break;
+                  case 'kunci':
+                  case 'answers':
+                    fileExtension = '.pdf'; // Assume PDF for answer files
+                    break;
+                  case 'test':
+                  case 'testCases':
+                    fileExtension = '.txt'; // Assume TXT for test cases
+                    break;
+                  default:
+                    fileExtension = '.pdf'; // Default to PDF
+                }
+              }
+            } else {
+              // No content-type, use default based on category
+              fileExtension = '.pdf';
+            }
+            
+            // Create safe filename if original doesn't exist
+            safeFileName = `${folderName}_${file.id}${fileExtension}`;
+          }
+          
+          // Ensure filename has proper extension
+          if (!safeFileName.includes('.')) {
+            safeFileName += fileExtension;
+          }
+          
+          // Clean filename for ZIP compatibility
+          safeFileName = safeFileName
+            .replace(/[<>:"/\\|?*]/g, '_') // Replace invalid characters
+            .replace(/\s+/g, '_') // Replace spaces
+            .replace(/_+/g, '_'); // Remove multiple underscores
+          
+          console.log(`📁 Adding file: ${safeFileName} (${fileType}) - Extension: ${fileExtension}`);
+          
+          // Add file to appropriate folder in ZIP
+          targetFolder.file(safeFileName, fileResponse.data);
+          hasFiles = true;
+          downloadedFiles[fileType]++;
+          
+          console.log(`✅ Added ${safeFileName} to ${folderName} folder`);
+        }).catch(error => {
+          console.error(`❌ Failed to download file ${file.id}:`, error);
+          // Continue with other files even if one fails
+        });
+        
+        downloadPromises.push(downloadPromise);
+      }
+      
+      // Wait for all downloads to complete
+      console.log('⏳ Waiting for all file downloads to complete...');
+      await Promise.allSettled(downloadPromises);
+      
+      if (!hasFiles) {
+        alert('Gagal mengunduh file. Tidak ada file yang berhasil diproses.');
+        return;
+      }
+      
+      // Create comprehensive README file
+      const readmeContent = `
+PAKET SOAL - BANK SOAL INFORMATIKA
+==================================
+
+INFORMASI UMUM:
+- Judul: ${questionSet.title || fileName}
+- Mata Kuliah: ${getSubjectNameById(questionSet.subject)}
+- Tingkat Kesulitan: ${questionSet.level}
+- Dosen: ${questionSet.lecturer}
+- Tahun: ${questionSet.year}
+- Tanggal Unduh: ${new Date().toLocaleString('id-ID')}
+
+STRUKTUR FOLDER:
+- 01_Soal/ : Berisi file soal utama (${downloadedFiles.soal} file)
+- 02_Kunci_Jawaban/ : Berisi file kunci jawaban (${downloadedFiles.jawaban} file)
+- 03_Test_Cases/ : Berisi file test cases (${downloadedFiles.testcase} file)
+
+DETAIL TAMBAHAN:
+- Topik: ${questionSet.topics || 'Tidak ada topik yang ditentukan'}
+- Deskripsi: ${questionSet.description || 'Tidak ada deskripsi tambahan'}
+- Total File: ${downloadedFiles.soal + downloadedFiles.jawaban + downloadedFiles.testcase} file
+
+INFORMASI DOWNLOAD:
+- ID Question Set: ${id}
+- Waktu Download: ${new Date().toISOString()}
+- User: ${currentUser?.username || 'Unknown'}
+
+CATATAN:
+Jika ada folder yang kosong, berarti file untuk kategori tersebut
+tidak tersedia atau gagal diunduh dari server.
+
+---
+Diunduh dari Bank Soal Informatika
+Universitas Katolik Parahyangan
+© ${new Date().getFullYear()}
+      `.trim();
+      
+      zip.file("README.txt", readmeContent);
+      
+      // Add summary file in JSON format for programmatic access
+      const summaryData = {
+        questionSet: {
+          id: id,
+          title: questionSet.title || fileName,
+          subject: getSubjectNameById(questionSet.subject),
+          level: questionSet.level,
+          lecturer: questionSet.lecturer,
+          year: questionSet.year,
+          topics: questionSet.topics,
+          description: questionSet.description
+        },
+        download: {
+          timestamp: new Date().toISOString(),
+          user: currentUser?.username || 'Unknown',
+          filesDownloaded: downloadedFiles,
+          totalFiles: downloadedFiles.soal + downloadedFiles.jawaban + downloadedFiles.testcase
+        }
+      };
+      
+      zip.file("summary.json", JSON.stringify(summaryData, null, 2));
+      
+      // Generate ZIP file
+      console.log('🔄 Generating ZIP file...');
+      const zipBlob = await zip.generateAsync({
+        type: "blob",
+        compression: "DEFLATE",
+        compressionOptions: {
+          level: 6
+        }
+      });
+      
+      // Create safe filename for ZIP
+      const safeFileName = (fileName || questionSet.title || `Soal_${id}`)
+        .replace(/[^a-zA-Z0-9\s-_]/g, '') // Remove special characters
+        .replace(/\s+/g, '_') // Replace spaces with underscores
+        .substring(0, 50); // Limit length
+      
+      const zipFileName = `${safeFileName}_${new Date().toISOString().split('T')[0]}.zip`;
+      
+      // Save ZIP file
+      saveAs(zipBlob, zipFileName);
+      
+      console.log(`✅ ZIP file "${zipFileName}" download started successfully`);
+      
+      // Show success message with details
+      const successMessage = `Berhasil mengunduh paket soal "${fileName}"!\n\n` +
+        `File yang diunduh:\n` +
+        `- Soal: ${downloadedFiles.soal} file\n` +
+        `- Kunci Jawaban: ${downloadedFiles.jawaban} file\n` +
+        `- Test Cases: ${downloadedFiles.testcase} file\n\n` +
+        `Total: ${downloadedFiles.soal + downloadedFiles.jawaban + downloadedFiles.testcase} file dalam format ZIP`;
+      
+      alert(successMessage);
+      
+    } catch (error) {
+      console.error("❌ Error downloading files:", error);
+      
+      if (error.response?.status === 404) {
+        alert('File soal tidak ditemukan atau telah dihapus');
+      } else if (error.response?.status === 403) {
+        alert('Anda tidak memiliki izin untuk mengunduh file ini');
+      } else if (error.code === 'ECONNABORTED') {
+        alert('Download timeout. Silakan coba lagi atau periksa koneksi internet.');
+      } else {
+        alert(`Gagal mengunduh file: ${error.message}`);
+      }
+    } finally {
+      setDownloadingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
+    }
   };
 
   // FIXED: Fungsi untuk soft delete question set
@@ -137,7 +420,6 @@ const SearchPage = ({ currentUser }) => {
 
   // Handler callbacks untuk RecycleBinModal
   const handleItemRestored = (id) => {
-    // Refresh the question sets list when an item is restored
     const initializeData = async () => {
       const courses = await fetchCourseOptions();
       await fetchQuestionSets(courses);
@@ -146,7 +428,6 @@ const SearchPage = ({ currentUser }) => {
   };
 
   const handleItemPermanentlyDeleted = (id) => {
-    // No need to refresh main list as item is permanently deleted
     console.log(`Item ${id} permanently deleted`);
   };
 
@@ -294,25 +575,6 @@ const SearchPage = ({ currentUser }) => {
       console.error("❌ Error fetching question sets:", error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleDownload = async (id) => {
-    try {
-      const response = await axios.get(`${API_URL}/questionsets/${id}?download=true`);
-      
-      const questionFile = response.data.files.find(file => 
-        file.filecategory === 'soal' || file.filecategory === 'questions'
-      );
-      
-      if (questionFile) {
-        window.open(`${API_URL}/files/download/${questionFile.id}`, '_blank');
-      } else {
-        alert('File soal tidak ditemukan');
-      }
-    } catch (error) {
-      console.error("Error downloading file:", error);
-      alert('Gagal mendownload file');
     }
   };
   
@@ -495,6 +757,7 @@ const SearchPage = ({ currentUser }) => {
   const renderCard = (item) => {
     const hasAnswerKey = item.hasAnswerKey ?? false;
     const hasTestCase = item.hasTestCase ?? false;
+    const isDownloading = downloadingItems.has(item.id);
 
     const completeness = (hasAnswerKey ? 1 : 0) + (hasTestCase ? 1 : 0);
     const completenessPercent = (completeness / 2) * 100;
@@ -599,15 +862,36 @@ const SearchPage = ({ currentUser }) => {
               <span>{item.downloads} unduhan</span>
             </div>
             <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+              whileHover={{ scale: isDownloading ? 1 : 1.05 }}
+              whileTap={{ scale: isDownloading ? 1 : 0.95 }}
+              className={`px-3 py-1.5 text-white text-sm rounded-lg transition-colors flex items-center gap-1 ${
+                isDownloading 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-blue-600 hover:bg-blue-700'
+              }`}
               onClick={(e) => {
                 e.stopPropagation();
-                handleDownload(item.id);
+                if (!isDownloading) {
+                  handleDownload(item.id, item.fileName);
+                }
               }}
+              disabled={isDownloading}
             >
-              Unduh
+              {isDownloading ? (
+                <>
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="w-3 h-3 border-2 border-white border-t-transparent rounded-full"
+                  />
+                  Mengunduh...
+                </>
+              ) : (
+                <>
+                  <Download className="w-3 h-3" />
+                  Unduh ZIP
+                </>
+              )}
             </motion.button>
           </div>
         </div>
@@ -1086,53 +1370,78 @@ const SearchPage = ({ currentUser }) => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredData.map((item) => (
-                      <motion.tr
-                        key={item.id}
-                        variants={itemVariants}
-                        className="hover:bg-gray-50"
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {item.fileName}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700" title={`Subject ID: ${item.subjectId}`}>
-                          {item.subject}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-3 py-1 rounded-full text-xs ${getLevelColor(item.level)}`}>
-                            {item.level}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                          {item.lecturer}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                          {formatDate(item.lastUpdated)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center">
-                          <div className="flex items-center justify-center gap-2">
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              className="inline-flex items-center px-3 py-1 rounded-lg text-sm text-white bg-blue-600 hover:bg-blue-700"
-                              onClick={() => handleDownload(item.id)}
-                            >
-                              <Download className="w-3 h-3 mr-1" />
-                              Download
-                            </motion.button>
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              className="inline-flex items-center px-3 py-1 rounded-lg text-sm text-white bg-red-600 hover:bg-red-700"
-                              onClick={() => confirmDelete(item)}
-                            >
-                              <Trash2 className="w-3 h-3 mr-1" />
-                              Hapus
-                            </motion.button>
-                          </div>
-                        </td>
-                      </motion.tr>
-                    ))}
+                    {filteredData.map((item) => {
+                      const isDownloading = downloadingItems.has(item.id);
+                      return (
+                        <motion.tr
+                          key={item.id}
+                          variants={itemVariants}
+                          className="hover:bg-gray-50"
+                        >
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {item.fileName}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700" title={`Subject ID: ${item.subjectId}`}>
+                            {item.subject}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-3 py-1 rounded-full text-xs ${getLevelColor(item.level)}`}>
+                              {item.level}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                            {item.lecturer}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                            {formatDate(item.lastUpdated)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <motion.button
+                                whileHover={{ scale: isDownloading ? 1 : 1.05 }}
+                                whileTap={{ scale: isDownloading ? 1 : 0.95 }}
+                                className={`inline-flex items-center px-3 py-1 rounded-lg text-sm text-white transition-colors ${
+                                  isDownloading 
+                                    ? 'bg-gray-400 cursor-not-allowed' 
+                                    : 'bg-blue-600 hover:bg-blue-700'
+                                }`}
+                                onClick={() => {
+                                  if (!isDownloading) {
+                                    handleDownload(item.id, item.fileName);
+                                  }
+                                }}
+                                disabled={isDownloading}
+                              >
+                                {isDownloading ? (
+                                  <>
+                                    <motion.div
+                                      animate={{ rotate: 360 }}
+                                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                      className="w-3 h-3 border-2 border-white border-t-transparent rounded-full mr-1"
+                                    />
+                                    Unduh...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Download className="w-3 h-3 mr-1" />
+                                    Unduh ZIP
+                                  </>
+                                )}
+                              </motion.button>
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                className="inline-flex items-center px-3 py-1 rounded-lg text-sm text-white bg-red-600 hover:bg-red-700"
+                                onClick={() => confirmDelete(item)}
+                              >
+                                <Trash2 className="w-3 h-3 mr-1" />
+                                Hapus
+                              </motion.button>
+                            </div>
+                          </td>
+                        </motion.tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </motion.div>
@@ -1163,7 +1472,7 @@ const SearchPage = ({ currentUser }) => {
       )}
 
       {/* Modals */}
-      {/* Recycle Bin Modal - Sekarang menggunakan component terpisah */}
+      {/* Recycle Bin Modal */}
       <RecycleBinModal
         isOpen={showRecycleBinModal}
         onClose={() => setShowRecycleBinModal(false)}

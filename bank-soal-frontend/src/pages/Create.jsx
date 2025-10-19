@@ -4,20 +4,6 @@ import { motion } from "framer-motion";
 import LogoUnpar from "../assets/LogoUnpar.png";
 import LogoIF from "../assets/LogoIF.jpg";
 
-// Lalu di komponen Header, ganti bagian logo:
-<div className="flex items-center space-x-4">
-    <img
-        src={LogoUnpar}
-        alt="Logo Unpar"
-        className="h-10 w-auto"
-    />
-    <div className="h-8 w-px bg-gray-300"></div>
-    <img
-        src={LogoIF}
-        alt="Logo IF"
-        className="h-10 w-auto rounded"
-    />
-</div>
 import {
     Upload, File, Search, Trash2, Edit, Download, Plus,
     Move, ChevronDown, ChevronUp, Check, Database, FileText, Clock, User, BookOpen, Calendar
@@ -39,17 +25,17 @@ const Header = ({ currentUser }) => {
         >
             <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
-                <img
-        src={LogoUnpar}
-        alt="Logo Unpar"
-        className="h-10 w-auto"
-    />
+                    <img
+                        src={LogoUnpar}
+                        alt="Logo Unpar"
+                        className="h-10 w-auto"
+                    />
                     <div className="h-8 w-px bg-gray-300"></div>
                     <img
-        src={LogoIF}
-        alt="Logo IF"
-        className="h-10 w-auto rounded"
-    />
+                        src={LogoIF}
+                        alt="Logo IF"
+                        className="h-10 w-auto rounded"
+                    />
                 </div>
 
                 <nav className="flex items-center space-x-7">
@@ -110,6 +96,168 @@ const Header = ({ currentUser }) => {
     );
 };
 
+// Custom Course Dropdown Component
+const CourseDropdown = ({ 
+    formSubject, 
+    setFormSubject, 
+    courseList, 
+    isCourseLoading 
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState("");
+    const dropdownRef = useRef(null);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setIsOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
+    // Filter courses based on search term
+    const filteredCourses = courseList.filter(course =>
+        course.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    // Get selected course name
+    const selectedCourse = courseList.find(course => course.id === formSubject);
+
+    const handleSelectCourse = (course) => {
+        setFormSubject(course.id);
+        setIsOpen(false);
+        setSearchTerm("");
+    };
+
+    return (
+        <div className="relative" ref={dropdownRef}>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+                Mata Kuliah Paket Soal (Wajib)
+            </label>
+            
+            {/* Selected course display */}
+            {selectedCourse && (
+                <div className="mb-2">
+                    <span className="inline-flex items-center gap-2 bg-blue-100 text-blue-800 text-sm px-3 py-1.5 rounded-full">
+                        <BookOpen className="w-4 h-4" />
+                        {selectedCourse.name}
+                        <button 
+                            onClick={() => setFormSubject("")}
+                            className="hover:text-blue-900 ml-1"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </span>
+                </div>
+            )}
+
+            {/* Dropdown trigger */}
+            <button
+                type="button"
+                onClick={() => setIsOpen(!isOpen)}
+                disabled={isCourseLoading}
+                className="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-3 text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <BookOpen className="w-5 h-5 text-gray-400" />
+                        <span className={`${selectedCourse ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>
+                            {isCourseLoading 
+                                ? "Memuat mata kuliah..." 
+                                : selectedCourse 
+                                    ? selectedCourse.name 
+                                    : "Pilih mata kuliah..."
+                            }
+                        </span>
+                    </div>
+                    <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+                </div>
+            </button>
+
+            {/* Dropdown menu */}
+            {isOpen && !isCourseLoading && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-hidden">
+                    {/* Search input */}
+                    <div className="p-3 border-b border-gray-100">
+                        <div className="relative">
+                            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                            <input
+                                type="text"
+                                placeholder="Cari mata kuliah..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                autoFocus
+                            />
+                        </div>
+                    </div>
+
+                    {/* Options list */}
+                    <div className="max-h-48 overflow-y-auto">
+                        {filteredCourses.length > 0 ? (
+                            <>
+                                {/* Clear selection option */}
+                                {selectedCourse && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setFormSubject("");
+                                            setIsOpen(false);
+                                            setSearchTerm("");
+                                        }}
+                                        className="w-full px-4 py-3 text-left hover:bg-red-50 transition-colors duration-150 border-b border-gray-100 flex items-center gap-3 text-red-600 hover:text-red-700"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                        <span className="font-medium">Hapus Pilihan</span>
+                                    </button>
+                                )}
+                                
+                                {/* Course options */}
+                                {filteredCourses.map((course) => (
+                                    <button
+                                        key={course.id}
+                                        type="button"
+                                        onClick={() => handleSelectCourse(course)}
+                                        className={`w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors duration-150 flex items-center gap-3 ${
+                                            formSubject === course.id 
+                                                ? 'bg-blue-100 text-blue-900 font-medium' 
+                                                : 'text-gray-700 hover:text-blue-700'
+                                        }`}
+                                    >
+                                        <BookOpen className={`w-4 h-4 ${
+                                            formSubject === course.id ? 'text-blue-600' : 'text-gray-400'
+                                        }`} />
+                                        <span className="flex-grow">{course.name}</span>
+                                        {formSubject === course.id && (
+                                            <Check className="w-4 h-4 text-blue-600" />
+                                        )}
+                                    </button>
+                                ))}
+                            </>
+                        ) : (
+                            <div className="px-4 py-6 text-center text-gray-500">
+                                <BookOpen className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                                <p className="text-sm font-medium">Tidak ada mata kuliah ditemukan</p>
+                                <p className="text-xs">Coba kata kunci lain</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 const FormCreatorPage = ({ currentUser }) => {
     const [formTitle, setFormTitle] = useState("Untitled Form");
     const [formDescription, setFormDescription] = useState("");
@@ -117,6 +265,9 @@ const FormCreatorPage = ({ currentUser }) => {
     const [searchTerm, setSearchTerm] = useState("");
     const [isSearching, setIsSearching] = useState(false);
     const [filteredQuestions, setFilteredQuestions] = useState([]);
+    const [formSubject, setFormSubject] = useState("");
+    const [courseList, setCourseList] = useState([]);
+    const [isCourseLoading, setIsCourseLoading] = useState(true);
     
     // State untuk questions dari API
     const [questions, setQuestions] = useState([]);
@@ -325,12 +476,12 @@ const FormCreatorPage = ({ currentUser }) => {
     }, [searchTerm, selectedCourseTags, selectedMaterialTags, selectedDifficulty, questions]);
 
     const handleDownloadZipBundle = () => {
-        const questionIds = selectedQuestions
+        const questionSetIds = selectedQuestions
             .map(q => q.question_set_id || q.id) 
             .filter(id => id) 
             .join(',');
 
-        if (!questionIds) {
+        if (!questionSetIds) {
             alert("Harap tambahkan setidaknya satu soal untuk mengaktifkan download ZIP.");
             return;
         }
@@ -339,7 +490,7 @@ const FormCreatorPage = ({ currentUser }) => {
             ? "Form_Tanpa_Judul" 
             : formTitle.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_');
 
-        const url = `http://localhost:8080/api/files/download-bundle?ids=${questionIds}&formTitle=${cleanFormTitle}`;
+        const url = `http://localhost:8080/api/files/download-bundle?ids=${questionSetIds}&formTitle=${cleanFormTitle}`;
         
         window.location.href = url;
 
@@ -362,6 +513,78 @@ const FormCreatorPage = ({ currentUser }) => {
             month: 'short',
             day: 'numeric'
         });
+    };
+
+    useEffect(() => {
+        const fetchCourses = async () => {
+            try {
+                setIsCourseLoading(true);
+                const token = localStorage.getItem("token");
+                console.log("Token:", token);
+
+                const response = await fetch("http://localhost:8080/api/course-tags", {
+                    headers: {
+                        "x-access-token": token,
+                    },
+                });
+
+                console.log("Response status:", response.status);
+                const data = await response.json();
+                console.log("Data mata kuliah:", data);
+
+                setCourseList(data);
+            } catch (error) {
+                console.error("Error mengambil daftar mata kuliah:", error);
+            } finally {
+                setIsCourseLoading(false);
+            }
+        };
+
+        fetchCourses();
+    }, []);
+
+    const handleSaveQuestionPackage = async () => {
+        const token = localStorage.getItem("token");
+        if (!token) return alert("Token tidak ditemukan, silakan login ulang");
+    
+        try {
+            const payload = {
+                title: formTitle,
+                description: formDescription,
+                course_id: formSubject,
+                questionSetIds: selectedQuestions.map(q => q.id)
+            };
+    
+            console.log("Payload dikirim ke backend:", payload);
+    
+            const response = await fetch("http://localhost:8080/api/question-packages", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-access-token": token
+                },
+                body: JSON.stringify(payload)
+            });
+    
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || "Gagal menyimpan paket soal");
+            }
+    
+            const savedPackage = await response.json();
+            alert("Paket soal berhasil disimpan!");
+            console.log(savedPackage);
+    
+            // Hanya reset form title, description, dan subject
+            // selectedQuestions TIDAK di-reset agar tetap stay di kiri
+            setFormTitle("");
+            setFormDescription("");
+            setFormSubject("");
+            // setSelectedQuestions([]); // <-- Baris ini dihapus/dikomentari
+        } catch (err) {
+            console.error("Error saving question package:", err);
+            alert(`Error saving question package: ${err.message}`);
+        }
     };
 
     return (
@@ -617,6 +840,14 @@ const FormCreatorPage = ({ currentUser }) => {
                                 placeholder="Deskripsi form (opsional)"
                                 rows="2"
                             />
+
+                            {/* Custom Course Dropdown */}
+                            <CourseDropdown 
+                                formSubject={formSubject}
+                                setFormSubject={setFormSubject}
+                                courseList={courseList}
+                                isCourseLoading={isCourseLoading}
+                            />
                         </div>
 
                         {/* Questions list - draggable */}
@@ -691,6 +922,19 @@ const FormCreatorPage = ({ currentUser }) => {
                                 ))
                             )}
                         </div>
+
+                        {/* Save button */}
+                        {selectedQuestions.length > 0 && (
+                        <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            className="w-full bg-green-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2 mb-3"
+                            onClick={handleSaveQuestionPackage}
+                        >
+                            <Check className="w-5 h-5" />
+                            Simpan Paket Soal 
+                        </motion.button>
+                        )}
                         
                         {/* Download button */}
                         {selectedQuestions.length > 0 && (
@@ -701,7 +945,7 @@ const FormCreatorPage = ({ currentUser }) => {
                                 onClick={handleDownloadZipBundle} 
                             >
                                 <Download className="w-5 h-5" />
-                                Download Kumpulan Soal ({selectedQuestions.length} soal)
+                                Download Paket Soal
                             </motion.button>
                         )}
                     </motion.div>
