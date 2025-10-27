@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Plus, User, LogOut, Tag, BookOpen, Trash2, X, AlertCircle, CheckCircle, ChevronRight, ArrowLeft } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import LogoIF from '../../assets/LogoIF.jpg';
 import axios from 'axios';
 import AuthService from '../../services/auth.service';
 
@@ -361,10 +362,11 @@ const CourseTaggingAdmin = ({ currentUser }) => {
       <div className="max-w-7xl mx-auto px-6 py-4">
         <div className="grid grid-cols-3 items-center">
           <div className="flex items-center space-x-3">
-            <div className="h-10 w-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <BookOpen className="w-6 h-6 text-white" />
-            </div>
-            <span className="font-bold text-gray-900">Course Assignment Manager</span>
+            <img
+              src="/src/assets/LogoIF.jpg"
+              alt="Logo Informatika UNPAR"
+              className="h-10 w-auto"
+            />
           </div>
           
           <nav className="flex justify-center space-x-8">
@@ -378,7 +380,7 @@ const CourseTaggingAdmin = ({ currentUser }) => {
               Tagging
             </Link>
             <Link to="/admin/course-tagging" className="text-blue-600 font-semibold relative px-2 py-1">
-              Assignment Materi
+              Tagging Mata Kuliah
               <div className="absolute -bottom-4 left-0 right-0 h-0.5 bg-blue-600 rounded-full"></div>
             </Link>
           </nav>
@@ -402,7 +404,6 @@ const CourseTaggingAdmin = ({ currentUser }) => {
       </div>
     </header>
   );
-
   // Notification Component
   const Notification = () => {
     if (!notification) return null;
@@ -546,7 +547,7 @@ const CourseTaggingAdmin = ({ currentUser }) => {
             onClick={handleBackToCourses}
             className={`text-sm font-medium ${currentView === 'courses' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'} transition-colors`}
           >
-            Mata Kuliah
+            
           </button>
           {selectedCourse && (
             <>
@@ -573,7 +574,7 @@ const CourseTaggingAdmin = ({ currentUser }) => {
         {currentView === 'courses' && (
           <>
             {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl border border-blue-200">
                 <div className="flex items-center justify-between">
                   <div>
@@ -607,18 +608,8 @@ const CourseTaggingAdmin = ({ currentUser }) => {
                   </div>
                 </div>
               </div>
-              <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-6 rounded-xl border border-orange-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-orange-600 text-sm font-medium">Rata-rata per MK</p>
-                    <p className="text-2xl font-bold text-orange-900">{statistics.avg_materials_per_course || 0}</p>
-                  </div>
-                  <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center">
-                    <Tag className="w-6 h-6 text-white" />
-                  </div>
-                </div>
               </div>
-            </div>
+         
 
             {/* Search */}
             <div className="mb-8">

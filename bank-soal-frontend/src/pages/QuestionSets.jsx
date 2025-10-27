@@ -1130,7 +1130,7 @@ Universitas Katolik Parahyangan
                           ) : (
                             <>
                               <Download className="w-3 h-3" />
-                              Unduh
+                              Unduh ZIP
                             </>
                           )}
                         </motion.button>

@@ -547,6 +547,19 @@ const FormCreatorPage = ({ currentUser }) => {
         const token = localStorage.getItem("token");
         if (!token) return alert("Token tidak ditemukan, silakan login ulang");
     
+        // ✅ TAMBAHKAN VALIDASI INI
+        if (!formTitle.trim()) {
+            return alert("⚠️ Judul paket soal tidak boleh kosong!");
+        }
+    
+        if (!formSubject) {
+            return alert("⚠️ Silakan pilih mata kuliah terlebih dahulu!");
+        }
+    
+        if (selectedQuestions.length === 0) {
+            return alert("⚠️ Minimal pilih 1 soal untuk membuat paket soal!");
+        }
+    
         try {
             const payload = {
                 title: formTitle,
@@ -572,18 +585,16 @@ const FormCreatorPage = ({ currentUser }) => {
             }
     
             const savedPackage = await response.json();
-            alert("Paket soal berhasil disimpan!");
+            alert("✅ Paket soal berhasil disimpan!");
             console.log(savedPackage);
     
-            // Hanya reset form title, description, dan subject
-            // selectedQuestions TIDAK di-reset agar tetap stay di kiri
             setFormTitle("");
             setFormDescription("");
             setFormSubject("");
-            // setSelectedQuestions([]); // <-- Baris ini dihapus/dikomentari
+        
         } catch (err) {
             console.error("Error saving question package:", err);
-            alert(`Error saving question package: ${err.message}`);
+            alert(`❌ Error: ${err.message}`);
         }
     };
 
@@ -884,6 +895,7 @@ const FormCreatorPage = ({ currentUser }) => {
                                                 <h3 className="font-semibold text-gray-900">{question.title}</h3>
                                                 <div className={`text-xs px-2 py-1 rounded-full ${
                                                     question.level === "Mudah"
+                                                   
                                                     ? "bg-green-100 text-green-800"
                                                     : question.level === "Sedang"
                                                     ? "bg-yellow-100 text-yellow-800"

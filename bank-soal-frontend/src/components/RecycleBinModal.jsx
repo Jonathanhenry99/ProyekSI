@@ -28,8 +28,9 @@ const RecycleBinModal = ({
   const [isLoadingRecycleBin, setIsLoadingRecycleBin] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('deletedAt'); // deletedAt, fileName, subject
-  const [sortOrder, setSortOrder] = useState('desc'); // asc, desc
+  const [sortBy, setSortBy] = useState('deletedAt');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [hasFetched, setHasFetched] = useState(false); // Track if data has been fetched
 
   // Helper function to get auth token
   const getAuthToken = useCallback(() => {
@@ -66,8 +67,11 @@ const RecycleBinModal = ({
   }, [courseOptions]);
 
   // Optimized data fetching dengan abort controller
-  const fetchRecycleBinData = useCallback(async () => {
-    if (isLoadingRecycleBin) return; // Prevent multiple calls
+  const fetchRecycleBinData = useCallback(async (forceRefresh = false) => {
+    if (isLoadingRecycleBin) return;
+    
+    // Don't fetch again if already fetched and not forcing refresh
+    if (hasFetched && !forceRefresh) return;
     
     setIsLoadingRecycleBin(true);
     const abortController = new AbortController();
@@ -87,7 +91,7 @@ const RecycleBinModal = ({
           "Content-Type": "application/json"
         },
         signal: abortController.signal,
-        timeout: 10000 // 10 second timeout
+        timeout: 10000
       });
       
       const data = response.data?.data || response.data || [];
@@ -116,6 +120,7 @@ const RecycleBinModal = ({
       }));
       
       setRecycleBinData(transformedData);
+      setHasFetched(true); // Mark as fetched
       console.log(`✅ Loaded ${transformedData.length} deleted question sets`);
       
     } catch (error) {
@@ -152,12 +157,13 @@ const RecycleBinModal = ({
       }
       
       setRecycleBinData([]);
+      setHasFetched(true); // Mark as fetched even on error to prevent infinite loop
     } finally {
       setIsLoadingRecycleBin(false);
     }
     
     return () => abortController.abort();
-  }, [getAuthToken, getSubjectNameById, isLoadingRecycleBin]);
+  }, [getAuthToken, getSubjectNameById, isLoadingRecycleBin, hasFetched]);
 
   // Optimized restore function
   const handleRestore = useCallback(async (id) => {
@@ -345,12 +351,12 @@ const RecycleBinModal = ({
     }
   }, []);
 
-  // Load data when modal opens
+  // Load data when modal opens (only once unless forced)
   useEffect(() => {
-    if (isOpen && recycleBinData.length === 0) {
+    if (isOpen && !hasFetched) {
       fetchRecycleBinData();
     }
-  }, [isOpen, fetchRecycleBinData, recycleBinData.length]);
+  }, [isOpen, hasFetched, fetchRecycleBinData]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -358,6 +364,7 @@ const RecycleBinModal = ({
       setSearchQuery('');
       setSortBy('deletedAt');
       setSortOrder('desc');
+      setHasFetched(false); // Reset fetch status on unmount
     };
   }, []);
 
@@ -416,16 +423,7 @@ const RecycleBinModal = ({
                 
                 {/* Sort Controls */}
                 <div className="flex gap-2">
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="px-3 py-2 border border-gray-200 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                  >
-                    <option value="deletedAt">Tanggal Hapus</option>
-                    <option value="fileName">Nama File</option>
-                    <option value="subject">Mata Kuliah</option>
-                    <option value="lecturer">Dosen</option>
-                  </select>
+                
                   
                   <button
                     onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
@@ -470,7 +468,7 @@ const RecycleBinModal = ({
                       key={item.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.02 }} // Stagger animation
+                      transition={{ delay: index * 0.02 }}
                       className="bg-gray-50/60 backdrop-blur-sm rounded-lg p-4 border border-gray-200/50 hover:shadow-md transition-shadow"
                     >
                       <div className="flex justify-between items-start gap-4">
@@ -576,13 +574,13 @@ const RecycleBinModal = ({
           {recycleBinData.length > 0 && (
             <div className="p-4 border-t border-gray-200/50 bg-gray-50/80 backdrop-blur-sm flex justify-between items-center">
               <p className="text-sm text-gray-500">
-                💡 Tips: Soal yang dihapus akan disimpan selama 30 hari
+              
               </p>
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="px-4 py-2 text-gray-600 hover:bg-gray-200/50 rounded-lg transition-colors flex items-center gap-2 backdrop-blur-sm"
-                onClick={fetchRecycleBinData}
+                onClick={() => fetchRecycleBinData(true)}
                 disabled={isLoadingRecycleBin}
               >
                 <RefreshCw className={`w-4 h-4 ${isLoadingRecycleBin ? 'animate-spin' : ''}`} />
@@ -595,5 +593,5 @@ const RecycleBinModal = ({
     </AnimatePresence>
   );
 };
-console.time('RecycleBin-Render');
+
 export default RecycleBinModal;

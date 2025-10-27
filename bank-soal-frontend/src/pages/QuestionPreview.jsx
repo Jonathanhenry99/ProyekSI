@@ -12,31 +12,31 @@ const API_URL = "http://localhost:8080/api";
 
 // Setup axios interceptor for authentication
 axios.interceptors.request.use(
-(config) => {
-  let token = localStorage.getItem('token') || sessionStorage.getItem('token');
-  
-  if (!token) {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        token = user.accessToken;
-      } catch (e) {
-        console.error('Error parsing user from localStorage:', e);
+  (config) => {
+    let token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    
+    if (!token) {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          token = user.accessToken;
+        } catch (e) {
+          console.error('Error parsing user from localStorage:', e);
+        }
       }
     }
+    
+    if (token) {
+      config.headers['x-access-token'] = token;
+      delete config.headers['Authorization'];
+    }
+    
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
   }
-  
-  if (token) {
-    config.headers['x-access-token'] = token;
-    delete config.headers['Authorization'];
-  }
-  
-  return config;
-},
-(error) => {
-  return Promise.reject(error);
-}
 );
 
 // Upload Modal Component
@@ -635,8 +635,21 @@ const QuestionPreview = ({ currentUser }) => {
     }
   };
 
-  const handleDownload = (fileId) => {
-    window.open(`${API_URL}/files/download/${fileId}`, '_blank');
+  const handleDownload = async (fileId) => {
+    try {
+      // Increment download count di backend
+      await axios.post(`${API_URL}/files/${fileId}/download`);
+      
+      // Buka file untuk download
+      window.open(`${API_URL}/files/download/${fileId}`, '_blank');
+      
+      // Refresh data untuk update counter
+      await fetchQuestionSetDetails();
+    } catch (error) {
+      console.error('Error tracking download:', error);
+      // Tetap buka download meskipun tracking gagal
+      window.open(`${API_URL}/files/download/${fileId}`, '_blank');
+    }
   };
 
   const handleDeleteClick = (file) => {
@@ -688,23 +701,27 @@ const QuestionPreview = ({ currentUser }) => {
 
     return (
       <div className="flex items-center space-x-2">
-        <button
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
           onClick={() => handleDownload(file.id)}
           className="flex items-center text-blue-600 hover:text-blue-800 transition-colors px-3 py-2 rounded-lg hover:bg-blue-50"
           title="Download file"
         >
-          <Download size={18} className="mr-1" />
-          Download
-        </button>
+          <Download className="w-5 h-5 mr-2" />
+          <span className="font-medium">Download</span>
+        </motion.button>
         {isAuthenticated && (
-          <button
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={() => handleDeleteClick(file)}
             className="flex items-center text-red-600 hover:text-red-800 transition-colors px-3 py-2 rounded-lg hover:bg-red-50"
             title="Hapus file"
           >
-            <Trash2 size={18} className="mr-1" />
-            Delete
-          </button>
+            <Trash2 className="w-5 h-5 mr-2" />
+            <span className="font-medium">Delete</span>
+          </motion.button>
         )}
       </div>
     );
@@ -896,11 +913,19 @@ const QuestionPreview = ({ currentUser }) => {
                 className="bg-white rounded-xl shadow-md overflow-hidden"
               >
                 <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-                  <div>
+                  <div className="flex-1">
                     <h3 className="text-lg font-medium text-gray-900">{file.originalname}</h3>
-                    <p className="text-sm text-gray-500">
-                      {file.filetype.toUpperCase()} • {Math.round(file.filesize / 1024)} KB
-                    </p>
+                    <div className="flex items-center gap-4 mt-1">
+                      <p className="text-sm text-gray-500">
+                        {file.filetype.toUpperCase()} • {Math.round(file.filesize / 1024)} KB
+                      </p>
+                      {file.download_count !== undefined && (
+                        <div className="flex items-center text-sm text-gray-500">
+                          <Download className="w-4 h-4 mr-1" />
+                          <span>{file.download_count} downloads</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   {renderFileActionButtons(file)}
                 </div>
