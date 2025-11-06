@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - TugasBesar Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/umd/lucide.js"></script>
+    <style>
+        .login-card {
+            animation: slideUp 0.6s ease-out;
+        }
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body class="bg-white min-h-screen flex items-center justify-center p-4">
+    
+    <div class="login-card bg-white border border-gray-200 rounded-lg p-8 w-full max-w-md shadow-lg">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="w-16 h-16 bg-blue-600 rounded-full mx-auto mb-4 flex items-center justify-center">
+                <i data-lucide="graduation-cap" class="w-8 h-8 text-white"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">Sistem Manajemen Tugas Besar</h1>
+            <p class="text-gray-600">Sistem Manajemen Tugas Besar</p>
+            <p class="text-gray-500 text-sm">Prodi Informatika UNPAR</p>
+        </div>
+
+        <!-- Login Form -->
+        <form id="loginForm" onsubmit="handleLogin(event)">
+            <!-- Username/Email Input -->
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-medium mb-2">
+                    <i data-lucide="user" class="w-4 h-4 inline mr-2"></i>
+                    Email / NPM / NIP
+                </label>
+                <input 
+                    type="text" 
+                    id="identifier" 
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Masukkan email, NPM, atau NIP"
+                    required
+                >
+            </div>
+
+            <!-- Password Input -->
+            <div class="mb-6">
+                <label class="block text-gray-700 text-sm font-medium mb-2">
+                    <i data-lucide="lock" class="w-4 h-4 inline mr-2"></i>
+                    Password
+                </label>
+                <div class="relative">
+                    <input 
+                        type="password" 
+                        id="password" 
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-12"
+                        placeholder="Masukkan password"
+                        required
+                    >
+                    <button type="button" onclick="togglePassword()" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                        <i data-lucide="eye" id="eyeIcon" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Remember Me -->
+            <div class="flex items-center justify-between mb-6">
+                <label class="flex items-center text-sm text-gray-600">
+                    <input type="checkbox" class="mr-2 rounded border-gray-300">
+                    Ingat Saya
+                </label>
+                <a href="#" class="text-sm text-blue-600 hover:text-blue-800">Lupa Password?</a>
+            </div>
+
+            <!-- Login Button -->
+            <button 
+                type="submit" 
+                class="w-full bg-blue-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-md"
+            >
+                <i data-lucide="log-in" class="w-5 h-5 inline mr-2"></i>
+                Masuk
+            </button>
+        </form>
+
+        <!-- Demo Accounts
+        <div class="mt-8 pt-6 border-t border-gray-200">
+            <p class="text-gray-600 text-xs text-center mb-3">Demo Accounts:</p>
+            <div class="grid grid-cols-1 gap-2 text-xs">
+                <button onclick="fillDemo('admin')" class="text-left text-gray-600 hover:text-gray-800 p-2 rounded bg-gray-50 hover:bg-gray-100">
+                    <strong>Admin:</strong> admin@unpar.ac.id / admin123
+                </button>
+                <button onclick="fillDemo('dosen')" class="text-left text-gray-600 hover:text-gray-800 p-2 rounded bg-gray-50 hover:bg-gray-100">
+                    <strong>Dosen:</strong> dosen@unpar.ac.id / dosen123
+                </button>
+                <button onclick="fillDemo('mahasiswa')" class="text-left text-gray-600 hover:text-gray-800 p-2 rounded bg-gray-50 hover:bg-gray-100">
+                    <strong>Mahasiswa:</strong> 2021730001 / mahasiswa123
+                </button>
+            </div>
+        </div>
+    </div> -->
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-lg p-6 flex items-center">
+            <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-3"></div>
+            <span class="text-gray-700">Memproses login...</span>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        function togglePassword() {
+            const passwordInput = document.getElementById('password');
+            const eyeIcon = document.getElementById('eyeIcon');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                eyeIcon.setAttribute('data-lucide', 'eye-off');
+            } else {
+                passwordInput.type = 'password';
+                eyeIcon.setAttribute('data-lucide', 'eye');
+            }
+            lucide.createIcons();
+        }
+
+        function fillDemo(role) {
+            const identifier = document.getElementById('identifier');
+            const password = document.getElementById('password');
+            
+            if (role === 'admin') {
+                identifier.value = 'admin@unpar.ac.id';
+                password.value = 'admin123';
+            } else if (role === 'dosen') {
+                identifier.value = 'dosen@unpar.ac.id';
+                password.value = 'dosen123';
+            } else if (role === 'mahasiswa') {
+                identifier.value = '2021730001';
+                password.value = 'mahasiswa123';
+            }
+        }
+
+        function handleLogin(event) {
+            event.preventDefault();
+            
+            const identifier = document.getElementById('identifier').value;
+            const password = document.getElementById('password').value;
+            
+            // Show loading overlay
+            document.getElementById('loadingOverlay').classList.remove('hidden');
+            
+            // Simulate login process
+            setTimeout(() => {
+                // Hide loading overlay
+                document.getElementById('loadingOverlay').classList.add('hidden');
+                
+                // Determine role based on identifier
+                let role = 'mahasiswa'; // default
+                if (identifier.includes('admin')) {
+                    role = 'admin';
+                } else if (identifier.includes('dosen') || identifier.includes('@unpar.ac.id')) {
+                    role = 'dosen';
+                }
+                
+                // Redirect based on role
+                const pages = {
+                    'admin': 'admin.html',
+                    'dosen': 'dosen.html',
+                    'mahasiswa': 'mahasiswa.html'
+                };
+                
+                // For demo purposes, show success message
+                alert(`Login berhasil sebagai ${role.charAt(0).toUpperCase() + role.slice(1)}!`);
+                
+                // In real implementation, uncomment this line:
+                // window.location.href = pages[role];
+                
+                console.log(`Redirecting to: ${pages[role]}`);
+            }, 1500);
+        }
+    </script>
+</body>
+</html>

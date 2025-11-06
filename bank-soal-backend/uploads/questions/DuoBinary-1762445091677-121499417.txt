@@ -1,0 +1,41 @@
+import java.util.*;
+public class DuoBinary {
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        LinkedList  list1 = new LinkedList<>();
+        LinkedList list2 = new LinkedList<>();
+        int angka = sc.nextInt();
+            while(angka>=0){
+            list1.add(angka);
+            angka = sc.nextInt();
+        }
+        int angka2 = sc.nextInt();
+            while(angka2>=0){
+            list2.add(angka2);
+            angka2 = sc.nextInt();
+        }
+        int index = sc.nextInt();
+        if(index == 0){
+            for (int i = 0; i < list2.size() - 1; i++) {
+                list1.add(0, list2.get(i));
+                index++;
+                
+            }
+        }else if(index<list1.size()){
+            for (int i = 0; i < list2.size() ; i++) {
+                list1.add(index, list2.get(i));
+                index++;
+            }
+        }else{
+            for (int i = 0; i < list2.size() ; i++) {
+                list1.add(list2.get(i));
+            }
+        }
+        //System.out.println(list1.toString());
+        int res=0;
+        for(int i =0;i<list1.size();i++){
+            res += (int)list1.get(i)*Math.pow(2,(list1.size()-1)-i);;
+        }
+        System.out.println(res);
+    }
+}

@@ -7,98 +7,139 @@ module.exports = (sequelize, Sequelize) => {
     },
     originalname: {
       type: Sequelize.STRING,
-      allowNull: false
+      allowNull: false,
+      field: 'originalname' // Match DB column name
     },
     filename: {
       type: Sequelize.STRING,
-      allowNull: false
+      allowNull: false,
+      field: 'filename'
     },
     filepath: {
       type: Sequelize.STRING,
-      allowNull: false
+      allowNull: false,
+      field: 'filepath'
     },
     filetype: {
-      type: Sequelize.STRING, // PDF, DOCX, TXT
-      allowNull: false
+      type: Sequelize.STRING,
+      allowNull: false,
+      field: 'filetype'
     },
     filesize: {
       type: Sequelize.INTEGER,
-      allowNull: false
+      allowNull: false,
+      field: 'filesize'
     },
     filecategory: {
-      type: Sequelize.STRING, // questions, answers, testCases
-      allowNull: false
+      type: Sequelize.STRING,
+      allowNull: false,
+      field: 'filecategory'
     },
     question_set_id: {
       type: Sequelize.INTEGER,
       allowNull: false,
+      field: 'question_set_id',
       references: {
         model: 'question_sets',
         key: 'id'
       }
     },
-    // ===== TAMBAHAN KOLOM UNTUK SOFT DELETE =====
+    uploadedBy: {
+      type: Sequelize.INTEGER,
+      allowNull: true,
+      field: 'uploaded_by', // ✅ Match DB
+      references: {
+        model: 'users',
+        key: 'id'
+      }
+    },
     is_deleted: {
       type: Sequelize.BOOLEAN,
       defaultValue: false,
-      allowNull: false
+      allowNull: false,
+      field: 'is_deleted'
     },
     deleted_at: {
       type: Sequelize.DATE,
-      allowNull: true
+      allowNull: true,
+      field: 'deleted_at'
+    },
+    deleted_by: {
+      type: Sequelize.INTEGER,
+      allowNull: true,
+      field: 'deleted_by',
+      references: {
+        model: 'users',
+        key: 'id'
+      }
+    },
+    // ✅ Update field names to match DB (snake_case)
+    mimeType: {
+      type: Sequelize.STRING(255),
+      allowNull: true,
+      field: 'mime_type' // ✅ Match DB column
+    },
+    languageType: {
+      type: Sequelize.STRING(100),
+      allowNull: true,
+      field: 'language_type' // ✅ Match DB column
+    },
+    supportsPreview: {
+      type: Sequelize.BOOLEAN,
+      defaultValue: false,
+      allowNull: true,
+      field: 'supports_preview' // ✅ Match DB column
     }
   }, {
-    // Tambahkan opsi ini untuk menggunakan nama kolom yang sama persis dengan definisi
-    underscored: true,
-    // Tentukan nama kolom timestamp secara eksplisit
+    underscored: false, // ✅ Set to false since we're using explicit field mapping
     createdAt: 'created_at',
-    updatedAt: 'updated_at'
+    updatedAt: 'updated_at',
+    tableName: 'files'
   });
 
-  // ===== TAMBAHAN SCOPES =====
-  // Default scope untuk hanya mengambil file yang tidak dihapus
-  File.addScope('active', {
-    where: {
-      is_deleted: false
-    }
-  });
   File.associate = function(models) {
-    File.belongsTo(models.QuestionSet, {
+    File.belongsTo(models.questionSet, {
       foreignKey: 'question_set_id',
       as: 'questionSet'
     });
+    
+    File.belongsTo(models.user, {
+      foreignKey: 'uploaded_by', // ✅ Use snake_case
+      as: 'uploader'
+    });
+    
+    File.belongsTo(models.user, {
+      foreignKey: 'deleted_by',
+      as: 'deleter'
+    });
   };
 
-  
+  File.addScope('active', {
+    where: { is_deleted: false }
+  });
 
-  // Scope untuk mengambil file yang dihapus
   File.addScope('deleted', {
-    where: {
-      is_deleted: true
-    }
+    where: { is_deleted: true }
   });
 
-  // Scope untuk mengambil semua file (termasuk yang dihapus)
-  File.addScope('withDeleted', {
-    // No where clause, includes all files
-  });
+  File.addScope('withDeleted', {});
 
-  // ===== TAMBAHAN INSTANCE METHODS =====
-  File.prototype.softDelete = function() {
+  File.prototype.softDelete = function(userId = null) {
     return this.update({
       is_deleted: true,
-      deleted_at: new Date()
+      deleted_at: new Date(),
+      deleted_by: userId
     });
   };
 
   File.prototype.restore = function() {
     return this.update({
       is_deleted: false,
-      deleted_at: null
+      deleted_at: null,
+      deleted_by: null
     });
   };
 
-  // ===== TAMBAHAN CLASS METHODS =====
   File.findActive = function(options = {}) {
     return this.scope('active').findAll(options);
   };
