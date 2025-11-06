@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from "framer-motion";
-import { ArrowLeft, Download, FileText, File, BookOpen, Trash2, AlertTriangle, Upload, RotateCcw, X, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Download, FileText, File, BookOpen, Trash2, AlertTriangle, Upload, RotateCcw, X, CheckCircle, Code } from 'lucide-react';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import EditModal from '../components/EditModal';
@@ -39,6 +41,207 @@ axios.interceptors.request.use(
   }
 );
 
+// ✅ Get language mapping for syntax highlighting
+const getLanguageForHighlighting = (extension) => {
+  const langMap = {
+    '.js': 'javascript',
+    '.jsx': 'jsx',
+    '.ts': 'typescript',
+    '.tsx': 'tsx',
+    '.py': 'python',
+    '.java': 'java',
+    '.c': 'c',
+    '.cpp': 'cpp',
+    '.cc': 'cpp',
+    '.cxx': 'cpp',
+    '.h': 'c',
+    '.hpp': 'cpp',
+    '.cs': 'csharp',
+    '.php': 'php',
+    '.rb': 'ruby',
+    '.go': 'go',
+    '.rs': 'rust',
+    '.kt': 'kotlin',
+    '.kts': 'kotlin',
+    '.swift': 'swift',
+    '.dart': 'dart',
+    '.scala': 'scala',
+    '.r': 'r',
+    '.m': 'matlab',
+    '.sh': 'bash',
+    '.bash': 'bash',
+    '.sql': 'sql',
+    '.html': 'html',
+    '.htm': 'html',
+    '.css': 'css',
+    '.scss': 'scss',
+    '.sass': 'sass',
+    '.json': 'json',
+    '.xml': 'xml',
+    '.yaml': 'yaml',
+    '.yml': 'yaml',
+    '.txt': 'text',
+    '.md': 'markdown'
+  };
+  
+  return langMap[extension.toLowerCase()] || 'text';
+};
+
+// ✅ Get language display name
+const getLanguageDisplayName = (extension) => {
+  const displayMap = {
+    '.js': 'JavaScript',
+    '.jsx': 'React JSX',
+    '.ts': 'TypeScript',
+    '.tsx': 'TypeScript React',
+    '.py': 'Python',
+    '.java': 'Java',
+    '.c': 'C',
+    '.cpp': 'C++',
+    '.cc': 'C++',
+    '.cxx': 'C++',
+    '.h': 'C Header',
+    '.hpp': 'C++ Header',
+    '.cs': 'C#',
+    '.php': 'PHP',
+    '.rb': 'Ruby',
+    '.go': 'Go',
+    '.rs': 'Rust',
+    '.kt': 'Kotlin',
+    '.swift': 'Swift',
+    '.dart': 'Dart',
+    '.scala': 'Scala',
+    '.r': 'R',
+    '.m': 'MATLAB',
+    '.sh': 'Shell Script',
+    '.bash': 'Bash',
+    '.sql': 'SQL',
+    '.html': 'HTML',
+    '.css': 'CSS',
+    '.scss': 'SCSS',
+    '.json': 'JSON',
+    '.xml': 'XML',
+    '.yaml': 'YAML',
+    '.txt': 'Plain Text',
+    '.md': 'Markdown'
+  };
+  
+  return displayMap[extension.toLowerCase()] || 'Code';
+};
+
+// ✅ Code Preview Component with Syntax Highlighting
+const CodePreview = ({ file }) => {
+  const [code, setCode] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [theme, setTheme] = useState('dark');
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const fetchCode = async () => {
+      try {
+        setLoading(true);
+        const response = await axios.get(`${API_URL}/files/preview/${file.id}`, {
+          responseType: 'text'
+        });
+        setCode(response.data);
+        setError(null);
+      } catch (err) {
+        console.error('Error loading code:', err);
+        setError('Gagal memuat file');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCode();
+  }, [file.id]);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-10 border border-gray-300 rounded-lg">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center p-10 border border-gray-300 rounded-lg">
+        <Code size={64} className="text-red-500 mb-4" />
+        <p className="text-lg font-medium text-red-600 mb-2">{error}</p>
+      </div>
+    );
+  }
+
+  const ext = file.originalname.substring(file.originalname.lastIndexOf('.')).toLowerCase();
+  const language = getLanguageForHighlighting(ext);
+  const displayName = getLanguageDisplayName(ext);
+
+  return (
+    <div className="border border-gray-300 rounded-lg overflow-hidden">
+      {/* Header with language info and theme toggle */}
+      <div className="bg-gray-100 px-4 py-2 flex items-center justify-between border-b">
+        <div className="flex items-center">
+          <Code className="w-5 h-5 text-gray-600 mr-2" />
+          <span className="font-medium text-gray-700">{displayName}</span>
+          <span className="ml-3 text-sm text-gray-500">
+            {code.split('\n').length} lines
+          </span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="px-3 py-1 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+          >
+            {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+          </button>
+          <button
+            onClick={handleCopy}
+            className={`px-3 py-1 text-sm rounded transition-colors ${
+              copied 
+                ? 'bg-green-600 text-white' 
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+          >
+            {copied ? '✓ Copied!' : '📋 Copy'}
+          </button>
+        </div>
+      </div>
+
+      {/* Code display with syntax highlighting */}
+      <div className="max-h-[600px] overflow-auto">
+        <SyntaxHighlighter
+          language={language}
+          style={theme === 'dark' ? vscDarkPlus : vs}
+          showLineNumbers={true}
+          wrapLines={true}
+          customStyle={{
+            margin: 0,
+            borderRadius: 0,
+            fontSize: '14px',
+            lineHeight: '1.5'
+          }}
+          lineNumberStyle={{
+            minWidth: '3em',
+            paddingRight: '1em',
+            color: theme === 'dark' ? '#858585' : '#999',
+            userSelect: 'none'
+          }}
+        >
+          {code}
+        </SyntaxHighlighter>
+      </div>
+    </div>
+  );
+};
+
 // Upload Modal Component
 const UploadFileModal = ({ isOpen, onClose, questionSetId, fileCategory, onFileUploaded }) => {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -49,13 +252,25 @@ const UploadFileModal = ({ isOpen, onClose, questionSetId, fileCategory, onFileU
   const handleFileChange = (file) => {
     if (!file) return;
 
-    const validTypes = ['.pdf', '.docx', '.txt'];
-    const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-    
-    if (!validTypes.includes(fileExt)) {
-      setError(`Format file ${fileExt} tidak didukung. Gunakan PDF, DOCX, atau TXT.`);
-      return;
+    // Different validation based on category
+    if (fileCategory === 'questions' || fileCategory === 'soal') {
+      const validTypes = ['.pdf', '.docx', '.doc'];
+      const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+      
+      if (!validTypes.includes(fileExt)) {
+        setError(`Format file ${fileExt} tidak didukung untuk soal. Gunakan PDF, DOCX, atau DOC.`);
+        return;
+      }
+    } else if (fileCategory === 'testCases' || fileCategory === 'test') {
+      const validTypes = ['.txt'];
+      const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+      
+      if (!validTypes.includes(fileExt)) {
+        setError(`Format file ${fileExt} tidak didukung untuk test cases. Gunakan TXT.`);
+        return;
+      }
     }
+    // For answers/kunci: accept all programming language files
 
     setSelectedFile(file);
     setError(null);
@@ -86,7 +301,7 @@ const UploadFileModal = ({ isOpen, onClose, questionSetId, fileCategory, onFileU
       onClose();
     } catch (err) {
       console.error('Error uploading file:', err);
-      setError('Gagal mengupload file. Silakan coba lagi.');
+      setError(err.response?.data?.message || 'Gagal mengupload file. Silakan coba lagi.');
     } finally {
       setUploading(false);
     }
@@ -115,6 +330,26 @@ const UploadFileModal = ({ isOpen, onClose, questionSetId, fileCategory, onFileU
         return 'Test Cases';
       default:
         return 'File';
+    }
+  };
+
+  const getAcceptedTypes = () => {
+    if (fileCategory === 'questions' || fileCategory === 'soal') {
+      return '.pdf,.docx,.doc';
+    } else if (fileCategory === 'testCases' || fileCategory === 'test') {
+      return '.txt';
+    } else {
+      return '.txt,.js,.jsx,.ts,.tsx,.py,.java,.c,.cpp,.cc,.cxx,.h,.hpp,.cs,.php,.rb,.go,.rs,.kt,.swift,.dart,.scala,.r,.m,.sh,.bash,.sql,.html,.css,.json,.xml,.yaml,.yml';
+    }
+  };
+
+  const getAcceptedTypesDisplay = () => {
+    if (fileCategory === 'questions' || fileCategory === 'soal') {
+      return 'PDF, DOCX, DOC';
+    } else if (fileCategory === 'testCases' || fileCategory === 'test') {
+      return 'TXT';
+    } else {
+      return 'Semua bahasa pemrograman + TXT';
     }
   };
 
@@ -185,7 +420,7 @@ const UploadFileModal = ({ isOpen, onClose, questionSetId, fileCategory, onFileU
             type="file"
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             onChange={(e) => handleFileChange(e.target.files[0])}
-            accept=".pdf,.docx,.txt"
+            accept={getAcceptedTypes()}
           />
           
           <div className="text-center">
@@ -204,7 +439,7 @@ const UploadFileModal = ({ isOpen, onClose, questionSetId, fileCategory, onFileU
                 <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-700 mb-2">Pilih file {getCategoryDisplayName(fileCategory)}</p>
                 <p className="text-sm text-gray-500">Drag & drop atau klik untuk memilih</p>
-                <p className="text-xs text-gray-400 mt-2">Format: PDF, DOCX, TXT</p>
+                <p className="text-xs text-gray-400 mt-2">Format: {getAcceptedTypesDisplay()}</p>
               </div>
             )}
           </div>
@@ -637,17 +872,10 @@ const QuestionPreview = ({ currentUser }) => {
 
   const handleDownload = async (fileId) => {
     try {
-      // Increment download count di backend
-      await axios.post(`${API_URL}/files/${fileId}/download`);
-      
-      // Buka file untuk download
       window.open(`${API_URL}/files/download/${fileId}`, '_blank');
-      
-      // Refresh data untuk update counter
       await fetchQuestionSetDetails();
     } catch (error) {
       console.error('Error tracking download:', error);
-      // Tetap buka download meskipun tracking gagal
       window.open(`${API_URL}/files/download/${fileId}`, '_blank');
     }
   };
@@ -692,6 +920,75 @@ const QuestionPreview = ({ currentUser }) => {
 
   const handleBack = () => {
     navigate(-1);
+  };
+
+  // ✅ Check if file is code/text for preview
+  const isCodeOrTextFile = (filename) => {
+    const ext = filename.substring(filename.lastIndexOf('.')).toLowerCase();
+    const codeExtensions = [
+      '.js', '.jsx', '.ts', '.tsx', '.py', '.java',
+      '.c', '.cpp', '.cc', '.cxx', '.h', '.hpp',
+      '.cs', '.php', '.rb', '.go', '.rs', '.kt',
+      '.swift', '.dart', '.scala', '.r', '.m',
+      '.sh', '.bash', '.sql', '.html', '.css',
+      '.json', '.xml', '.yaml', '.yml', '.txt', '.md'
+    ];
+    return codeExtensions.includes(ext);
+  };
+
+  // ✅ Render file preview with code support
+  const renderFilePreview = (file) => {
+    const ext = file.originalname.substring(file.originalname.lastIndexOf('.')).toLowerCase();
+
+    // PDF Preview
+    if (ext === '.pdf') {
+      return (
+        <div className="w-full h-[600px] border border-gray-300 rounded-lg overflow-hidden">
+          <iframe 
+            src={`${API_URL}/files/blob/${file.id}`}
+            className="w-full h-full"
+            title="PDF Viewer"
+          />
+        </div>
+      );
+    }
+
+    // Code/Text Preview with Syntax Highlighting
+    if (isCodeOrTextFile(file.originalname)) {
+      return <CodePreview file={file} />;
+    }
+
+    // DOCX/DOC Preview (Download only)
+    if (ext === '.docx' || ext === '.doc') {
+      return (
+        <div className="flex flex-col items-center justify-center p-10 border border-gray-300 rounded-lg">
+          <File size={64} className="text-blue-500 mb-4" />
+          <p className="text-lg font-medium mb-2">{file.originalname}</p>
+          <p className="text-gray-500 mb-4">File Microsoft Word tidak dapat ditampilkan secara langsung</p>
+          <button
+            onClick={() => handleDownload(file.id)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Download untuk melihat
+          </button>
+        </div>
+      );
+    }
+
+    // Unsupported file type
+    return (
+      <div className="flex flex-col items-center justify-center p-10 border border-gray-300 rounded-lg">
+        <FileText size={64} className="text-gray-500 mb-4" />
+        <p className="text-lg font-medium mb-2">{file.originalname}</p>
+        <p className="text-gray-500 mb-4">Tipe file tidak didukung untuk preview</p>
+        <button
+          onClick={() => handleDownload(file.id)}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          Download File
+        </button>
+      </div>
+    );
   };
 
   const renderFileActionButtons = (file) => {
@@ -914,7 +1211,15 @@ const QuestionPreview = ({ currentUser }) => {
               >
                 <div className="p-4 border-b border-gray-200 flex justify-between items-center">
                   <div className="flex-1">
-                    <h3 className="text-lg font-medium text-gray-900">{file.originalname}</h3>
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-lg font-medium text-gray-900">{file.originalname}</h3>
+                      {isCodeOrTextFile(file.originalname) && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-700">
+                          <Code className="w-3 h-3 mr-1" />
+                          {getLanguageDisplayName(file.originalname.substring(file.originalname.lastIndexOf('.')))}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-4 mt-1">
                       <p className="text-sm text-gray-500">
                         {file.filetype.toUpperCase()} • {Math.round(file.filesize / 1024)} KB
@@ -930,39 +1235,7 @@ const QuestionPreview = ({ currentUser }) => {
                   {renderFileActionButtons(file)}
                 </div>
                 <div className="p-4">
-                  {file.filetype.toLowerCase() === 'pdf' ? (
-                    <div className="w-full h-[600px] border border-gray-300 rounded-lg overflow-hidden">
-                      <iframe 
-                        src={`${API_URL}/files/blob/${file.id}`}
-                        className="w-full h-full"
-                        title="PDF Viewer"
-                      />
-                    </div>
-                  ) : file.filetype.toLowerCase() === 'docx' || file.filetype.toLowerCase() === 'doc' ? (
-                    <div className="flex flex-col items-center justify-center p-10 border border-gray-300 rounded-lg">
-                      <File size={64} className="text-blue-500 mb-4" />
-                      <p className="text-lg font-medium mb-2">{file.originalname}</p>
-                      <p className="text-gray-500 mb-4">File Microsoft Word tidak dapat ditampilkan secara langsung</p>
-                      <button
-                        onClick={() => handleDownload(file.id)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        Download untuk melihat
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center p-10 border border-gray-300 rounded-lg">
-                      <FileText size={64} className="text-gray-500 mb-4" />
-                      <p className="text-lg font-medium mb-2">{file.originalname}</p>
-                      <p className="text-gray-500 mb-4">Tipe file tidak didukung untuk preview</p>
-                      <button
-                        onClick={() => handleDownload(file.id)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        Download File
-                      </button>
-                    </div>
-                  )}
+                  {renderFilePreview(file)}
                 </div>
               </motion.div>
             ))

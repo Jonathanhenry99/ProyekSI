@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from "framer-motion";
-import { Upload, File, CheckCircle, X, AlertCircle, User, Calendar, Tag, ChevronDown } from 'lucide-react';
+import { Upload, File, CheckCircle, X, AlertCircle, User, Calendar, Tag, ChevronDown, Plus, Trash2 } from 'lucide-react';
 import LogoIF from '../assets/LogoIF.jpg';
 import LogoUnpar from '../assets/LogoUnpar.png';
 import Footer from '../components/Footer';
@@ -30,13 +30,13 @@ const handleDownloadTemplate = async () => {
 const UploadPage = ({ currentUser }) => {
   const [files, setFiles] = useState({
     questions: null,
-    answers: null,
+    answers: [], // Changed to array for multiple files
     testCases: null
   });
 
   const [uploadStatus, setUploadStatus] = useState({
     questions: null,
-    answers: null,
+    answers: [], // Changed to array for multiple files
     testCases: null
   });
 
@@ -175,34 +175,140 @@ const UploadPage = ({ currentUser }) => {
     }
   }, [courseSearchTerm, courseTags]);
 
-  const handleFileChange = (e, type) => {
+  // Helper function to get file extension and language
+  const getFileInfo = (fileName) => {
+    const extension = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+    const languageMap = {
+      '.js': 'JavaScript',
+      '.jsx': 'React',
+      '.ts': 'TypeScript',
+      '.tsx': 'TypeScript React',
+      '.py': 'Python',
+      '.java': 'Java',
+      '.c': 'C',
+      '.cpp': 'C++',
+      '.cc': 'C++',
+      '.cxx': 'C++',
+      '.cs': 'C#',
+      '.php': 'PHP',
+      '.rb': 'Ruby',
+      '.go': 'Go',
+      '.rs': 'Rust',
+      '.kt': 'Kotlin',
+      '.swift': 'Swift',
+      '.dart': 'Dart',
+      '.scala': 'Scala',
+      '.r': 'R',
+      '.m': 'MATLAB',
+      '.sh': 'Shell',
+      '.sql': 'SQL',
+      '.html': 'HTML',
+      '.css': 'CSS',
+      '.scss': 'SCSS',
+      '.sass': 'SASS',
+      '.less': 'LESS',
+      '.xml': 'XML',
+      '.json': 'JSON',
+      '.yaml': 'YAML',
+      '.yml': 'YAML',
+      '.md': 'Markdown',
+      '.txt': 'Text',
+      '.pdf': 'PDF',
+      '.docx': 'Word Document',
+      '.doc': 'Word Document'
+    };
+    
+    return {
+      extension,
+      language: languageMap[extension] || 'Unknown'
+    };
+  };
+
+  // ✅ FIXED: Handle file change with proper validation
+  const handleFileChange = (e, type, index = null) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
-      // Validasi tipe file
-      const validTypes = ['.pdf', '.docx', '.txt'];
-      const fileExt = selectedFile.name.substring(selectedFile.name.lastIndexOf('.')).toLowerCase();
-      
-      if (!validTypes.includes(fileExt)) {
+      if (type === 'answers' && index !== null) {
+        // Handle multiple answer files - accept all types
+        setFiles(prev => {
+          const newAnswers = [...prev.answers];
+          newAnswers[index] = selectedFile;
+          return {
+            ...prev,
+            answers: newAnswers
+          };
+        });
+        
+        setUploadStatus(prev => {
+          const newAnswerStatus = [...prev.answers];
+          newAnswerStatus[index] = 'ready';
+          return {
+            ...prev,
+            answers: newAnswerStatus
+          };
+        });
+      } else if (type === 'questions') {
+        // Questions: only PDF, DOCX, TXT
+        const validTypes = ['.pdf', '.docx', '.txt'];
+        const fileExt = selectedFile.name.substring(selectedFile.name.lastIndexOf('.')).toLowerCase();
+        
+        if (!validTypes.includes(fileExt)) {
+          setUploadStatus(prev => ({
+            ...prev,
+            [type]: 'error'
+          }));
+          setError(`Format file ${fileExt} tidak didukung untuk soal. Gunakan PDF, DOCX, atau TXT.`);
+          return;
+        }
+        
+        setFiles(prev => ({
+          ...prev,
+          [type]: selectedFile
+        }));
+        
         setUploadStatus(prev => ({
           ...prev,
-          [type]: 'error'
+          [type]: 'ready'
         }));
-        setError(`Format file ${fileExt} tidak didukung. Gunakan PDF, DOCX, atau TXT.`);
-        return;
+      } else {
+        // ✅ Test cases: accept all file types (like answers)
+        setFiles(prev => ({
+          ...prev,
+          [type]: selectedFile
+        }));
+        
+        setUploadStatus(prev => ({
+          ...prev,
+          [type]: 'ready'
+        }));
       }
-      
-      setFiles(prev => ({
-        ...prev,
-        [type]: selectedFile
-      }));
-      
-      setUploadStatus(prev => ({
-        ...prev,
-        [type]: 'ready'
-      }));
       
       setError(null);
     }
+  };
+
+  // Add new answer file slot
+  const addAnswerFile = () => {
+    setFiles(prev => ({
+      ...prev,
+      answers: [...prev.answers, null]
+    }));
+    setUploadStatus(prev => ({
+      ...prev,
+      answers: [...prev.answers, null]
+    }));
+  };
+
+  // Remove answer file
+  const removeAnswerFile = (index) => {
+    setFiles(prev => ({
+      ...prev,
+      answers: prev.answers.filter((_, i) => i !== index)
+    }));
+    setUploadStatus(prev => ({
+      ...prev,
+      answers: prev.answers.filter((_, i) => i !== index)
+    }));
   };
 
   const handleInputChange = (e) => {
@@ -296,10 +402,9 @@ const UploadPage = ({ currentUser }) => {
   };
 
   const handleSubmit = async () => {
-    // Validasi input
     window.scrollTo({top:0,behavior: "smooth"});
+    
     if (!files.questions) {
-      // window.scrollTo({top:0,behavior: "smooth"});
       setError("Silakan upload file soal terlebih dahulu!");
       return;
     }
@@ -309,7 +414,6 @@ const UploadPage = ({ currentUser }) => {
       return;
     }
     
-    // Validasi token
     const user = JSON.parse(localStorage.getItem('user'));
     if (!user || !user.accessToken) {
       setError("Anda belum login atau sesi telah berakhir. Silakan login kembali.");
@@ -332,7 +436,7 @@ const UploadPage = ({ currentUser }) => {
           difficulty: metadata.difficulty,
           year: metadata.year,
           lecturer: metadata.lecturer,
-          topics: metadata.topics.map(topic => topic.name).join(', '), // Convert array to comma-separated string
+          topics: metadata.topics.map(topic => topic.name).join(', '),
           description: metadata.description,
           lastupdated: new Date()
         },
@@ -345,16 +449,42 @@ const UploadPage = ({ currentUser }) => {
       );
       
       const questionSetId = questionSetResponse.data.questionSet.id;
+      console.log('Question set created:', questionSetId);
       
-      // 2. Upload files
+      // 2. Upload files sequentially with better error handling
       const uploadPromises = [];
       
-      for (const [category, file] of Object.entries(files)) {
+      // Upload questions file
+      if (files.questions) {
+        const formData = new FormData();
+        formData.append('file', files.questions);
+        formData.append('questionSetId', questionSetId);
+        formData.append('fileCategory', 'questions');
+        
+        console.log('Uploading questions file:', files.questions.name);
+        
+        uploadPromises.push(
+          axios.post(`${API_URL}/files/upload`, formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+              'x-access-token': token
+            }
+          }).catch(error => {
+            console.error('Error uploading questions:', error.response?.data || error.message);
+            throw error;
+          })
+        );
+      }
+      
+      // ✅ Upload multiple answer files with proper indexing
+      files.answers.forEach((file, index) => {
         if (file) {
           const formData = new FormData();
           formData.append('file', file);
           formData.append('questionSetId', questionSetId);
-          formData.append('fileCategory', category);
+          formData.append('fileCategory', `answers_${index + 1}`);
+          
+          console.log(`Uploading answer file ${index + 1}:`, file.name);
           
           uploadPromises.push(
             axios.post(`${API_URL}/files/upload`, formData, {
@@ -362,25 +492,54 @@ const UploadPage = ({ currentUser }) => {
                 'Content-Type': 'multipart/form-data',
                 'x-access-token': token
               }
+            }).catch(error => {
+              console.error(`Error uploading answer ${index + 1}:`, error.response?.data || error.message);
+              throw error;
             })
           );
         }
+      });
+      
+      // Upload test cases file
+      if (files.testCases) {
+        const formData = new FormData();
+        formData.append('file', files.testCases);
+        formData.append('questionSetId', questionSetId);
+        formData.append('fileCategory', 'testCases');
+        
+        console.log('Uploading test cases file:', files.testCases.name);
+        
+        uploadPromises.push(
+          axios.post(`${API_URL}/files/upload`, formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+              'x-access-token': token
+            }
+          }).catch(error => {
+            console.error('Error uploading test cases:', error.response?.data || error.message);
+            throw error;
+          })
+        );
       }
       
+      // Wait for all uploads to complete
       await Promise.all(uploadPromises);
+      
+      console.log('All files uploaded successfully');
+      
       window.scrollTo({top:0,behavior: "smooth"});
       setSuccess("Soal berhasil diupload!");
       
       // Reset form
       setFiles({
         questions: null,
-        answers: null,
+        answers: [],
         testCases: null
       });
       
       setUploadStatus({
         questions: null,
-        answers: null,
+        answers: [],
         testCases: null
       });
       
@@ -403,17 +562,19 @@ const UploadPage = ({ currentUser }) => {
       if (error.response?.status === 403) {
         setError("Akses ditolak. Silakan login kembali untuk mendapatkan token yang valid.");
       } else {
-        setError(error.response?.data?.message || "Terjadi kesalahan saat mengupload soal.");
+        setError(error.response?.data?.message || "Terjadi kesalahan saat mengupload soal. Silakan cek console untuk detail.");
       }
     } finally {
       setLoading(false);
     }
   };
-
-  // Render file input
+  // ✅ FIXED: Render file input with dynamic accept attribute
   const renderFileInput = (type, label, description, icon) => {
     const IconComponent = icon;
     const status = uploadStatus[type];
+    
+    // ✅ Dynamic accept based on file type
+    const acceptTypes = type === 'questions' ? '.pdf,.docx,.txt' : '*';
     
     return (
       <div className="mb-6">
@@ -429,7 +590,7 @@ const UploadPage = ({ currentUser }) => {
             id={`file-${type}`}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             onChange={(e) => handleFileChange(e, type)}
-            accept=".pdf,.docx,.txt"
+            accept={acceptTypes}
           />
           <div className="flex items-center gap-4">
             {status === 'ready' ? (
@@ -460,6 +621,134 @@ const UploadPage = ({ currentUser }) => {
             )}
           </div>
         </div>
+      </div>
+    );
+  };
+
+  // Render multiple answer file inputs
+  const renderAnswerFileInputs = () => {
+    return (
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-gray-900">Upload Kunci Jawaban</h3>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            type="button"
+            onClick={addAnswerFile}
+            className="flex items-center gap-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Tambah File
+          </motion.button>
+        </div>
+        
+        {files.answers.length === 0 && (
+          <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center">
+            <File className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+            <p className="text-sm text-gray-500 mb-3">Belum ada file kunci jawaban</p>
+            <button
+              type="button"
+              onClick={addAnswerFile}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Tambah File Jawaban
+            </button>
+          </div>
+        )}
+        
+        {files.answers.map((file, index) => {
+          const status = uploadStatus.answers[index];
+          const fileInfo = file ? getFileInfo(file.name) : null;
+          
+          return (
+            <div
+              key={index}
+              className={`relative border-2 border-dashed rounded-xl p-4 mb-3 transition-all ${
+                status === 'ready' ? 'border-blue-400 bg-blue-50' :
+                status === 'error' ? 'border-red-400 bg-red-50' :
+                'border-gray-300 hover:border-blue-400'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="relative flex-shrink-0">
+                  <input
+                    type="file"
+                    id={`answer-file-${index}`}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    onChange={(e) => handleFileChange(e, 'answers', index)}
+                    accept="*"
+                  />
+                  {status === 'ready' ? (
+                    <CheckCircle className="w-6 h-6 text-blue-500" />
+                  ) : status === 'error' ? (
+                    <AlertCircle className="w-6 h-6 text-red-500" />
+                  ) : (
+                    <File className="w-6 h-6 text-blue-500" />
+                  )}
+                </div>
+                
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-medium text-gray-700">
+                      Jawaban {index + 1}
+                    </span>
+                    {fileInfo && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">
+                        {fileInfo.language}
+                      </span>
+                    )}
+                  </div>
+                  {file ? (
+                    <div>
+                      <p className="text-sm text-blue-600 truncate">{file.name}</p>
+                      <p className="text-xs text-gray-500">
+                        {(file.size / 1024).toFixed(1)} KB • {fileInfo?.extension}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">Semua jenis file didukung</p>
+                  )}
+                </div>
+                
+                <div className="flex gap-2">
+                  {file && (
+                    <button
+                      type="button"
+                      className="p-1 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors"
+                      onClick={() => {
+                        setFiles(prev => {
+                          const newAnswers = [...prev.answers];
+                          newAnswers[index] = null;
+                          return { ...prev, answers: newAnswers };
+                        });
+                        setUploadStatus(prev => {
+                          const newAnswerStatus = [...prev.answers];
+                          newAnswerStatus[index] = null;
+                          return { ...prev, answers: newAnswerStatus };
+                        });
+                      }}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="p-1 rounded-full bg-red-100 hover:bg-red-200 text-red-600 transition-colors"
+                    onClick={() => removeAnswerFile(index)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        
+        <p className="text-xs text-gray-500 mt-2">
+          Mendukung semua jenis file dan bahasa pemrograman (Python, JavaScript, Java, C++, dll.)
+        </p>
       </div>
     );
   };
@@ -512,8 +801,9 @@ const UploadPage = ({ currentUser }) => {
               <h2 className="text-2xl font-semibold mb-6 text-gray-900">Upload Files</h2>
 
               {renderFileInput('questions', 'Upload Soal', 'Format: PDF, DOCX, atau TXT', Upload)}
-              {renderFileInput('answers', 'Upload Kunci Jawaban', 'Format: PDF, DOCX, atau TXT', File)}
-              {renderFileInput('testCases', 'Upload Test Cases', 'Format: PDF, DOCX, atau TXT', AlertCircle)}
+              {renderAnswerFileInputs()}
+              {/* ✅ FIXED: Updated description for test cases */}
+              {renderFileInput('testCases', 'Upload Test Cases', 'Semua format file didukung', AlertCircle)}
             </div>
 
             {/* Template Soal Card */}
