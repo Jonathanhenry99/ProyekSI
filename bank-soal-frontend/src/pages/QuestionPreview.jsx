@@ -764,8 +764,8 @@ const CombinedPDFViewer = ({ questionSetId, type = 'questions', isAuthenticated,
   // Render code preview for answers with pagination
   if (contentType === 'code' && filesList.length > 0) {
     return (
-      <div className="relative">
-        <div className="space-y-4">
+      <div className="relative flex flex-col h-full">
+        <div className="space-y-4 flex-1">
           {/* File counter with improved styling for single file view */}
           <div className="flex items-center justify-between mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-center">
@@ -829,8 +829,8 @@ const CombinedPDFViewer = ({ questionSetId, type = 'questions', isAuthenticated,
 
   // Render PDF for questions or mixed content
   return (
-    <div className="relative">
-      <div className="w-full h-[600px] border border-gray-300 rounded-lg overflow-hidden">
+    <div className="relative flex flex-col h-full">
+      <div className="w-full flex-1 min-h-[600px] border border-gray-300 rounded-lg overflow-hidden">
         <iframe 
           key={`pdf-${refreshKey}`}
           src={pdfUrl}
@@ -1004,6 +1004,8 @@ const QuestionPreview = ({ currentUser }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [tabUploadModal, setTabUploadModal] = useState({ isOpen: false, category: '', questionSetId: null });
+  const [currentAnswerPage, setCurrentAnswerPage] = useState(1);
+  const [itemsPerPage] = useState(1); // 1 jawaban per halaman
 
   useEffect(() => {
     const user = AuthService?.getCurrentUser ? AuthService.getCurrentUser() : null;
@@ -1073,6 +1075,8 @@ const QuestionPreview = ({ currentUser }) => {
       
       console.log('📁 Filtered files by category:', filesByCategory);
       setFiles(filesByCategory);
+      // Reset pagination when files change
+      setCurrentAnswerPage(1);
       setIsLoading(false);
     } catch (error) {
       console.error("Error fetching question set details:", error);
@@ -1353,40 +1357,44 @@ const QuestionPreview = ({ currentUser }) => {
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <div className="bg-white rounded-xl shadow-md overflow-hidden">
-            <div className="p-4 border-b border-gray-200">
+          <div className="bg-white rounded-xl shadow-md overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-gray-200 flex-shrink-0">
               <h3 className="text-lg font-medium text-gray-900">Soal dan Test Cases</h3>
             </div>
-            <div className="p-4">
+            <div className="p-4 flex-1 flex flex-col min-h-0">
               {questionSet && questionSet.id ? (
-                <CombinedPDFViewer 
-                  questionSetId={questionSet.id} 
-                  type="questions" 
-                  isAuthenticated={isAuthenticated}
-                  onFileUploaded={handleFileUploaded}
-                />
+                <div className="flex-1 flex flex-col min-h-0">
+                  <CombinedPDFViewer 
+                    questionSetId={questionSet.id} 
+                    type="questions" 
+                    isAuthenticated={isAuthenticated}
+                    onFileUploaded={handleFileUploaded}
+                  />
+                </div>
               ) : (
-                <div className="flex items-center justify-center p-10">
+                <div className="flex items-center justify-center p-10 flex-1">
                   <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-md overflow-hidden">
-            <div className="p-4 border-b border-gray-200">
+          <div className="bg-white rounded-xl shadow-md overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-gray-200 flex-shrink-0">
               <h3 className="text-lg font-medium text-gray-900">Kunci Jawaban</h3>
             </div>
-            <div className="p-4">
+            <div className="p-4 flex-1 flex flex-col min-h-0">
               {questionSet && questionSet.id ? (
-                <CombinedPDFViewer 
-                  questionSetId={questionSet.id} 
-                  type="answers" 
-                  isAuthenticated={isAuthenticated}
-                  onFileUploaded={handleFileUploaded}
-                />
+                <div className="flex-1 flex flex-col min-h-0">
+                  <CombinedPDFViewer 
+                    questionSetId={questionSet.id} 
+                    type="answers" 
+                    isAuthenticated={isAuthenticated}
+                    onFileUploaded={handleFileUploaded}
+                  />
+                </div>
               ) : (
-                <div className="flex items-center justify-center p-10">
+                <div className="flex items-center justify-center p-10 flex-1">
                   <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
                 </div>
               )}
@@ -1404,7 +1412,10 @@ const QuestionPreview = ({ currentUser }) => {
             </button>
             <button
               className={`px-4 py-2 font-medium ${activeTab === 'answers' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-              onClick={() => setActiveTab('answers')}
+              onClick={() => {
+                setActiveTab('answers');
+                setCurrentAnswerPage(1); // Reset to first page when switching to answers tab
+              }}
             >
               Jawaban ({files.answers ? files.answers.length : 0})
             </button>
@@ -1419,44 +1430,87 @@ const QuestionPreview = ({ currentUser }) => {
         
         <div className="space-y-6">
           {files[activeTab] && files[activeTab].length > 0 ? (
-            files[activeTab].map((file, index) => (
-              <motion.div 
-                key={`file-${file.id}-${activeTab}`}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="bg-white rounded-xl shadow-md overflow-hidden"
-              >
-                <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3">
-                      <h3 className="text-lg font-medium text-gray-900">{file.originalname}</h3>
-                      {isCodeOrTextFile(file.originalname) && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-700">
-                          <Code className="w-3 h-3 mr-1" />
-                          {getLanguageDisplayName(file.originalname.substring(file.originalname.lastIndexOf('.')))}
+            (() => {
+              // For answers tab, implement pagination (1 per page)
+              let filesToDisplay = files[activeTab];
+              let totalPages = 1;
+              let currentPage = 1;
+              
+              if (activeTab === 'answers') {
+                totalPages = Math.ceil(files[activeTab].length / itemsPerPage);
+                currentPage = currentAnswerPage;
+                const startIndex = (currentPage - 1) * itemsPerPage;
+                const endIndex = startIndex + itemsPerPage;
+                filesToDisplay = files[activeTab].slice(startIndex, endIndex);
+              }
+              
+              return (
+                <>
+                  {/* File counter for answers pagination */}
+                  {activeTab === 'answers' && files[activeTab].length > 1 && (
+                    <div className="flex items-center justify-between mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center">
+                        <FileText className="w-5 h-5 text-blue-600 mr-2" />
+                        <span className="text-sm font-medium text-blue-900">
+                          File {currentPage} dari {files[activeTab].length}
                         </span>
-                      )}
+                      </div>
+                      <span className="text-xs text-blue-600 bg-white px-3 py-1 rounded-full">
+                        {files[activeTab].length} file tersedia
+                      </span>
                     </div>
-                    <div className="flex items-center gap-4 mt-1">
-                      <p className="text-sm text-gray-500">
-                        {file.filetype.toUpperCase()} • {Math.round(file.filesize / 1024)} KB
-                      </p>
-                      {file.download_count !== undefined && (
-                        <div className="flex items-center text-sm text-gray-500">
-                          <Download className="w-4 h-4 mr-1" />
-                          <span>{file.download_count} downloads</span>
+                  )}
+                  
+                  {filesToDisplay.map((file, index) => (
+                    <motion.div 
+                      key={`file-${file.id}-${activeTab}`}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="bg-white rounded-xl shadow-md overflow-hidden"
+                    >
+                      <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3">
+                            <h3 className="text-lg font-medium text-gray-900">{file.originalname}</h3>
+                            {isCodeOrTextFile(file.originalname) && (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-700">
+                                <Code className="w-3 h-3 mr-1" />
+                                {getLanguageDisplayName(file.originalname.substring(file.originalname.lastIndexOf('.')))}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-4 mt-1">
+                            <p className="text-sm text-gray-500">
+                              {file.filetype.toUpperCase()} • {Math.round(file.filesize / 1024)} KB
+                            </p>
+                            {file.download_count !== undefined && (
+                              <div className="flex items-center text-sm text-gray-500">
+                                <Download className="w-4 h-4 mr-1" />
+                                <span>{file.download_count} downloads</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  </div>
-                  {renderFileActionButtons(file)}
-                </div>
-                <div className="p-4">
-                  {renderFilePreview(file)}
-                </div>
-              </motion.div>
-            ))
+                        {renderFileActionButtons(file)}
+                      </div>
+                      <div className="p-4">
+                        {renderFilePreview(file)}
+                      </div>
+                    </motion.div>
+                  ))}
+                  
+                  {/* Pagination for answers */}
+                  {activeTab === 'answers' && totalPages > 1 && (
+                    <Pagination 
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      onPageChange={setCurrentAnswerPage}
+                    />
+                  )}
+                </>
+              );
+            })()
           ) : (
             <div className="bg-white rounded-xl shadow-md p-6 text-center">
               <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />

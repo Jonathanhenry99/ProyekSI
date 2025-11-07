@@ -9,6 +9,32 @@ import {
     Move, ChevronDown, ChevronUp, Check, Database, FileText, Clock, User, BookOpen, Calendar
 } from 'lucide-react';
 
+const normalizeTopics = (topics) => {
+    if (!topics) return [];
+
+    if (Array.isArray(topics)) {
+        return topics
+            .map(topic => (typeof topic === 'string' ? topic.trim() : topic))
+            .filter(topic => typeof topic === 'string' && topic.length > 0);
+    }
+
+    if (typeof topics === 'string') {
+        return topics
+            .split(',')
+            .map(topic => topic.trim())
+            .filter(topic => topic.length > 0);
+    }
+
+    return [];
+};
+
+const transformQuestionData = (data = []) => {
+    return data.map(item => ({
+        ...item,
+        topicsList: normalizeTopics(item.topics || item.material_tags || item.materialTags)
+    }));
+};
+
 // Header Component
 const Header = ({ currentUser }) => {
     const handleLogout = () => {
@@ -336,8 +362,9 @@ const FormCreatorPage = ({ currentUser }) => {
                 const response = await fetch("http://localhost:8080/api/questionSets");
                 const data = await response.json();
                 console.log("Questions data dari backend:", data);
-                setQuestions(data);
-                setFilteredQuestions(data);
+                const transformed = transformQuestionData(data);
+                setQuestions(transformed);
+                setFilteredQuestions(transformed);
             } catch (error) {
                 console.error("Error fetch question sets:", error);
             }
@@ -439,7 +466,8 @@ const FormCreatorPage = ({ currentUser }) => {
         if (searchTerm.trim()) {
             results = results.filter(q =>
                 q.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                q.description?.toLowerCase().includes(searchTerm.toLowerCase())
+                q.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                q.topicsList?.some(topic => topic.toLowerCase().includes(searchTerm.toLowerCase()))
             );
         }
 
@@ -455,10 +483,13 @@ const FormCreatorPage = ({ currentUser }) => {
         // Filter berdasarkan material tags
         if (selectedMaterialTags.length > 0) {
             results = results.filter(q => 
-                selectedMaterialTags.some(tag => 
-                    q.title?.toLowerCase().includes(tag.name?.toLowerCase()) ||
-                    q.description?.toLowerCase().includes(tag.name?.toLowerCase())
-                )
+                selectedMaterialTags.some(tag => {
+                    const tagName = tag.name?.toLowerCase().trim();
+                    if (!tagName) {
+                        return false;
+                    }
+                    return q.topicsList?.some(topic => topic.toLowerCase().includes(tagName));
+                })
             );
         }
 
@@ -908,6 +939,18 @@ const FormCreatorPage = ({ currentUser }) => {
                                                 <p className="text-sm text-gray-600 mb-2 line-clamp-2">{question.description}</p>
                                             )}
                                             <div className="text-sm text-gray-700 mb-1">{question.subject}</div>
+                                            {question.topicsList?.length > 0 && (
+                                                <div className="flex flex-wrap gap-2 mb-2">
+                                                    {question.topicsList.map((topic, topicIndex) => (
+                                                        <span
+                                                            key={`${question.id || index}-selected-topic-${topicIndex}`}
+                                                            className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full"
+                                                        >
+                                                            {topic}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
                                             <div className="flex justify-between items-center">
                                                 <div className="text-xs text-gray-500 flex items-center gap-1">
                                                     <User className="w-3 h-3" />
@@ -1027,6 +1070,19 @@ const FormCreatorPage = ({ currentUser }) => {
                                             <div className="flex items-center gap-2 text-xs text-gray-500">
                                                 <Clock className="w-3 h-3 text-gray-400 flex-shrink-0" />
                                                 <span>Diperbarui: {formatDate(q.updated_at)}</span>
+                                            </div>
+                                        )}
+                                        
+                                        {q.topicsList?.length > 0 && (
+                                            <div className="flex flex-wrap gap-2 pt-1">
+                                                {q.topicsList.map((topic, topicIndex) => (
+                                                    <span
+                                                        key={`${q.id}-topic-${topicIndex}`}
+                                                        className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full"
+                                                    >
+                                                        {topic}
+                                                    </span>
+                                                ))}
                                             </div>
                                         )}
                                     </div>
