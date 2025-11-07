@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from "framer-motion";
-import { ArrowLeft, Download, FileText, File, BookOpen, Trash2, AlertTriangle, Upload, RotateCcw, X, CheckCircle, Code } from 'lucide-react';
+import { ArrowLeft, Download, FileText, File, BookOpen, Trash2, AlertTriangle, Upload, RotateCcw, X, CheckCircle, Code, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import Header from '../components/Header';
@@ -480,15 +480,136 @@ const UploadFileModal = ({ isOpen, onClose, questionSetId, fileCategory, onFileU
   );
 };
 
-// Enhanced Combined PDF Viewer Component
+// ✅ Pagination Component
+const Pagination = ({ currentPage, totalPages, onPageChange }) => {
+  const pages = [];
+  const maxVisible = 5;
+  
+  let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+  let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+  
+  if (endPage - startPage < maxVisible - 1) {
+    startPage = Math.max(1, endPage - maxVisible + 1);
+  }
+  
+  for (let i = startPage; i <= endPage; i++) {
+    pages.push(i);
+  }
+
+  return (
+    <div className="flex items-center justify-center space-x-2 mt-6">
+      <button
+        onClick={() => onPageChange(currentPage - 1)}
+        disabled={currentPage === 1}
+        className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      >
+        <ChevronLeft className="w-5 h-5" />
+      </button>
+      
+      {startPage > 1 && (
+        <>
+          <button
+            onClick={() => onPageChange(1)}
+            className="px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 transition-colors"
+          >
+            1
+          </button>
+          {startPage > 2 && <span className="px-2 text-gray-500">...</span>}
+        </>
+      )}
+      
+      {pages.map(page => (
+        <button
+          key={page}
+          onClick={() => onPageChange(page)}
+          className={`px-3 py-2 rounded-lg border transition-colors ${
+            currentPage === page
+              ? 'bg-blue-600 text-white border-blue-600'
+              : 'border-gray-300 hover:bg-gray-100'
+          }`}
+        >
+          {page}
+        </button>
+      ))}
+      
+      {endPage < totalPages && (
+        <>
+          {endPage < totalPages - 1 && <span className="px-2 text-gray-500">...</span>}
+          <button
+            onClick={() => onPageChange(totalPages)}
+            className="px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 transition-colors"
+          >
+            {totalPages}
+          </button>
+        </>
+      )}
+      
+      <button
+        onClick={() => onPageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+        className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      >
+        <ChevronRight className="w-5 h-5" />
+      </button>
+    </div>
+  );
+};
+
+// Enhanced Combined PDF Viewer Component with Code Preview Support and Pagination
 const CombinedPDFViewer = ({ questionSetId, type = 'questions', isAuthenticated, onFileUploaded }) => {
   const [pdfUrl, setPdfUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [filesList, setFilesList] = useState([]);
+  const [contentType, setContentType] = useState('pdf'); // 'pdf' or 'code'
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(1); // Show 1 file per page for focused view
 
-  const fetchCombinedPDF = async (forceRefresh = false) => {
+  const fetchFiles = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/questionsets/${questionSetId}`);
+      const questionSet = response.data;
+      
+      const activeFiles = questionSet.files.filter(file => 
+        file.is_deleted !== true && file.isDeleted !== true
+      );
+      
+      // Filter files by type
+      let filteredFiles = [];
+      if (type === 'answers') {
+        filteredFiles = activeFiles.filter(f => 
+          f.filecategory === 'kunci' || f.filecategory === 'answers'
+        );
+      } else if (type === 'questions') {
+        filteredFiles = activeFiles.filter(f => 
+          f.filecategory === 'soal' || f.filecategory === 'questions' || 
+          f.filecategory === 'test' || f.filecategory === 'testCases'
+        );
+      }
+      
+      return filteredFiles;
+    } catch (err) {
+      console.error('Error fetching files:', err);
+      return [];
+    }
+  };
+
+  const isCodeOrTextFile = (filename) => {
+    const ext = filename.substring(filename.lastIndexOf('.')).toLowerCase();
+    const codeExtensions = [
+      '.js', '.jsx', '.ts', '.tsx', '.py', '.java',
+      '.c', '.cpp', '.cc', '.cxx', '.h', '.hpp',
+      '.cs', '.php', '.rb', '.go', '.rs', '.kt',
+      '.swift', '.dart', '.scala', '.r', '.m',
+      '.sh', '.bash', '.sql', '.html', '.css',
+      '.json', '.xml', '.yaml', '.yml', '.txt', '.md'
+    ];
+    return codeExtensions.includes(ext);
+  };
+
+  const fetchCombinedContent = async (forceRefresh = false) => {
     try {
       setLoading(true);
       
@@ -497,26 +618,45 @@ const CombinedPDFViewer = ({ questionSetId, type = 'questions', isAuthenticated,
         setPdfUrl(null);
       }
       
-      const timestamp = forceRefresh ? `&_t=${Date.now()}` : '';
-      const response = await axios.get(
-        `${API_URL}/files/combine-preview/${questionSetId}?type=${type}${timestamp}`, 
-        {
-          responseType: 'blob',
-          headers: forceRefresh ? {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          } : {}
-        }
-      );
+      // Fetch files to check content type
+      const files = await fetchFiles();
+      setFilesList(files);
       
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      setPdfUrl(url);
-      setError(null);
+      if (files.length === 0) {
+        throw new Error('NO_FILES');
+      }
+      
+      // Check if all files are code files (for answers type)
+      const allCodeFiles = files.every(f => isCodeOrTextFile(f.originalname));
+      
+      if (type === 'answers' && allCodeFiles && files.length > 0) {
+        // Show code preview for answers
+        setContentType('code');
+        setError(null);
+      } else {
+        // Show PDF for questions or mixed content
+        setContentType('pdf');
+        const timestamp = forceRefresh ? `&_t=${Date.now()}` : '';
+        const response = await axios.get(
+          `${API_URL}/files/combine-preview/${questionSetId}?type=${type}${timestamp}`, 
+          {
+            responseType: 'blob',
+            headers: forceRefresh ? {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            } : {}
+          }
+        );
+        
+        const blob = new Blob([response.data], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        setPdfUrl(url);
+        setError(null);
+      }
     } catch (err) {
-      console.error(`Error loading ${type} PDF:`, err);
+      console.error(`Error loading ${type} content:`, err);
       
-      if (err.response?.status === 404) {
+      if (err.message === 'NO_FILES' || err.response?.status === 404) {
         setError(`Belum ada file ${type === 'questions' ? 'soal dan test cases' : 'kunci jawaban'} untuk ditampilkan`);
       } else if (err.response?.status === 500) {
         setError(`Gagal memproses file ${type === 'questions' ? 'soal dan test cases' : 'kunci jawaban'}`);
@@ -530,7 +670,7 @@ const CombinedPDFViewer = ({ questionSetId, type = 'questions', isAuthenticated,
 
   useEffect(() => {
     if (questionSetId) {
-      fetchCombinedPDF();
+      fetchCombinedContent();
     }
 
     return () => {
@@ -539,6 +679,11 @@ const CombinedPDFViewer = ({ questionSetId, type = 'questions', isAuthenticated,
       }
     };
   }, [questionSetId, type, refreshKey]);
+
+  // Reset to page 1 when files list changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filesList.length]);
 
   const getUploadCategory = (type) => {
     switch (type) {
@@ -561,8 +706,14 @@ const CombinedPDFViewer = ({ questionSetId, type = 'questions', isAuthenticated,
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     setRefreshKey(prev => prev + 1);
-    await fetchCombinedPDF(true);
+    await fetchCombinedContent(true);
   };
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filesList.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentFiles = filesList.slice(startIndex, endIndex);
 
   if (loading) {
     return (
@@ -610,6 +761,73 @@ const CombinedPDFViewer = ({ questionSetId, type = 'questions', isAuthenticated,
     );
   }
 
+  // Render code preview for answers with pagination
+  if (contentType === 'code' && filesList.length > 0) {
+    return (
+      <div className="relative">
+        <div className="space-y-4">
+          {/* File counter with improved styling for single file view */}
+          <div className="flex items-center justify-between mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center">
+              <FileText className="w-5 h-5 text-blue-600 mr-2" />
+              <span className="text-sm font-medium text-blue-900">
+                File {currentPage} dari {filesList.length}
+              </span>
+            </div>
+            <span className="text-xs text-blue-600 bg-white px-3 py-1 rounded-full">
+              {filesList.length} file tersedia
+            </span>
+          </div>
+          
+          {currentFiles.map((file, index) => (
+            <div key={`preview-${file.id}-${index}`} className="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+              <div className="bg-gray-100 px-4 py-3 border-b flex items-center justify-between">
+                <div className="flex items-center">
+                  <Code className="w-5 h-5 text-gray-600 mr-2" />
+                  <div>
+                    <span className="font-medium text-gray-900 block">{file.originalname}</span>
+                    <span className="text-xs text-gray-500">
+                      {getLanguageDisplayName(file.originalname.substring(file.originalname.lastIndexOf('.')))}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded">
+                    {Math.round(file.filesize / 1024)} KB
+                  </span>
+                </div>
+              </div>
+              <CodePreview file={file} />
+            </div>
+          ))}
+          
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <Pagination 
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
+          )}
+        </div>
+        
+        {isAuthenticated && (
+          <button
+            onClick={() => {
+              setRefreshKey(prev => prev + 1);
+              fetchCombinedContent(true);
+            }}
+            className="absolute top-4 right-4 p-2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full shadow-md transition-all z-10"
+            title="Refresh Preview"
+          >
+            <RotateCcw className="w-4 h-4 text-gray-600" />
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Render PDF for questions or mixed content
   return (
     <div className="relative">
       <div className="w-full h-[600px] border border-gray-300 rounded-lg overflow-hidden">
@@ -625,7 +843,7 @@ const CombinedPDFViewer = ({ questionSetId, type = 'questions', isAuthenticated,
         <button
           onClick={() => {
             setRefreshKey(prev => prev + 1);
-            fetchCombinedPDF(true);
+            fetchCombinedContent(true);
           }}
           className="absolute top-4 right-4 p-2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full shadow-md transition-all"
           title="Refresh Preview"
@@ -936,9 +1154,14 @@ const QuestionPreview = ({ currentUser }) => {
     return codeExtensions.includes(ext);
   };
 
-  // ✅ Render file preview with code support
+  // ✅ Render file preview with code support (PRIORITIZING CODE PREVIEW)
   const renderFilePreview = (file) => {
     const ext = file.originalname.substring(file.originalname.lastIndexOf('.')).toLowerCase();
+
+    // Code/Text Preview with Syntax Highlighting (PRIORITIZED FIRST)
+    if (isCodeOrTextFile(file.originalname)) {
+      return <CodePreview file={file} />;
+    }
 
     // PDF Preview
     if (ext === '.pdf') {
@@ -951,11 +1174,6 @@ const QuestionPreview = ({ currentUser }) => {
           />
         </div>
       );
-    }
-
-    // Code/Text Preview with Syntax Highlighting
-    if (isCodeOrTextFile(file.originalname)) {
-      return <CodePreview file={file} />;
     }
 
     // DOCX/DOC Preview (Download only)

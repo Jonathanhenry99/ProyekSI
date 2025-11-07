@@ -626,132 +626,139 @@ const UploadPage = ({ currentUser }) => {
   };
 
   // Render multiple answer file inputs
-  const renderAnswerFileInputs = () => {
-    return (
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-900">Upload Kunci Jawaban</h3>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+const renderAnswerFileInputs = () => {
+  return (
+    <div className="mb-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold text-gray-900">Upload Kunci Jawaban</h3>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          type="button"
+          onClick={addAnswerFile}
+          className="flex items-center gap-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
+        >
+          <Plus className="w-4 h-4" />
+          Tambah File
+        </motion.button>
+      </div>
+      
+      {files.answers.length === 0 && (
+        <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center">
+          <File className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+          <p className="text-sm text-gray-500 mb-3">Belum ada file kunci jawaban</p>
+          <button
             type="button"
             onClick={addAnswerFile}
-            className="flex items-center gap-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
           >
             <Plus className="w-4 h-4" />
-            Tambah File
-          </motion.button>
+            Tambah File Jawaban
+          </button>
         </div>
+      )}
+      
+      {files.answers.map((file, index) => {
+        const status = uploadStatus.answers[index];
+        const fileInfo = file ? getFileInfo(file.name) : null;
         
-        {files.answers.length === 0 && (
-          <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center">
-            <File className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-            <p className="text-sm text-gray-500 mb-3">Belum ada file kunci jawaban</p>
-            <button
-              type="button"
-              onClick={addAnswerFile}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
-            >
-              <Plus className="w-4 h-4" />
-              Tambah File Jawaban
-            </button>
-          </div>
-        )}
-        
-        {files.answers.map((file, index) => {
-          const status = uploadStatus.answers[index];
-          const fileInfo = file ? getFileInfo(file.name) : null;
-          
-          return (
-            <div
-              key={index}
-              className={`relative border-2 border-dashed rounded-xl p-4 mb-3 transition-all ${
-                status === 'ready' ? 'border-blue-400 bg-blue-50' :
-                status === 'error' ? 'border-red-400 bg-red-50' :
-                'border-gray-300 hover:border-blue-400'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className="relative flex-shrink-0">
-                  <input
-                    type="file"
-                    id={`answer-file-${index}`}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    onChange={(e) => handleFileChange(e, 'answers', index)}
-                    accept="*"
-                  />
-                  {status === 'ready' ? (
-                    <CheckCircle className="w-6 h-6 text-blue-500" />
-                  ) : status === 'error' ? (
-                    <AlertCircle className="w-6 h-6 text-red-500" />
-                  ) : (
-                    <File className="w-6 h-6 text-blue-500" />
-                  )}
-                </div>
-                
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-medium text-gray-700">
-                      Jawaban {index + 1}
+        return (
+          <div
+            key={index}
+            className={`relative border-2 border-dashed rounded-xl p-4 mb-3 transition-all cursor-pointer ${
+              status === 'ready' ? 'border-blue-400 bg-blue-50' :
+              status === 'error' ? 'border-red-400 bg-red-50' :
+              'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
+            }`}
+          >
+            {/* ✅ File input sekarang menutupi seluruh area */}
+            <input
+              type="file"
+              id={`answer-file-${index}`}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+              onChange={(e) => handleFileChange(e, 'answers', index)}
+              accept="*"
+            />
+            
+            <div className="flex items-center gap-3 relative pointer-events-none">
+              <div className="flex-shrink-0">
+                {status === 'ready' ? (
+                  <CheckCircle className="w-6 h-6 text-blue-500" />
+                ) : status === 'error' ? (
+                  <AlertCircle className="w-6 h-6 text-red-500" />
+                ) : (
+                  <File className="w-6 h-6 text-blue-500" />
+                )}
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm font-medium text-gray-700">
+                    Jawaban {index + 1}
+                  </span>
+                  {fileInfo && (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">
+                      {fileInfo.language}
                     </span>
-                    {fileInfo && (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">
-                        {fileInfo.language}
-                      </span>
-                    )}
-                  </div>
-                  {file ? (
-                    <div>
-                      <p className="text-sm text-blue-600 truncate">{file.name}</p>
-                      <p className="text-xs text-gray-500">
-                        {(file.size / 1024).toFixed(1)} KB • {fileInfo?.extension}
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500">Semua jenis file didukung</p>
                   )}
                 </div>
-                
-                <div className="flex gap-2">
-                  {file && (
-                    <button
-                      type="button"
-                      className="p-1 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors"
-                      onClick={() => {
-                        setFiles(prev => {
-                          const newAnswers = [...prev.answers];
-                          newAnswers[index] = null;
-                          return { ...prev, answers: newAnswers };
-                        });
-                        setUploadStatus(prev => {
-                          const newAnswerStatus = [...prev.answers];
-                          newAnswerStatus[index] = null;
-                          return { ...prev, answers: newAnswerStatus };
-                        });
-                      }}
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
+                {file ? (
+                  <div>
+                    <p className="text-sm text-blue-600 truncate">{file.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {(file.size / 1024).toFixed(1)} KB • {fileInfo?.extension}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">Klik di mana saja untuk memilih file</p>
+                )}
+              </div>
+              
+              {/* ✅ Tombol dengan pointer-events-auto agar tetap bisa diklik */}
+              <div className="flex gap-2 pointer-events-auto relative z-20">
+                {file && (
                   <button
                     type="button"
-                    className="p-1 rounded-full bg-red-100 hover:bg-red-200 text-red-600 transition-colors"
-                    onClick={() => removeAnswerFile(index)}
+                    className="p-1 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFiles(prev => {
+                        const newAnswers = [...prev.answers];
+                        newAnswers[index] = null;
+                        return { ...prev, answers: newAnswers };
+                      });
+                      setUploadStatus(prev => {
+                        const newAnswerStatus = [...prev.answers];
+                        newAnswerStatus[index] = null;
+                        return { ...prev, answers: newAnswerStatus };
+                      });
+                    }}
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <X className="w-4 h-4" />
                   </button>
-                </div>
+                )}
+                <button
+                  type="button"
+                  className="p-1 rounded-full bg-red-100 hover:bg-red-200 text-red-600 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeAnswerFile(index);
+                  }}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
             </div>
-          );
-        })}
-        
-        <p className="text-xs text-gray-500 mt-2">
-          Mendukung semua jenis file dan bahasa pemrograman (Python, JavaScript, Java, C++, dll.)
-        </p>
-      </div>
-    );
-  };
+          </div>
+        );
+      })}
+      
+      <p className="text-xs text-gray-500 mt-2">
+        Mendukung semua jenis file dan bahasa pemrograman (Python, JavaScript, Java, C++, dll.)
+      </p>
+    </div>
+  );
+};
 
   if (loadingData) {
     return (

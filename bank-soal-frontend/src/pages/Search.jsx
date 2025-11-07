@@ -54,13 +54,24 @@ const SearchPage = ({ currentUser }) => {
 
   // Helper function untuk mendapatkan nama mata kuliah berdasarkan ID
   const getSubjectNameById = (subjectId) => {
-    if (!subjectId || !courseOptions.length) return subjectId;
+    if (!subjectId || !courseOptions.length) {
+      console.warn(`⚠️ getSubjectNameById: No subjectId (${subjectId}) or no courseOptions (${courseOptions.length})`);
+      return subjectId;
+    }
     
-    const course = courseOptions.find(course => 
-      course.id.toString() === subjectId.toString()
-    );
+    const subjectIdStr = String(subjectId).trim();
+    const course = courseOptions.find(course => {
+      const courseIdStr = String(course.id).trim();
+      return courseIdStr === subjectIdStr;
+    });
     
-    return course ? course.name : subjectId;
+    if (course) {
+      console.log(`🔍 getSubjectNameById: Found course ${course.id} -> "${course.name}" for subjectId ${subjectId}`);
+      return course.name;
+    } else {
+      console.warn(`⚠️ getSubjectNameById: Course not found for subjectId ${subjectId}. Available: ${courseOptions.map(c => `${c.id}`).join(', ')}`);
+      return subjectId;
+    }
   };
 
   // Helper function to get auth token
@@ -535,22 +546,55 @@ Universitas Katolik Parahyangan
       );
       
       const transformedData = activeData.map(item => {
+        // Simpan subject ID asli
+        const subjectId = item.subject;
         let subjectName = item.subject;
         
-        if (item.courseName || item.subjectName) {
-          subjectName = item.courseName || item.subjectName;
-        } else if (courses.length > 0) {
-          const course = courses.find(course => 
-            course.id.toString() === item.subject.toString()
-          );
-          subjectName = course ? course.name : item.subject;
+        // Helper function untuk cek apakah value adalah numeric ID
+        const isNumericId = (value) => {
+          if (!value) return false;
+          const str = String(value).trim();
+          // Cek apakah string adalah pure number (bisa parseInt)
+          return !isNaN(str) && !isNaN(parseFloat(str)) && isFinite(str) && str.length > 0;
+        };
+        
+        // Priority 1: Gunakan courseName atau subjectName dari backend JIKA bukan numeric ID
+        const backendName = item.courseName || item.subjectName;
+        if (backendName && !isNumericId(backendName)) {
+          // Backend memberikan nama yang valid (bukan ID)
+          subjectName = backendName;
+          console.log(`✅ Using backend name for subject ${subjectId}: ${subjectName}`);
+        } 
+        // Priority 2: Jika backend name adalah ID atau tidak ada, resolve menggunakan courseOptions
+        else if (courseOptions.length > 0) {
+          subjectName = getSubjectNameById(subjectId);
+          if (subjectName !== subjectId) {
+            console.log(`✅ Resolved subject ID ${subjectId} to name: ${subjectName}`);
+          } else {
+            console.warn(`⚠️ Could not resolve subject ID ${subjectId} to name. Available courses: ${courseOptions.map(c => `${c.id}:${c.name}`).join(', ')}`);
+          }
         }
+        // Priority 3: Fallback ke parameter courses jika courseOptions belum ter-load
+        else if (courses.length > 0) {
+          const course = courses.find(course => 
+            course.id.toString() === subjectId.toString()
+          );
+          if (course) {
+            subjectName = course.name;
+            console.log(`✅ Resolved subject ID ${subjectId} to name using courses param: ${subjectName}`);
+          } else {
+            console.warn(`⚠️ Subject ID ${subjectId} not found in courses parameter`);
+          }
+        } else {
+          console.warn(`⚠️ No course options available to resolve subject ID ${subjectId}`);
+        }
+        // Jika tidak ada yang cocok, tetap gunakan nilai asli (bisa ID atau nama)
         
         return {
           id: item.id,
           fileName: item.title,
           subject: subjectName,
-          subjectId: item.subject,
+          subjectId: subjectId, // Simpan ID asli untuk referensi
           year: item.year,
           lecturer: item.lecturer || (item.creator ? (item.creator.fullName || item.creator.username) : 'Unknown'),
           level: item.level,
@@ -920,6 +964,59 @@ Universitas Katolik Parahyangan
     
     initializeData();
   }, []);
+
+  // Re-transform question sets ketika courseOptions ter-load/update
+  // Ini memastikan subject ID selalu di-resolve ke nama mata kuliah
+  useEffect(() => {
+    if (courseOptions.length > 0) {
+      setQuestionSets(prevQuestionSets => {
+        if (prevQuestionSets.length === 0) return prevQuestionSets;
+        
+        // Helper function untuk cek apakah value adalah numeric ID
+        const isNumericId = (value) => {
+          if (!value) return false;
+          const str = String(value).trim();
+          return !isNaN(str) && !isNaN(parseFloat(str)) && isFinite(str) && str.length > 0;
+        };
+        
+        // Cek apakah ada item yang masih menggunakan ID (numeric) sebagai subject
+        const needsRetransform = prevQuestionSets.some(item => {
+          // Jika subject adalah numeric (baik sama dengan subjectId atau tidak), berarti perlu di-resolve
+          return item.subjectId && !isNaN(item.subjectId) && isNumericId(item.subject);
+        });
+
+        if (!needsRetransform) {
+          console.log('ℹ️ No re-transformation needed, all subjects already resolved');
+          return prevQuestionSets;
+        }
+
+        console.log('🔄 Re-transforming question sets dengan courseOptions yang sudah ter-load...');
+        console.log(`📚 Available courseOptions: ${courseOptions.length} courses`);
+        
+        const reTransformedData = prevQuestionSets.map(item => {
+          // Jika subject masih berupa ID (numeric), resolve ke nama
+          if (item.subjectId && !isNaN(item.subjectId) && isNumericId(item.subject)) {
+            const resolvedName = getSubjectNameById(item.subjectId);
+            // Jika berhasil di-resolve (bukan ID lagi), update
+            if (resolvedName !== item.subjectId && resolvedName !== item.subject) {
+              console.log(`✅ Re-resolved subject ID ${item.subjectId} from "${item.subject}" to "${resolvedName}"`);
+              return {
+                ...item,
+                subject: resolvedName
+              };
+            } else if (resolvedName === item.subjectId) {
+              console.warn(`⚠️ Could not resolve subject ID ${item.subjectId} to name. Available courses: ${courseOptions.map(c => `${c.id}:${c.name}`).join(', ')}`);
+            }
+          }
+          return item;
+        });
+
+        // Update filteredData juga
+        setFilteredData(reTransformedData);
+        return reTransformedData;
+      });
+    }
+  }, [courseOptions]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
