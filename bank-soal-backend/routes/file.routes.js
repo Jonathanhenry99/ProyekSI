@@ -36,4 +36,7 @@ module.exports = function(app) {
 
   // Route untuk menggabungkan file dari satu question set
   app.get("/api/files/combine-preview/:id", controller.combineFilesForPreview);
+  
+  // Route untuk menggabungkan file dari beberapa question set
+  app.post("/api/files/combine", [authJwt.verifyToken], controller.combineMultipleQuestionSets);
 };

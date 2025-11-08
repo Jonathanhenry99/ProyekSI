@@ -16,6 +16,10 @@ const QuestionSetsPage = ({ currentUser }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [data, setData] = useState([]);
   const [error, setError] = useState(null);
+  const [selectedQuestionSets, setSelectedQuestionSets] = useState([]);
+  const [combineMode, setCombineMode] = useState(false);
+  const [showCombineModal, setShowCombineModal] = useState(false);
+  const [combinedPdfTitle, setCombinedPdfTitle] = useState('');
   
   // State untuk dropdown
   const [showLevelDropdown, setShowLevelDropdown] = useState(false);
@@ -32,21 +36,22 @@ const QuestionSetsPage = ({ currentUser }) => {
   const courseTags = ['Algoritma dan Struktur Data', 'Pemrograman Web', 'Basis Data', 'Pemrograman Berorientasi Objek', 'Jaringan Komputer', 'Kecerdasan Buatan'];
   const materialTags = ['Algoritma', 'Struktur Data', 'HTML', 'CSS', 'JavaScript', 'React', 'SQL', 'Normalisasi', 'ERD', 'OOP', 'Java', 'Inheritance', 'Polymorphism', 'TCP/IP', 'Routing', 'Switching', 'Machine Learning', 'Neural Network', 'AI'];
 
-  useEffect(() => {
-    const fetchPaketSoal = async () => {
-      try {
-        setIsLoading(true);
-        const response = await axios.get("http://localhost:8080/api/paketsoal");
-        console.log("Fetched paket soal:", response.data);
-        setData(response.data);
-      } catch (err) {
-        console.error("Error fetching paket soal:", err);
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // Fungsi untuk mengambil data paket soal
+  const fetchPaketSoal = async () => {
+    try {
+      setIsLoading(true);
+      const response = await axios.get("http://localhost:8080/api/paketsoal");
+      console.log("Fetched paket soal:", response.data);
+      setData(response.data);
+    } catch (err) {
+      console.error("Error fetching paket soal:", err);
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchPaketSoal();
   }, []);
 
@@ -182,7 +187,11 @@ const QuestionSetsPage = ({ currentUser }) => {
 
   // Card click handler for preview
   const handleCardClick = (id) => {
-    navigate(`/preview/${id}`);
+    if (combineMode) {
+      toggleQuestionSetSelection(id);
+    } else {
+      navigate(`/preview/${id}`);
+    }
   };
 
   // Download handler
@@ -200,17 +209,112 @@ const QuestionSetsPage = ({ currentUser }) => {
       alert('Gagal mendownload file');
     }
   };
+  
+  // Toggle question set selection for combining
+  const toggleQuestionSetSelection = (id) => {
+    setSelectedQuestionSets(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(setId => setId !== id);
+      } else {
+        return [...prev, id];
+      }
+    });
+  };
+  
+  // Toggle combine mode
+  const toggleCombineMode = () => {
+    setCombineMode(prev => !prev);
+    if (!combineMode) {
+      setSelectedQuestionSets([]);
+    }
+  };
+  
+  // Handle combine selected question sets
+  const handleCombineQuestionSets = async () => {
+    if (selectedQuestionSets.length < 2) {
+      alert('Pilih minimal 2 set soal untuk digabungkan');
+      return;
+    }
+    
+    setShowCombineModal(true);
+  };
+  
+  // Handle confirm combine
+  const handleConfirmCombine = async () => {
+    if (!combinedPdfTitle) {
+      alert('Judul PDF gabungan harus diisi');
+      return;
+    }
+    
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (!user || !user.accessToken) {
+        alert("Anda belum login atau sesi telah berakhir. Silakan login kembali.");
+        return;
+      }
+      
+      const token = user.accessToken;
+      
+      // Kirim permintaan ke backend untuk menggabungkan PDF
+      const response = await axios.post(
+        `http://localhost:8080/api/files/combine`,
+        {
+          questionSetIds: selectedQuestionSets,
+          title: combinedPdfTitle,
+          description: `Gabungan dari ${selectedQuestionSets.length} set soal`,
+          subject: data.find(item => item.id === selectedQuestionSets[0])?.subject || '',
+          year: new Date().getFullYear(),
+          level: 'Gabungan',
+          lecturer: currentUser?.username || user.username || ''
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'x-access-token': token
+          },
+          responseType: 'blob'
+        }
+      );
+      
+      // Buat URL untuk file blob dan download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${combinedPdfTitle}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Reset state
+      setShowCombineModal(false);
+      setCombineMode(false);
+      setSelectedQuestionSets([]);
+      setCombinedPdfTitle('');
+      
+      // Refresh data untuk menampilkan paket soal gabungan yang baru
+      fetchPaketSoal();
+      
+    } catch (error) {
+      console.error("Error combining files:", error);
+      alert('Gagal menggabungkan file');
+    }
+  };
 
   // Card renderer (from Search.jsx)
   const renderCard = (item) => (
     <motion.div
       variants={itemVariants}
-      className={`bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow cursor-pointer ${viewMode === 'grid' ? 'h-full' : ''}`}
+      className={`bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow cursor-pointer ${viewMode === 'grid' ? 'h-full' : ''} ${selectedQuestionSets.includes(item.id) ? 'ring-2 ring-blue-500' : ''}`}
       onClick={() => handleCardClick(item.id)}
       key={item.id}
     >
       <div className="p-6">
         <div className="flex justify-between items-start mb-4">
+          {combineMode && (
+            <div className={`w-6 h-6 border rounded mr-2 flex items-center justify-center ${selectedQuestionSets.includes(item.id) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}`}>
+              {selectedQuestionSets.includes(item.id) && <Check className="w-4 h-4 text-white" />}
+            </div>
+          )}
           <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">{item.title}</h3>
           <span className={`px-2 py-1 text-xs rounded-full ${getLevelColor(item.level)}`}>
             {item.level}
@@ -247,17 +351,31 @@ const QuestionSetsPage = ({ currentUser }) => {
             <Download className="w-4 h-4 mr-1" />
             <span>{item.downloads} unduhan</span>
           </div>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDownload(item.id);
-            }}
-          >
-            Unduh
-          </motion.button>
+          {!combineMode ? (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDownload(item.id);
+              }}
+            >
+              Unduh
+            </motion.button>
+          ) : (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${selectedQuestionSets.includes(item.id) ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleQuestionSetSelection(item.id);
+              }}
+            >
+              {selectedQuestionSets.includes(item.id) ? 'Batal Pilih' : 'Pilih'}
+            </motion.button>
+          )}
         </div>
       </div>
     </motion.div>
@@ -612,12 +730,53 @@ const QuestionSetsPage = ({ currentUser }) => {
 
           
 
-          {/* View Toggle and Results Count */}
+          {/* View Toggle, Combine Mode, and Results Count */}
           <div className="flex justify-between items-center mt-6">
-            <p className="text-gray-600 text-sm">
-              Menampilkan <span className="font-medium">{filteredData.length}</span> hasil pencarian
-            </p>
+            <div className="flex items-center gap-4">
+              <p className="text-gray-600 text-sm">
+                Menampilkan <span className="font-medium">{filteredData.length}</span> hasil pencarian
+              </p>
+              {combineMode && (
+                <div className="flex items-center">
+                  <span className="text-blue-600 font-medium text-sm">
+                    {selectedQuestionSets.length} set soal dipilih
+                  </span>
+                </div>
+              )}
+            </div>
             <div className="flex gap-2">
+              {combineMode ? (
+                <>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="px-3 py-2 bg-red-600 text-white rounded-lg text-sm flex items-center gap-1"
+                    onClick={toggleCombineMode}
+                  >
+                    <X className="w-4 h-4" />
+                    Batal
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className={`px-3 py-2 rounded-lg text-sm flex items-center gap-1 ${selectedQuestionSets.length >= 2 ? 'bg-green-600 text-white' : 'bg-gray-300 text-gray-600 cursor-not-allowed'}`}
+                    onClick={selectedQuestionSets.length >= 2 ? handleCombineQuestionSets : undefined}
+                  >
+                    <Download className="w-4 h-4" />
+                    Gabung & Unduh ({selectedQuestionSets.length})
+                  </motion.button>
+                </>
+              ) : (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm flex items-center gap-1 mr-2"
+                  onClick={toggleCombineMode}
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Pilih Beberapa
+                </motion.button>
+              )}
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -742,6 +901,67 @@ const QuestionSetsPage = ({ currentUser }) => {
           </motion.button>
         </Link>
       </div>
+      
+      {/* Modal untuk judul PDF gabungan */}
+      <AnimatePresence>
+        {showCombineModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-xl p-6 w-full max-w-md"
+            >
+              <h3 className="text-xl font-semibold mb-4">Gabung Set Soal</h3>
+              <p className="text-gray-600 mb-4">
+                Anda akan menggabungkan {selectedQuestionSets.length} set soal menjadi satu PDF.
+                Silakan masukkan judul untuk PDF gabungan ini.
+              </p>
+              
+              <div className="mb-4">
+                <label htmlFor="combinedTitle" className="block text-sm font-medium text-gray-700 mb-1">
+                  Judul PDF Gabungan
+                </label>
+                <input
+                  type="text"
+                  id="combinedTitle"
+                  value={combinedPdfTitle}
+                  onChange={(e) => setCombinedPdfTitle(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Masukkan judul PDF gabungan"
+                />
+              </div>
+              
+              <div className="flex justify-end gap-2">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg"
+                  onClick={() => {
+                    setShowCombineModal(false);
+                    setCombinedPdfTitle('');
+                  }}
+                >
+                  Batal
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`px-4 py-2 rounded-lg ${!combinedPdfTitle ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-blue-600 text-white'}`}
+                  onClick={combinedPdfTitle ? handleConfirmCombine : undefined}
+                >
+                  Gabung & Unduh
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       <Footer />
     </div>

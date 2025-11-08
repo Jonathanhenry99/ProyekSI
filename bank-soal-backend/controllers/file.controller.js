@@ -1,5 +1,6 @@
 const db = require("../models");
 const File = db.file;
+const PaketSoal = db.paketSoal;
 const fs = require("fs");
 const path = require("path");
 const { PDFDocument } = require('pdf-lib');
@@ -45,6 +46,135 @@ exports.uploadFile = async (req, res) => {
     if (req.file) {
       fs.unlinkSync(req.file.path);
     }
+    res.status(500).send({ message: error.message });
+  }
+};
+
+// Fungsi untuk menggabungkan file dari beberapa question set menjadi satu PDF dan menyimpannya
+exports.combineMultipleQuestionSets = async (req, res) => {
+  try {
+    const { questionSetIds, title, description, subject, year, level, lecturer } = req.body;
+    
+    if (!questionSetIds || !Array.isArray(questionSetIds) || questionSetIds.length < 2) {
+      return res.status(400).send({ message: "Minimal 2 set soal diperlukan untuk digabungkan!" });
+    }
+    
+    console.log('Combining multiple question sets:', questionSetIds);
+    
+    // Buat PDF baru untuk menampung semua file
+    const mergedPdf = await PDFDocument.create();
+    
+    // Proses setiap question set
+    for (const questionSetId of questionSetIds) {
+      // Ambil semua file questions dari question set ini
+      const files = await File.findAll({
+        where: { 
+          question_set_id: questionSetId,
+          filecategory: 'questions'
+        },
+        order: [['id', 'ASC']]
+      });
+      
+      if (!files || files.length === 0) {
+        console.log('No files found for question set:', questionSetId);
+        continue; // Lanjutkan ke question set berikutnya
+      }
+      
+      // Proses setiap file
+      for (const file of files) {
+        try {
+          let pdfBytes;
+          
+          // Konversi berdasarkan tipe file
+          if (file.filetype.toLowerCase() === 'pdf') {
+            // Jika file adalah PDF, langsung baca
+            pdfBytes = fs.readFileSync(file.filepath);
+          } else if (file.filetype.toLowerCase() === 'docx') {
+            // Jika file adalah DOCX, konversi ke PDF dulu
+            const tempPdfPath = file.filepath.replace('.docx', '_temp.pdf');
+            await docxToPdfPromise(file.filepath, tempPdfPath);
+            pdfBytes = fs.readFileSync(tempPdfPath);
+            // Hapus file PDF temporary
+            fs.unlinkSync(tempPdfPath);
+          } else if (file.filetype.toLowerCase() === 'txt') {
+            // Jika file adalah TXT, buat PDF baru dengan konten teks
+            const txtContent = fs.readFileSync(file.filepath, 'utf8');
+            const tempPdf = await PDFDocument.create();
+            const page = tempPdf.addPage();
+            const { width, height } = page.getSize();
+            page.drawText(txtContent, {
+              x: 50,
+              y: height - 50,
+              size: 12,
+              maxWidth: width - 100
+            });
+            pdfBytes = await tempPdf.save();
+          } else {
+            console.warn(`Tipe file tidak didukung: ${file.filetype}`);
+            continue;
+          }
+          
+          // Tambahkan halaman baru untuk setiap file
+          const pdfDoc = await PDFDocument.load(pdfBytes);
+          const copiedPages = await mergedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
+          copiedPages.forEach(page => mergedPdf.addPage(page));
+          
+        } catch (error) {
+          console.error(`Error processing file ${file.originalname}:`, error);
+          // Lanjutkan ke file berikutnya jika ada error
+          continue;
+        }
+      }
+    }
+    
+    // Simpan PDF yang sudah digabung
+    const mergedPdfBytes = await mergedPdf.save();
+    
+    // Buat nama file unik untuk PDF gabungan
+    const timestamp = Date.now();
+    const randomString = Math.random().toString(36).substring(2, 15);
+    const combinedFilename = `combined-${timestamp}-${randomString}.pdf`;
+    const combinedFilepath = path.join(__dirname, '../uploads/questions/', combinedFilename);
+    
+    // Tulis file PDF ke disk
+    fs.writeFileSync(combinedFilepath, Buffer.from(mergedPdfBytes));
+    
+    // Simpan informasi file ke database
+    const combinedFile = await File.create({
+      originalname: `${title}.pdf`,
+      filename: combinedFilename,
+      filepath: combinedFilepath,
+      filetype: 'PDF',
+      filesize: Buffer.from(mergedPdfBytes).length,
+      filecategory: 'questions',
+      question_set_id: null // Tidak terkait dengan question set tertentu
+    });
+    
+    // Buat paket soal baru untuk file gabungan
+    const paketSoal = await PaketSoal.create({
+      title,
+      description,
+      subject,
+      year,
+      level,
+      lecturer,
+      topics: JSON.stringify(['Gabungan']),
+      downloads: 0,
+      lastUpdated: new Date()
+    });
+    
+    // Update file dengan paket soal baru
+    await combinedFile.update({ question_set_id: paketSoal.id });
+    
+    // Set headers untuk response
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${title}.pdf"`);
+    
+    // Kirim PDF sebagai response
+    res.send(Buffer.from(mergedPdfBytes));
+    
+  } catch (error) {
+    console.error("Error in combineMultipleQuestionSets:", error);
     res.status(500).send({ message: error.message });
   }
 };
