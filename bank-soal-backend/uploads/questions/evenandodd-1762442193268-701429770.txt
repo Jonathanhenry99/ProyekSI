@@ -1,0 +1,30 @@
+import java.util.*;
+public class GG {
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+ 
+        int n = sc.nextInt();
+        for(int x = 0;x<n;x++){
+            LinkedList  urutanGanjil = new LinkedList<>();
+            LinkedList urutanGenap = new LinkedList<>();
+            int angka = sc.nextInt();
+            while(angka>0){
+          
+            if(angka%2 ==0){
+                urutanGenap.add(angka);
+            }else{
+                urutanGanjil.add(angka);
+            }
+            angka = sc.nextInt();
+        }
+        for(int i =0;i<urutanGenap.size();i++){
+            System.out.print(urutanGenap.get(i)+" ");
+        }
+        for(int i =0;i<urutanGanjil.size();i++){
+            System.out.print(urutanGanjil.get(i)+" ");
+        }
+        System.out.println();
+        }
+        
+    }
+}

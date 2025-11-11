@@ -3,8 +3,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, CheckCircle, ChevronDown, FileText, BarChart2, Plus, Check, BookOpen, Trash2, AlertTriangle, Archive, RefreshCw, Trash } from 'lucide-react';
 import Footer from '../components/Footer';
 import Header from '../components/Header';
+import RecycleBinModal from '../components/RecycleBinModal.jsx';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 
 const API_URL = "http://localhost:8080/api";
 
@@ -28,9 +31,6 @@ const SearchPage = ({ currentUser }) => {
 
   // State untuk recycle bin
   const [showRecycleBinModal, setShowRecycleBinModal] = useState(false);
-  const [recycleBinData, setRecycleBinData] = useState([]);
-  const [isLoadingRecycleBin, setIsLoadingRecycleBin] = useState(false);
-  const [isRestoring, setIsRestoring] = useState(false);
 
   // State untuk dropdown
   const [showLevelDropdown, setShowLevelDropdown] = useState(false);
@@ -49,15 +49,29 @@ const SearchPage = ({ currentUser }) => {
   const [dropdownLoading, setDropdownLoading] = useState(false);
   const [dropdownError, setDropdownError] = useState(null);
 
+  // State untuk download progress
+  const [downloadingItems, setDownloadingItems] = useState(new Set());
+
   // Helper function untuk mendapatkan nama mata kuliah berdasarkan ID
   const getSubjectNameById = (subjectId) => {
-    if (!subjectId || !courseOptions.length) return subjectId;
+    if (!subjectId || !courseOptions.length) {
+      console.warn(`⚠️ getSubjectNameById: No subjectId (${subjectId}) or no courseOptions (${courseOptions.length})`);
+      return subjectId;
+    }
     
-    const course = courseOptions.find(course => 
-      course.id.toString() === subjectId.toString()
-    );
+    const subjectIdStr = String(subjectId).trim();
+    const course = courseOptions.find(course => {
+      const courseIdStr = String(course.id).trim();
+      return courseIdStr === subjectIdStr;
+    });
     
-    return course ? course.name : subjectId;
+    if (course) {
+      console.log(`🔍 getSubjectNameById: Found course ${course.id} -> "${course.name}" for subjectId ${subjectId}`);
+      return course.name;
+    } else {
+      console.warn(`⚠️ getSubjectNameById: Course not found for subjectId ${subjectId}. Available: ${courseOptions.map(c => `${c.id}`).join(', ')}`);
+      return subjectId;
+    }
   };
 
   // Helper function to get auth token
@@ -81,6 +95,284 @@ const SearchPage = ({ currentUser }) => {
     }
     
     return token;
+  };
+
+  // UPDATED: Fungsi untuk download ZIP dengan semua file
+  const handleDownload = async (id, fileName) => {
+    if (downloadingItems.has(id)) {
+      return; // Prevent multiple downloads
+    }
+
+    try {
+      setDownloadingItems(prev => new Set(prev).add(id));
+      
+      console.log(`🔄 Starting ZIP download for question set ID: ${id}`);
+      
+      // Get detailed question set data with files
+      const response = await axios.get(`${API_URL}/questionsets/${id}?download=true`);
+      const questionSet = response.data;
+      
+      if (!questionSet.files || questionSet.files.length === 0) {
+        alert('Tidak ada file yang tersedia untuk diunduh');
+        return;
+      }
+      
+      console.log(`📁 Found ${questionSet.files.length} files to process`);
+      
+      // Create a new ZIP instance
+      const zip = new JSZip();
+      
+      // Create folders in ZIP
+      const soalFolder = zip.folder("01_Soal");
+      const jawabanFolder = zip.folder("02_Kunci_Jawaban");
+      const testCaseFolder = zip.folder("03_Test_Cases");
+      
+      // Track download promises and successful downloads
+      const downloadPromises = [];
+      let hasFiles = false;
+      let downloadedFiles = {
+        soal: 0,
+        jawaban: 0,
+        testcase: 0
+      };
+      
+      // Process each file
+      for (const file of questionSet.files) {
+        let targetFolder = null;
+        let folderName = '';
+        let fileType = '';
+        
+        // Determine which folder based on file category
+        switch (file.filecategory) {
+          case 'soal':
+          case 'questions':
+            targetFolder = soalFolder;
+            folderName = 'Soal';
+            fileType = 'soal';
+            break;
+          case 'kunci':
+          case 'answers':
+            targetFolder = jawabanFolder;
+            folderName = 'Kunci Jawaban';
+            fileType = 'jawaban';
+            break;
+          case 'test':
+          case 'testCases':
+            targetFolder = testCaseFolder;
+            folderName = 'Test Cases';
+            fileType = 'testcase';
+            break;
+          default:
+            console.warn(`⚠️ Unknown file category: ${file.filecategory}`);
+            continue;
+        }
+        
+        // Download file and add to ZIP
+        const downloadPromise = axios.get(`${API_URL}/files/download/${file.id}`, {
+          responseType: 'blob',
+          timeout: 30000 // 30 second timeout
+        }).then(fileResponse => {
+          // Get file extension from original filename or content-type
+          let fileExtension = '';
+          let safeFileName = '';
+          
+          // First try to get extension from original filename
+          if (file.filename && file.filename.includes('.')) {
+            const lastDot = file.filename.lastIndexOf('.');
+            fileExtension = file.filename.substring(lastDot);
+            safeFileName = file.filename;
+          } else {
+            // Fallback: determine extension from content-type
+            const contentType = fileResponse.headers['content-type'] || fileResponse.headers['Content-Type'];
+            console.log(`File ${file.id} content-type:`, contentType);
+            
+            if (contentType) {
+              if (contentType.includes('pdf') || contentType.includes('application/pdf')) {
+                fileExtension = '.pdf';
+              } else if (contentType.includes('word') || contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
+                fileExtension = '.docx';
+              } else if (contentType.includes('msword') || contentType.includes('application/msword')) {
+                fileExtension = '.doc';
+              } else if (contentType.includes('text') || contentType.includes('text/plain')) {
+                fileExtension = '.txt';
+              } else {
+                // Default fallback based on file category
+                switch (file.filecategory) {
+                  case 'soal':
+                  case 'questions':
+                    fileExtension = '.pdf'; // Assume PDF for question files
+                    break;
+                  case 'kunci':
+                  case 'answers':
+                    fileExtension = '.pdf'; // Assume PDF for answer files
+                    break;
+                  case 'test':
+                  case 'testCases':
+                    fileExtension = '.txt'; // Assume TXT for test cases
+                    break;
+                  default:
+                    fileExtension = '.pdf'; // Default to PDF
+                }
+              }
+            } else {
+              // No content-type, use default based on category
+              fileExtension = '.pdf';
+            }
+            
+            // Create safe filename if original doesn't exist
+            safeFileName = `${folderName}_${file.id}${fileExtension}`;
+          }
+          
+          // Ensure filename has proper extension
+          if (!safeFileName.includes('.')) {
+            safeFileName += fileExtension;
+          }
+          
+          // Clean filename for ZIP compatibility
+          safeFileName = safeFileName
+            .replace(/[<>:"/\\|?*]/g, '_') // Replace invalid characters
+            .replace(/\s+/g, '_') // Replace spaces
+            .replace(/_+/g, '_'); // Remove multiple underscores
+          
+          console.log(`📁 Adding file: ${safeFileName} (${fileType}) - Extension: ${fileExtension}`);
+          
+          // Add file to appropriate folder in ZIP
+          targetFolder.file(safeFileName, fileResponse.data);
+          hasFiles = true;
+          downloadedFiles[fileType]++;
+          
+          console.log(`✅ Added ${safeFileName} to ${folderName} folder`);
+        }).catch(error => {
+          console.error(`❌ Failed to download file ${file.id}:`, error);
+          // Continue with other files even if one fails
+        });
+        
+        downloadPromises.push(downloadPromise);
+      }
+      
+      // Wait for all downloads to complete
+      console.log('⏳ Waiting for all file downloads to complete...');
+      await Promise.allSettled(downloadPromises);
+      
+      if (!hasFiles) {
+        alert('Gagal mengunduh file. Tidak ada file yang berhasil diproses.');
+        return;
+      }
+      
+      // Create comprehensive README file
+      const readmeContent = `
+PAKET SOAL - BANK SOAL INFORMATIKA
+==================================
+
+INFORMASI UMUM:
+- Judul: ${questionSet.title || fileName}
+- Mata Kuliah: ${getSubjectNameById(questionSet.subject)}
+- Tingkat Kesulitan: ${questionSet.level}
+- Dosen: ${questionSet.lecturer}
+- Tahun: ${questionSet.year}
+- Tanggal Unduh: ${new Date().toLocaleString('id-ID')}
+
+STRUKTUR FOLDER:
+- 01_Soal/ : Berisi file soal utama (${downloadedFiles.soal} file)
+- 02_Kunci_Jawaban/ : Berisi file kunci jawaban (${downloadedFiles.jawaban} file)
+- 03_Test_Cases/ : Berisi file test cases (${downloadedFiles.testcase} file)
+
+DETAIL TAMBAHAN:
+- Topik: ${questionSet.topics || 'Tidak ada topik yang ditentukan'}
+- Deskripsi: ${questionSet.description || 'Tidak ada deskripsi tambahan'}
+- Total File: ${downloadedFiles.soal + downloadedFiles.jawaban + downloadedFiles.testcase} file
+
+INFORMASI DOWNLOAD:
+- ID Question Set: ${id}
+- Waktu Download: ${new Date().toISOString()}
+- User: ${currentUser?.username || 'Unknown'}
+
+CATATAN:
+Jika ada folder yang kosong, berarti file untuk kategori tersebut
+tidak tersedia atau gagal diunduh dari server.
+
+---
+Diunduh dari Bank Soal Informatika
+Universitas Katolik Parahyangan
+© ${new Date().getFullYear()}
+      `.trim();
+      
+      zip.file("README.txt", readmeContent);
+      
+      // Add summary file in JSON format for programmatic access
+      const summaryData = {
+        questionSet: {
+          id: id,
+          title: questionSet.title || fileName,
+          subject: getSubjectNameById(questionSet.subject),
+          level: questionSet.level,
+          lecturer: questionSet.lecturer,
+          year: questionSet.year,
+          topics: questionSet.topics,
+          description: questionSet.description
+        },
+        download: {
+          timestamp: new Date().toISOString(),
+          user: currentUser?.username || 'Unknown',
+          filesDownloaded: downloadedFiles,
+          totalFiles: downloadedFiles.soal + downloadedFiles.jawaban + downloadedFiles.testcase
+        }
+      };
+      
+      zip.file("summary.json", JSON.stringify(summaryData, null, 2));
+      
+      // Generate ZIP file
+      console.log('🔄 Generating ZIP file...');
+      const zipBlob = await zip.generateAsync({
+        type: "blob",
+        compression: "DEFLATE",
+        compressionOptions: {
+          level: 6
+        }
+      });
+      
+      // Create safe filename for ZIP
+      const safeFileName = (fileName || questionSet.title || `Soal_${id}`)
+        .replace(/[^a-zA-Z0-9\s-_]/g, '') // Remove special characters
+        .replace(/\s+/g, '_') // Replace spaces with underscores
+        .substring(0, 50); // Limit length
+      
+      const zipFileName = `${safeFileName}_${new Date().toISOString().split('T')[0]}.zip`;
+      
+      // Save ZIP file
+      saveAs(zipBlob, zipFileName);
+      
+      console.log(`✅ ZIP file "${zipFileName}" download started successfully`);
+      
+      // Show success message with details
+      const successMessage = `Berhasil mengunduh paket soal "${fileName}"!\n\n` +
+        `File yang diunduh:\n` +
+        `- Soal: ${downloadedFiles.soal} file\n` +
+        `- Kunci Jawaban: ${downloadedFiles.jawaban} file\n` +
+        `- Test Cases: ${downloadedFiles.testcase} file\n\n` +
+        `Total: ${downloadedFiles.soal + downloadedFiles.jawaban + downloadedFiles.testcase} file dalam format ZIP`;
+      
+      alert(successMessage);
+      
+    } catch (error) {
+      console.error("❌ Error downloading files:", error);
+      
+      if (error.response?.status === 404) {
+        alert('File soal tidak ditemukan atau telah dihapus');
+      } else if (error.response?.status === 403) {
+        alert('Anda tidak memiliki izin untuk mengunduh file ini');
+      } else if (error.code === 'ECONNABORTED') {
+        alert('Download timeout. Silakan coba lagi atau periksa koneksi internet.');
+      } else {
+        alert(`Gagal mengunduh file: ${error.message}`);
+      }
+    } finally {
+      setDownloadingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
+    }
   };
 
   // FIXED: Fungsi untuk soft delete question set
@@ -137,244 +429,22 @@ const SearchPage = ({ currentUser }) => {
     }
   };
 
-  // FIXED: Fungsi untuk mengambil data recycle bin
-const fetchRecycleBinData = async () => {
-  setIsLoadingRecycleBin(true);
-  try {
-    const token = getAuthToken();
-    if (!token) {
-      alert('Token autentikasi tidak ditemukan. Silakan login kembali.');
-      setIsLoadingRecycleBin(false);
-      return;
-    }
-
-    console.log('🔄 Fetching recycle bin data...');
-    console.log('📍 Full URL:', `${API_URL}/questionsets/recycle-bin/all`);
-    console.log('🔑 Token preview:', token ? `${token.substring(0, 30)}...` : 'missing');
-    
-    const response = await axios.get(`${API_URL}/questionsets/recycle-bin/all`, {
-      headers: { 
-        "x-access-token": token,
-        "Content-Type": "application/json"
-      }
-    });
-    
-    console.log('✅ Recycle bin response status:', response.status);
-    console.log('✅ Recycle bin response data:', response.data);
-    
-    const data = response.data?.data || response.data || [];
-    console.log('📦 Parsed data:', data.length, 'items');
-    
-    // Transform data
-    const transformedData = data.map(item => {
-      let subjectName = item.subject;
-      
-      if (item.courseName || item.subjectName) {
-        subjectName = item.courseName || item.subjectName;
-      } else if (courseOptions.length > 0) {
-        const course = courseOptions.find(course => 
-          course.id.toString() === item.subject.toString()
-        );
-        subjectName = course ? course.name : item.subject;
-      }
-      
-      return {
-        id: item.id,
-        fileName: item.title,
-        subject: subjectName,
-        subjectId: item.subject,
-        year: item.year,
-        lecturer: item.lecturer || (item.creator ? (item.creator.fullName || item.creator.username) : 'Unknown'),
-        level: item.level,
-        lastUpdated: new Date(item.last_updated || item.updated_at || item.createdAt).toISOString(),
-        deletedAt: new Date(item.deleted_at || item.deletedAt || new Date()).toISOString(),
-        deletedBy: item.deletedBy || item.deleted_by || null,
-        topics: item.topics ? item.topics.split(',').map(topic => topic.trim()) : [],
-        downloads: item.downloads || 0,
-        description: item.description || '',
-        hasAnswerKey: Array.isArray(item.files) && item.files.some(file => 
-          file.filecategory === 'kunci' || file.filecategory === 'answers'
-        ),
-        hasTestCase: Array.isArray(item.files) && item.files.some(file => 
-          file.filecategory === 'test' || file.filecategory === 'testCases'
-        )
-      };
-    });
-    
-    setRecycleBinData(transformedData);
-    console.log(`✅ Loaded ${transformedData.length} deleted question sets`);
-    
-  } catch (error) {
-    console.error("❌ Error fetching recycle bin data:", error);
-    console.error("❌ Error details:", {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
-      url: error.config?.url
-    });
-    
-    if (error.response?.status === 401) {
-      alert('Sesi telah berakhir. Silakan login kembali.');
-      setRecycleBinData([]);
-    } else if (error.response?.status === 403) {
-      alert('Anda tidak memiliki izin untuk mengakses recycle bin.');
-      setRecycleBinData([]);
-    } else if (error.response?.status === 404) {
-      console.log('⚠️ Endpoint not found. Possible issues:');
-      console.log('1. Backend routes not registered correctly');
-      console.log('2. Route order issue (generic /:id catching /recycle-bin/all)');
-      console.log('3. Server not restarted after route changes');
-      alert('⚠️ Fitur Recycle Bin belum tersedia.\n\nKemungkinan:\n1. Backend belum diupdate\n2. Server belum direstart\n3. Route order salah\n\nSilakan hubungi administrator.');
-      setRecycleBinData([]);
-    } else if (error.response?.status === 500) {
-      console.error('⚠️ Server Error (500) - Backend issue');
-      console.error('Backend error message:', error.response?.data?.error);
-      console.error('Backend error details:', error.response?.data?.details);
-      
-      const errorMsg = error.response?.data?.error || error.message;
-      
-      if (errorMsg.includes('column') || errorMsg.includes('does not exist')) {
-        alert('⚠️ Database Error!\n\nKolom "is_deleted", "deleted_at", atau "deleted_by" belum ada di database.\n\nSilakan jalankan migration SQL terlebih dahulu.');
-      } else if (errorMsg.includes('association') || errorMsg.includes('deletedByUser')) {
-        alert('⚠️ Model Error!\n\nAssociation "deletedByUser" belum terdaftar.\n\nSilakan update models/index.js dengan associations yang benar.');
-      } else {
-        alert(`❌ Server Error:\n${errorMsg}\n\nCek console server untuk detail lengkap.`);
-      }
-      
-      setRecycleBinData([]);
-    } else {
-      alert(`Gagal memuat recycle bin: ${error.response?.data?.message || error.message}`);
-      setRecycleBinData([]);
-    }
-  } finally {
-    setIsLoadingRecycleBin(false);
-  }
-};
-  // FIXED: Fungsi untuk restore dari recycle bin
-  const handleRestore = async (id) => {
-    setIsRestoring(true);
-    try {
-      const token = getAuthToken();
-      if (!token) {
-        alert('Token autentikasi tidak ditemukan. Silakan login kembali.');
-        return;
-      }
-
-      console.log(`♻️ Restoring question set ID: ${id}`);
-      
-      let response;
-      let restoreSuccess = false;
-      
-      // Try restore endpoint first
-      try {
-        response = await axios.patch(`${API_URL}/questionsets/${id}/restore`, {}, {
-          headers: { 
-            "x-access-token": token,
-            "Content-Type": "application/json"
-          }
-        });
-        restoreSuccess = true;
-      } catch (error) {
-        if (error.response?.status === 404) {
-          // Fallback: try update with isDeleted = false
-          try {
-            response = await axios.patch(`${API_URL}/questionsets/${id}`, {
-              isDeleted: false,
-              deletedAt: null
-            }, {
-              headers: { 
-                "x-access-token": token,
-                "Content-Type": "application/json"
-              }
-            });
-            restoreSuccess = true;
-          } catch (updateError) {
-            throw updateError;
-          }
-        } else {
-          throw error;
-        }
-      }
-
-      if (restoreSuccess && (response.status === 200 || response.status === 204)) {
-        console.log('✅ Question set restored successfully');
-        
-        // Remove from recycle bin data
-        setRecycleBinData(prev => prev.filter(item => item.id !== id));
-        
-        // Refresh question sets list
-        const courses = await fetchCourseOptions();
-        await fetchQuestionSets(courses);
-        
-        alert('Soal berhasil dipulihkan');
-      } else {
-        throw new Error('Restore operation failed');
-      }
-    } catch (error) {
-      console.error("❌ Error restoring question set:", error);
-      
-      if (error.response?.status === 401) {
-        alert('Sesi telah berakhir. Silakan login kembali.');
-      } else if (error.response?.status === 403) {
-        alert('Anda tidak memiliki izin untuk memulihkan soal ini.');
-      } else if (error.response?.status === 404) {
-        alert('Fitur restore belum tersedia atau soal tidak ditemukan.');
-      } else {
-        alert('Gagal memulihkan soal. Silakan coba lagi.');
-      }
-    } finally {
-      setIsRestoring(false);
-    }
+  // Handler callbacks untuk RecycleBinModal
+  const handleItemRestored = (id) => {
+    const initializeData = async () => {
+      const courses = await fetchCourseOptions();
+      await fetchQuestionSets(courses);
+    };
+    initializeData();
   };
 
-  // Fungsi untuk permanent delete
-  const handlePermanentDelete = async (id) => {
-    if (!confirm('Apakah Anda yakin ingin menghapus soal ini secara permanen? Aksi ini tidak dapat dibatalkan.')) {
-      return;
-    }
-
-    try {
-      const token = getAuthToken();
-      if (!token) {
-        alert('Token autentikasi tidak ditemukan. Silakan login kembali.');
-        return;
-      }
-
-      console.log(`🗑️ Permanently deleting question set ID: ${id}`);
-      
-      const response = await axios.delete(`${API_URL}/questionsets/${id}`, {
-        headers: { 
-          "x-access-token": token,
-          "Content-Type": "application/json"
-        }
-      });
-
-      if (response.status === 200 || response.status === 204) {
-        console.log('✅ Question set permanently deleted');
-        
-        // Remove from recycle bin data
-        setRecycleBinData(prev => prev.filter(item => item.id !== id));
-        
-        alert('Soal berhasil dihapus secara permanen');
-      } else {
-        throw new Error('Permanent delete failed');
-      }
-    } catch (error) {
-      console.error("❌ Error permanently deleting question set:", error);
-      if (error.response?.status === 404) {
-        // Item already deleted, remove from UI
-        setRecycleBinData(prev => prev.filter(item => item.id !== id));
-        alert('Soal sudah terhapus.');
-      } else {
-        alert('Gagal menghapus soal secara permanen. Silakan coba lagi.');
-      }
-    }
+  const handleItemPermanentlyDeleted = (id) => {
+    console.log(`Item ${id} permanently deleted`);
   };
 
   // Helper functions
   const openRecycleBinModal = () => {
     setShowRecycleBinModal(true);
-    fetchRecycleBinData();
   };
 
   const confirmDelete = (item) => {
@@ -476,22 +546,55 @@ const fetchRecycleBinData = async () => {
       );
       
       const transformedData = activeData.map(item => {
+        // Simpan subject ID asli
+        const subjectId = item.subject;
         let subjectName = item.subject;
         
-        if (item.courseName || item.subjectName) {
-          subjectName = item.courseName || item.subjectName;
-        } else if (courses.length > 0) {
-          const course = courses.find(course => 
-            course.id.toString() === item.subject.toString()
-          );
-          subjectName = course ? course.name : item.subject;
+        // Helper function untuk cek apakah value adalah numeric ID
+        const isNumericId = (value) => {
+          if (!value) return false;
+          const str = String(value).trim();
+          // Cek apakah string adalah pure number (bisa parseInt)
+          return !isNaN(str) && !isNaN(parseFloat(str)) && isFinite(str) && str.length > 0;
+        };
+        
+        // Priority 1: Gunakan courseName atau subjectName dari backend JIKA bukan numeric ID
+        const backendName = item.courseName || item.subjectName;
+        if (backendName && !isNumericId(backendName)) {
+          // Backend memberikan nama yang valid (bukan ID)
+          subjectName = backendName;
+          console.log(`✅ Using backend name for subject ${subjectId}: ${subjectName}`);
+        } 
+        // Priority 2: Jika backend name adalah ID atau tidak ada, resolve menggunakan courseOptions
+        else if (courseOptions.length > 0) {
+          subjectName = getSubjectNameById(subjectId);
+          if (subjectName !== subjectId) {
+            console.log(`✅ Resolved subject ID ${subjectId} to name: ${subjectName}`);
+          } else {
+            console.warn(`⚠️ Could not resolve subject ID ${subjectId} to name. Available courses: ${courseOptions.map(c => `${c.id}:${c.name}`).join(', ')}`);
+          }
         }
+        // Priority 3: Fallback ke parameter courses jika courseOptions belum ter-load
+        else if (courses.length > 0) {
+          const course = courses.find(course => 
+            course.id.toString() === subjectId.toString()
+          );
+          if (course) {
+            subjectName = course.name;
+            console.log(`✅ Resolved subject ID ${subjectId} to name using courses param: ${subjectName}`);
+          } else {
+            console.warn(`⚠️ Subject ID ${subjectId} not found in courses parameter`);
+          }
+        } else {
+          console.warn(`⚠️ No course options available to resolve subject ID ${subjectId}`);
+        }
+        // Jika tidak ada yang cocok, tetap gunakan nilai asli (bisa ID atau nama)
         
         return {
           id: item.id,
           fileName: item.title,
           subject: subjectName,
-          subjectId: item.subject,
+          subjectId: subjectId, // Simpan ID asli untuk referensi
           year: item.year,
           lecturer: item.lecturer || (item.creator ? (item.creator.fullName || item.creator.username) : 'Unknown'),
           level: item.level,
@@ -516,25 +619,6 @@ const fetchRecycleBinData = async () => {
       console.error("❌ Error fetching question sets:", error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleDownload = async (id) => {
-    try {
-      const response = await axios.get(`${API_URL}/questionsets/${id}?download=true`);
-      
-      const questionFile = response.data.files.find(file => 
-        file.filecategory === 'soal' || file.filecategory === 'questions'
-      );
-      
-      if (questionFile) {
-        window.open(`${API_URL}/files/download/${questionFile.id}`, '_blank');
-      } else {
-        alert('File soal tidak ditemukan');
-      }
-    } catch (error) {
-      console.error("Error downloading file:", error);
-      alert('Gagal mendownload file');
     }
   };
   
@@ -717,6 +801,7 @@ const fetchRecycleBinData = async () => {
   const renderCard = (item) => {
     const hasAnswerKey = item.hasAnswerKey ?? false;
     const hasTestCase = item.hasTestCase ?? false;
+    const isDownloading = downloadingItems.has(item.id);
 
     const completeness = (hasAnswerKey ? 1 : 0) + (hasTestCase ? 1 : 0);
     const completenessPercent = (completeness / 2) * 100;
@@ -821,15 +906,36 @@ const fetchRecycleBinData = async () => {
               <span>{item.downloads} unduhan</span>
             </div>
             <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+              whileHover={{ scale: isDownloading ? 1 : 1.05 }}
+              whileTap={{ scale: isDownloading ? 1 : 0.95 }}
+              className={`px-3 py-1.5 text-white text-sm rounded-lg transition-colors flex items-center gap-1 ${
+                isDownloading 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-blue-600 hover:bg-blue-700'
+              }`}
               onClick={(e) => {
                 e.stopPropagation();
-                handleDownload(item.id);
+                if (!isDownloading) {
+                  handleDownload(item.id, item.fileName);
+                }
               }}
+              disabled={isDownloading}
             >
-              Unduh
+              {isDownloading ? (
+                <>
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="w-3 h-3 border-2 border-white border-t-transparent rounded-full"
+                  />
+                  Mengunduh...
+                </>
+              ) : (
+                <>
+                  <Download className="w-3 h-3" />
+                  Unduh ZIP
+                </>
+              )}
             </motion.button>
           </div>
         </div>
@@ -858,6 +964,59 @@ const fetchRecycleBinData = async () => {
     
     initializeData();
   }, []);
+
+  // Re-transform question sets ketika courseOptions ter-load/update
+  // Ini memastikan subject ID selalu di-resolve ke nama mata kuliah
+  useEffect(() => {
+    if (courseOptions.length > 0) {
+      setQuestionSets(prevQuestionSets => {
+        if (prevQuestionSets.length === 0) return prevQuestionSets;
+        
+        // Helper function untuk cek apakah value adalah numeric ID
+        const isNumericId = (value) => {
+          if (!value) return false;
+          const str = String(value).trim();
+          return !isNaN(str) && !isNaN(parseFloat(str)) && isFinite(str) && str.length > 0;
+        };
+        
+        // Cek apakah ada item yang masih menggunakan ID (numeric) sebagai subject
+        const needsRetransform = prevQuestionSets.some(item => {
+          // Jika subject adalah numeric (baik sama dengan subjectId atau tidak), berarti perlu di-resolve
+          return item.subjectId && !isNaN(item.subjectId) && isNumericId(item.subject);
+        });
+
+        if (!needsRetransform) {
+          console.log('ℹ️ No re-transformation needed, all subjects already resolved');
+          return prevQuestionSets;
+        }
+
+        console.log('🔄 Re-transforming question sets dengan courseOptions yang sudah ter-load...');
+        console.log(`📚 Available courseOptions: ${courseOptions.length} courses`);
+        
+        const reTransformedData = prevQuestionSets.map(item => {
+          // Jika subject masih berupa ID (numeric), resolve ke nama
+          if (item.subjectId && !isNaN(item.subjectId) && isNumericId(item.subject)) {
+            const resolvedName = getSubjectNameById(item.subjectId);
+            // Jika berhasil di-resolve (bukan ID lagi), update
+            if (resolvedName !== item.subjectId && resolvedName !== item.subject) {
+              console.log(`✅ Re-resolved subject ID ${item.subjectId} from "${item.subject}" to "${resolvedName}"`);
+              return {
+                ...item,
+                subject: resolvedName
+              };
+            } else if (resolvedName === item.subjectId) {
+              console.warn(`⚠️ Could not resolve subject ID ${item.subjectId} to name. Available courses: ${courseOptions.map(c => `${c.id}:${c.name}`).join(', ')}`);
+            }
+          }
+          return item;
+        });
+
+        // Update filteredData juga
+        setFilteredData(reTransformedData);
+        return reTransformedData;
+      });
+    }
+  }, [courseOptions]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -1308,53 +1467,78 @@ const fetchRecycleBinData = async () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredData.map((item) => (
-                      <motion.tr
-                        key={item.id}
-                        variants={itemVariants}
-                        className="hover:bg-gray-50"
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {item.fileName}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700" title={`Subject ID: ${item.subjectId}`}>
-                          {item.subject}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-3 py-1 rounded-full text-xs ${getLevelColor(item.level)}`}>
-                            {item.level}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                          {item.lecturer}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                          {formatDate(item.lastUpdated)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center">
-                          <div className="flex items-center justify-center gap-2">
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              className="inline-flex items-center px-3 py-1 rounded-lg text-sm text-white bg-blue-600 hover:bg-blue-700"
-                              onClick={() => handleDownload(item.id)}
-                            >
-                              <Download className="w-3 h-3 mr-1" />
-                              Download
-                            </motion.button>
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              className="inline-flex items-center px-3 py-1 rounded-lg text-sm text-white bg-red-600 hover:bg-red-700"
-                              onClick={() => confirmDelete(item)}
-                            >
-                              <Trash2 className="w-3 h-3 mr-1" />
-                              Hapus
-                            </motion.button>
-                          </div>
-                        </td>
-                      </motion.tr>
-                    ))}
+                    {filteredData.map((item) => {
+                      const isDownloading = downloadingItems.has(item.id);
+                      return (
+                        <motion.tr
+                          key={item.id}
+                          variants={itemVariants}
+                          className="hover:bg-gray-50"
+                        >
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {item.fileName}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700" title={`Subject ID: ${item.subjectId}`}>
+                            {item.subject}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-3 py-1 rounded-full text-xs ${getLevelColor(item.level)}`}>
+                              {item.level}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                            {item.lecturer}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                            {formatDate(item.lastUpdated)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <motion.button
+                                whileHover={{ scale: isDownloading ? 1 : 1.05 }}
+                                whileTap={{ scale: isDownloading ? 1 : 0.95 }}
+                                className={`inline-flex items-center px-3 py-1 rounded-lg text-sm text-white transition-colors ${
+                                  isDownloading 
+                                    ? 'bg-gray-400 cursor-not-allowed' 
+                                    : 'bg-blue-600 hover:bg-blue-700'
+                                }`}
+                                onClick={() => {
+                                  if (!isDownloading) {
+                                    handleDownload(item.id, item.fileName);
+                                  }
+                                }}
+                                disabled={isDownloading}
+                              >
+                                {isDownloading ? (
+                                  <>
+                                    <motion.div
+                                      animate={{ rotate: 360 }}
+                                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                      className="w-3 h-3 border-2 border-white border-t-transparent rounded-full mr-1"
+                                    />
+                                    Unduh...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Download className="w-3 h-3 mr-1" />
+                                    Unduh ZIP
+                                  </>
+                                )}
+                              </motion.button>
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                className="inline-flex items-center px-3 py-1 rounded-lg text-sm text-white bg-red-600 hover:bg-red-700"
+                                onClick={() => confirmDelete(item)}
+                              >
+                                <Trash2 className="w-3 h-3 mr-1" />
+                                Hapus
+                              </motion.button>
+                            </div>
+                          </td>
+                        </motion.tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </motion.div>
@@ -1385,181 +1569,16 @@ const fetchRecycleBinData = async () => {
       )}
 
       {/* Modals */}
-     {/* Recycle Bin Modal */}
-     <AnimatePresence>
-        {showRecycleBinModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 backdrop-blur-md bg-white/30 flex items-center justify-center z-50 p-4"
-            onClick={() => setShowRecycleBinModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-2xl max-w-6xl w-full max-h-[90vh] shadow-2xl overflow-hidden backdrop-blur-sm border border-white/20"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gray-50/80 backdrop-blur-sm">
-                <div className="flex items-center gap-3">
-                  <Archive className="w-6 h-6 text-gray-600" />
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900">Recycle Bin</h3>
-                    <p className="text-sm text-gray-500">
-                      {recycleBinData.length} soal dihapus
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowRecycleBinModal(false)}
-                  className="text-gray-500 hover:text-gray-700 p-2 rounded-full hover:bg-gray-200/50 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+      {/* Recycle Bin Modal */}
+      <RecycleBinModal
+        isOpen={showRecycleBinModal}
+        onClose={() => setShowRecycleBinModal(false)}
+        currentUser={currentUser}
+        courseOptions={courseOptions}
+        onItemRestored={handleItemRestored}
+        onItemPermanentlyDeleted={handleItemPermanentlyDeleted}
+      />
 
-              <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)] bg-white/90 backdrop-blur-sm">
-                {isLoadingRecycleBin ? (
-                  <div className="flex items-center justify-center py-12">
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"
-                    />
-                    <p className="ml-3 text-gray-600">Memuat data recycle bin...</p>
-                  </div>
-                ) : recycleBinData.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Archive className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <h4 className="text-lg font-medium text-gray-900 mb-2">Recycle Bin Kosong</h4>
-                    <p className="text-gray-500">Tidak ada soal yang dihapus</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {recycleBinData.map((item) => (
-                      <motion.div
-                        key={item.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="bg-gray-50/60 backdrop-blur-sm rounded-lg p-4 border border-gray-200/50"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <div className="flex items-start justify-between mb-3">
-                              <h4 className="text-lg font-semibold text-gray-900 mb-1">
-                                {item.fileName}
-                              </h4>
-                              <span className={`px-2 py-1 text-xs rounded-full ${getLevelColor(item.level)}`}>
-                                {item.level}
-                              </span>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-                              <div className="space-y-2">
-                                <div className="flex items-center text-sm text-gray-600">
-                                  <BookOpen className="w-4 h-4 mr-2" />
-                                  <span>{item.subject}</span>
-                                </div>
-                                <div className="flex items-center text-sm text-gray-600">
-                                  <User className="w-4 h-4 mr-2" />
-                                  <span>{item.lecturer}</span>
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                <div className="flex items-center text-sm text-gray-600">
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  <span>Dihapus: {formatDate(item.deletedAt)}</span>
-                                </div>
-                                <div className="flex items-center text-sm text-gray-600">
-                                  <Clock className="w-4 h-4 mr-2" />
-                                  <span>Dibuat: {formatDate(item.lastUpdated)}</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {item.topics?.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mb-3">
-                                {item.topics.map((topic, index) => (
-                                  <span
-                                    key={index}
-                                    className="px-2 py-1 bg-blue-100/70 text-blue-800 text-xs rounded-full backdrop-blur-sm"
-                                  >
-                                    {topic}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-
-                            <div className="mb-4">
-                              <div className="flex items-center gap-4">
-                                <span className={`text-xs flex items-center gap-1 ${item.hasAnswerKey ? 'text-green-600' : 'text-gray-400'}`}>
-                                  <Check className="w-3 h-3" /> Kunci Jawaban
-                                </span>
-                                <span className={`text-xs flex items-center gap-1 ${item.hasTestCase ? 'text-green-600' : 'text-gray-400'}`}>
-                                  <Check className="w-3 h-3" /> Test Case
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col gap-2 ml-4">
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              className="px-3 py-2 bg-green-600/90 backdrop-blur-sm text-white text-sm rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                              onClick={() => handleRestore(item.id)}
-                              disabled={isRestoring}
-                            >
-                              {isRestoring ? (
-                                <motion.div
-                                  animate={{ rotate: 360 }}
-                                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                                  className="w-3 h-3 border-2 border-white border-t-transparent rounded-full"
-                                />
-                              ) : (
-                                <RefreshCw className="w-3 h-3" />
-                              )}
-                              Pulihkan
-                            </motion.button>
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              className="px-3 py-2 bg-red-600/90 backdrop-blur-sm text-white text-sm rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
-                              onClick={() => handlePermanentDelete(item.id)}
-                            >
-                              <Trash className="w-3 h-3" />
-                              Hapus Permanen
-                            </motion.button>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {recycleBinData.length > 0 && (
-                <div className="p-4 border-t border-gray-200/50 bg-gray-50/80 backdrop-blur-sm flex justify-between items-center">
-                  <p className="text-sm text-gray-500">
-                    💡 Tips: Soal yang dihapus akan disimpan selama 30 hari
-                  </p>
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="px-4 py-2 text-gray-600 hover:bg-gray-200/50 rounded-lg transition-colors flex items-center gap-2 backdrop-blur-sm"
-                    onClick={() => fetchRecycleBinData()}
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    Refresh
-                  </motion.button>
-                </div>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
         {showDeleteModal && (
@@ -1637,8 +1656,9 @@ const fetchRecycleBinData = async () => {
           </motion.div>
         )}
       </AnimatePresence>
-     {/* Filter Modal */}
-     <AnimatePresence>
+
+      {/* Filter Modal */}
+      <AnimatePresence>
         {showFilterModal && (
           <motion.div
             initial={{ opacity: 0 }}

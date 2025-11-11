@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from "framer-motion";
-import { Upload, File, CheckCircle, X, AlertCircle, User, Calendar, Tag, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from "framer-motion";
+import { Upload, File, CheckCircle, X, AlertCircle, User, Calendar, Tag, ChevronDown, Plus, Trash2, Settings } from 'lucide-react';
 import LogoIF from '../assets/LogoIF.jpg';
 import LogoUnpar from '../assets/LogoUnpar.png';
 import Footer from '../components/Footer';
@@ -10,33 +10,16 @@ import { saveAs } from 'file-saver';
 
 const API_URL = "http://localhost:8080/api";
 
-const handleDownloadTemplate = async () => {
-  try {
-    const response = await axios.get(`${API_URL}/files/download-template`, {
-      responseType: "blob",
-    });
-
-    const blob = new Blob([response.data], {
-      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    });
-
-    saveAs(blob, "Template_Soal.docx");
-  } catch (error) {
-    console.error("Error downloading file:", error);
-    alert("Gagal mendownload template");
-  }
-};
-
 const UploadPage = ({ currentUser }) => {
   const [files, setFiles] = useState({
     questions: null,
-    answers: null,
+    answers: [], // Changed to array for multiple files
     testCases: null
   });
 
   const [uploadStatus, setUploadStatus] = useState({
     questions: null,
-    answers: null,
+    answers: [], // Changed to array for multiple files
     testCases: null
   });
 
@@ -66,6 +49,79 @@ const UploadPage = ({ currentUser }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+
+  // Template file management
+  const templateFileInputRef = useRef(null);
+  const [localTemplateFile, setLocalTemplateFile] = useState(null);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templateSuccess, setTemplateSuccess] = useState(null);
+
+  const handleTemplateFileUpload = (event) => {
+    const file = event.target.files[0];
+    
+    if (file) {
+      if (file.name.toLowerCase().endsWith('.docx')) {
+        console.log("File template DOCX dipilih:", file.name);
+        
+        // ⭐️ PERBAIKAN PENTING: SET STATE localTemplateFile
+        setLocalTemplateFile(file); // <--- BARIS INI HILANG SEBELUMNYA
+        
+        const successMessage = `Template soal berhasil diganti dengan: ${file.name}`;
+        setTemplateSuccess(successMessage);
+        
+        // Atur waktu agar notifikasi menghilang setelah 4 detik
+        setTimeout(() => {
+          setTemplateSuccess(null);
+        }, 4000);
+        
+      } else {
+        // Biarkan alert jika terjadi error, atau gunakan toast error terpisah
+        alert("Gagal: Hanya file dengan format .DOCX yang diizinkan untuk template.");
+      }
+    }
+    event.target.value = null;
+  };
+
+  const handleDownloadTemplate = async () => {
+    // PRIORITAS 1: Download dari file lokal (jika ada)
+    if (localTemplateFile) {
+      console.log("Downloading local template file:", localTemplateFile.name);
+      // Membuat Blob dari objek File dan langsung mendownloadnya
+      saveAs(localTemplateFile, localTemplateFile.name);
+      return; // Berhenti di sini
+    }
+    
+    // PRIORITAS 2: Download dari server (jika tidak ada file lokal)
+    try {
+      const response = await axios.get(`${API_URL}/files/download-template`, {
+        responseType: "blob",
+      });
+
+      const blob = new Blob([response.data], {
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      });
+
+      // Menggunakan nama default dari server jika tidak ada file lokal
+      saveAs(blob, "Template_Soal.docx");
+    } catch (error) {
+      console.error("Error downloading file from server:", error);
+      alert("Gagal mendownload template dari server.");
+    }
+  };
+
+  const handleEditTemplate = () => {
+      setShowTemplateModal(true);
+  };
+
+  const handleConfirmTemplateEdit = () => {
+    setShowTemplateModal(false);
+    // Panggil aksi utama: memicu input file
+    templateFileInputRef.current.click();
+  };
+
+  const handleCancelTemplateEdit = () => {
+    setShowTemplateModal(false);
+  };
 
   // Fetch data from database on component mount
   useEffect(() => {
@@ -175,34 +231,140 @@ const UploadPage = ({ currentUser }) => {
     }
   }, [courseSearchTerm, courseTags]);
 
-  const handleFileChange = (e, type) => {
+  // Helper function to get file extension and language
+  const getFileInfo = (fileName) => {
+    const extension = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+    const languageMap = {
+      '.js': 'JavaScript',
+      '.jsx': 'React',
+      '.ts': 'TypeScript',
+      '.tsx': 'TypeScript React',
+      '.py': 'Python',
+      '.java': 'Java',
+      '.c': 'C',
+      '.cpp': 'C++',
+      '.cc': 'C++',
+      '.cxx': 'C++',
+      '.cs': 'C#',
+      '.php': 'PHP',
+      '.rb': 'Ruby',
+      '.go': 'Go',
+      '.rs': 'Rust',
+      '.kt': 'Kotlin',
+      '.swift': 'Swift',
+      '.dart': 'Dart',
+      '.scala': 'Scala',
+      '.r': 'R',
+      '.m': 'MATLAB',
+      '.sh': 'Shell',
+      '.sql': 'SQL',
+      '.html': 'HTML',
+      '.css': 'CSS',
+      '.scss': 'SCSS',
+      '.sass': 'SASS',
+      '.less': 'LESS',
+      '.xml': 'XML',
+      '.json': 'JSON',
+      '.yaml': 'YAML',
+      '.yml': 'YAML',
+      '.md': 'Markdown',
+      '.txt': 'Text',
+      '.pdf': 'PDF',
+      '.docx': 'Word Document',
+      '.doc': 'Word Document'
+    };
+    
+    return {
+      extension,
+      language: languageMap[extension] || 'Unknown'
+    };
+  };
+
+  // ✅ FIXED: Handle file change with proper validation
+  const handleFileChange = (e, type, index = null) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
-      // Validasi tipe file
-      const validTypes = ['.pdf', '.docx', '.txt'];
-      const fileExt = selectedFile.name.substring(selectedFile.name.lastIndexOf('.')).toLowerCase();
-      
-      if (!validTypes.includes(fileExt)) {
+      if (type === 'answers' && index !== null) {
+        // Handle multiple answer files - accept all types
+        setFiles(prev => {
+          const newAnswers = [...prev.answers];
+          newAnswers[index] = selectedFile;
+          return {
+            ...prev,
+            answers: newAnswers
+          };
+        });
+        
+        setUploadStatus(prev => {
+          const newAnswerStatus = [...prev.answers];
+          newAnswerStatus[index] = 'ready';
+          return {
+            ...prev,
+            answers: newAnswerStatus
+          };
+        });
+      } else if (type === 'questions') {
+        // Questions: only PDF, DOCX, TXT
+        const validTypes = ['.pdf', '.docx', '.txt'];
+        const fileExt = selectedFile.name.substring(selectedFile.name.lastIndexOf('.')).toLowerCase();
+        
+        if (!validTypes.includes(fileExt)) {
+          setUploadStatus(prev => ({
+            ...prev,
+            [type]: 'error'
+          }));
+          setError(`Format file ${fileExt} tidak didukung untuk soal. Gunakan PDF, DOCX, atau TXT.`);
+          return;
+        }
+        
+        setFiles(prev => ({
+          ...prev,
+          [type]: selectedFile
+        }));
+        
         setUploadStatus(prev => ({
           ...prev,
-          [type]: 'error'
+          [type]: 'ready'
         }));
-        setError(`Format file ${fileExt} tidak didukung. Gunakan PDF, DOCX, atau TXT.`);
-        return;
+      } else {
+        // ✅ Test cases: accept all file types (like answers)
+        setFiles(prev => ({
+          ...prev,
+          [type]: selectedFile
+        }));
+        
+        setUploadStatus(prev => ({
+          ...prev,
+          [type]: 'ready'
+        }));
       }
-      
-      setFiles(prev => ({
-        ...prev,
-        [type]: selectedFile
-      }));
-      
-      setUploadStatus(prev => ({
-        ...prev,
-        [type]: 'ready'
-      }));
       
       setError(null);
     }
+  };
+
+  // Add new answer file slot
+  const addAnswerFile = () => {
+    setFiles(prev => ({
+      ...prev,
+      answers: [...prev.answers, null]
+    }));
+    setUploadStatus(prev => ({
+      ...prev,
+      answers: [...prev.answers, null]
+    }));
+  };
+
+  // Remove answer file
+  const removeAnswerFile = (index) => {
+    setFiles(prev => ({
+      ...prev,
+      answers: prev.answers.filter((_, i) => i !== index)
+    }));
+    setUploadStatus(prev => ({
+      ...prev,
+      answers: prev.answers.filter((_, i) => i !== index)
+    }));
   };
 
   const handleInputChange = (e) => {
@@ -296,10 +458,9 @@ const UploadPage = ({ currentUser }) => {
   };
 
   const handleSubmit = async () => {
-    // Validasi input
     window.scrollTo({top:0,behavior: "smooth"});
+    
     if (!files.questions) {
-      // window.scrollTo({top:0,behavior: "smooth"});
       setError("Silakan upload file soal terlebih dahulu!");
       return;
     }
@@ -309,7 +470,6 @@ const UploadPage = ({ currentUser }) => {
       return;
     }
     
-    // Validasi token
     const user = JSON.parse(localStorage.getItem('user'));
     if (!user || !user.accessToken) {
       setError("Anda belum login atau sesi telah berakhir. Silakan login kembali.");
@@ -332,7 +492,7 @@ const UploadPage = ({ currentUser }) => {
           difficulty: metadata.difficulty,
           year: metadata.year,
           lecturer: metadata.lecturer,
-          topics: metadata.topics.map(topic => topic.name).join(', '), // Convert array to comma-separated string
+          topics: metadata.topics.map(topic => topic.name).join(', '),
           description: metadata.description,
           lastupdated: new Date()
         },
@@ -345,16 +505,42 @@ const UploadPage = ({ currentUser }) => {
       );
       
       const questionSetId = questionSetResponse.data.questionSet.id;
+      console.log('Question set created:', questionSetId);
       
-      // 2. Upload files
+      // 2. Upload files sequentially with better error handling
       const uploadPromises = [];
       
-      for (const [category, file] of Object.entries(files)) {
+      // Upload questions file
+      if (files.questions) {
+        const formData = new FormData();
+        formData.append('file', files.questions);
+        formData.append('questionSetId', questionSetId);
+        formData.append('fileCategory', 'questions');
+        
+        console.log('Uploading questions file:', files.questions.name);
+        
+        uploadPromises.push(
+          axios.post(`${API_URL}/files/upload`, formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+              'x-access-token': token
+            }
+          }).catch(error => {
+            console.error('Error uploading questions:', error.response?.data || error.message);
+            throw error;
+          })
+        );
+      }
+      
+      // ✅ Upload multiple answer files with proper indexing
+      files.answers.forEach((file, index) => {
         if (file) {
           const formData = new FormData();
           formData.append('file', file);
           formData.append('questionSetId', questionSetId);
-          formData.append('fileCategory', category);
+          formData.append('fileCategory', `answers_${index + 1}`);
+          
+          console.log(`Uploading answer file ${index + 1}:`, file.name);
           
           uploadPromises.push(
             axios.post(`${API_URL}/files/upload`, formData, {
@@ -362,25 +548,54 @@ const UploadPage = ({ currentUser }) => {
                 'Content-Type': 'multipart/form-data',
                 'x-access-token': token
               }
+            }).catch(error => {
+              console.error(`Error uploading answer ${index + 1}:`, error.response?.data || error.message);
+              throw error;
             })
           );
         }
+      });
+      
+      // Upload test cases file
+      if (files.testCases) {
+        const formData = new FormData();
+        formData.append('file', files.testCases);
+        formData.append('questionSetId', questionSetId);
+        formData.append('fileCategory', 'testCases');
+        
+        console.log('Uploading test cases file:', files.testCases.name);
+        
+        uploadPromises.push(
+          axios.post(`${API_URL}/files/upload`, formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+              'x-access-token': token
+            }
+          }).catch(error => {
+            console.error('Error uploading test cases:', error.response?.data || error.message);
+            throw error;
+          })
+        );
       }
       
+      // Wait for all uploads to complete
       await Promise.all(uploadPromises);
+      
+      console.log('All files uploaded successfully');
+      
       window.scrollTo({top:0,behavior: "smooth"});
       setSuccess("Soal berhasil diupload!");
       
       // Reset form
       setFiles({
         questions: null,
-        answers: null,
+        answers: [],
         testCases: null
       });
       
       setUploadStatus({
         questions: null,
-        answers: null,
+        answers: [],
         testCases: null
       });
       
@@ -403,17 +618,19 @@ const UploadPage = ({ currentUser }) => {
       if (error.response?.status === 403) {
         setError("Akses ditolak. Silakan login kembali untuk mendapatkan token yang valid.");
       } else {
-        setError(error.response?.data?.message || "Terjadi kesalahan saat mengupload soal.");
+        setError(error.response?.data?.message || "Terjadi kesalahan saat mengupload soal. Silakan cek console untuk detail.");
       }
     } finally {
       setLoading(false);
     }
   };
-
-  // Render file input
+  // ✅ FIXED: Render file input with dynamic accept attribute
   const renderFileInput = (type, label, description, icon) => {
     const IconComponent = icon;
     const status = uploadStatus[type];
+    
+    // ✅ Dynamic accept based on file type
+    const acceptTypes = type === 'questions' ? '.pdf,.docx,.txt' : '*';
     
     return (
       <div className="mb-6">
@@ -429,7 +646,7 @@ const UploadPage = ({ currentUser }) => {
             id={`file-${type}`}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             onChange={(e) => handleFileChange(e, type)}
-            accept=".pdf,.docx,.txt"
+            accept={acceptTypes}
           />
           <div className="flex items-center gap-4">
             {status === 'ready' ? (
@@ -464,6 +681,141 @@ const UploadPage = ({ currentUser }) => {
     );
   };
 
+  // Render multiple answer file inputs
+const renderAnswerFileInputs = () => {
+  return (
+    <div className="mb-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold text-gray-900">Upload Kunci Jawaban</h3>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          type="button"
+          onClick={addAnswerFile}
+          className="flex items-center gap-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
+        >
+          <Plus className="w-4 h-4" />
+          Tambah File
+        </motion.button>
+      </div>
+      
+      {files.answers.length === 0 && (
+        <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center">
+          <File className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+          <p className="text-sm text-gray-500 mb-3">Belum ada file kunci jawaban</p>
+          <button
+            type="button"
+            onClick={addAnswerFile}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Tambah File Jawaban
+          </button>
+        </div>
+      )}
+      
+      {files.answers.map((file, index) => {
+        const status = uploadStatus.answers[index];
+        const fileInfo = file ? getFileInfo(file.name) : null;
+        
+        return (
+          <div
+            key={index}
+            className={`relative border-2 border-dashed rounded-xl p-4 mb-3 transition-all cursor-pointer ${
+              status === 'ready' ? 'border-blue-400 bg-blue-50' :
+              status === 'error' ? 'border-red-400 bg-red-50' :
+              'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
+            }`}
+          >
+            {/* ✅ File input sekarang menutupi seluruh area */}
+            <input
+              type="file"
+              id={`answer-file-${index}`}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+              onChange={(e) => handleFileChange(e, 'answers', index)}
+              accept="*"
+            />
+            
+            <div className="flex items-center gap-3 relative pointer-events-none">
+              <div className="flex-shrink-0">
+                {status === 'ready' ? (
+                  <CheckCircle className="w-6 h-6 text-blue-500" />
+                ) : status === 'error' ? (
+                  <AlertCircle className="w-6 h-6 text-red-500" />
+                ) : (
+                  <File className="w-6 h-6 text-blue-500" />
+                )}
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm font-medium text-gray-700">
+                    Jawaban {index + 1}
+                  </span>
+                  {fileInfo && (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">
+                      {fileInfo.language}
+                    </span>
+                  )}
+                </div>
+                {file ? (
+                  <div>
+                    <p className="text-sm text-blue-600 truncate">{file.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {(file.size / 1024).toFixed(1)} KB • {fileInfo?.extension}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">Klik di mana saja untuk memilih file</p>
+                )}
+              </div>
+              
+              {/* ✅ Tombol dengan pointer-events-auto agar tetap bisa diklik */}
+              <div className="flex gap-2 pointer-events-auto relative z-20">
+                {file && (
+                  <button
+                    type="button"
+                    className="p-1 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFiles(prev => {
+                        const newAnswers = [...prev.answers];
+                        newAnswers[index] = null;
+                        return { ...prev, answers: newAnswers };
+                      });
+                      setUploadStatus(prev => {
+                        const newAnswerStatus = [...prev.answers];
+                        newAnswerStatus[index] = null;
+                        return { ...prev, answers: newAnswerStatus };
+                      });
+                    }}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="p-1 rounded-full bg-red-100 hover:bg-red-200 text-red-600 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeAnswerFile(index);
+                  }}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+      
+      <p className="text-xs text-gray-500 mt-2">
+        Mendukung semua jenis file dan bahasa pemrograman (Python, JavaScript, Java, C++, dll.)
+      </p>
+    </div>
+  );
+};
+
   if (loadingData) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-blue-50 flex items-center justify-center">
@@ -478,7 +830,99 @@ const UploadPage = ({ currentUser }) => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-blue-50">
       <Header currentUser={currentUser} />
+
+      {/* KOMPONEN TOAST SUKSES TEMPLATE BARU */}
+      <AnimatePresence>
+        {templateSuccess && (
+          <motion.div
+            initial={{ opacity: 0, x: 50, scale: 0.9 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 50, scale: 0.9 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="fixed top-24 right-4 z-50 p-4 rounded-xl shadow-2xl bg-white/90 backdrop-blur-sm border border-green-200/50"
+          >
+            <div className="flex items-start gap-3">
+              <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
+              <div>
+                <h4 className="text-base font-semibold text-gray-900 mb-1">Template Berhasil Diganti</h4>
+                <p className="text-sm text-gray-600">{templateSuccess}</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* AKHIR KOMPONEN TOAST */}
+
       <div className="container mx-auto px-4 py-8">
+        <input 
+        type="file"
+        ref={templateFileInputRef}
+        onChange={handleTemplateFileUpload}
+        accept=".docx" // Filter hanya DOCX
+        style={{ display: 'none' }} // Sembunyikan input
+      />
+
+      {/* MODAL KONFIRMASI PENGGANTIAN TEMPLATE BARU */}
+        {showTemplateModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 backdrop-blur-md bg-white/30 flex items-center justify-center z-50 p-4"
+            onClick={handleCancelTemplateEdit} // Menutup modal saat klik di luar
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 max-w-md w-full shadow-2xl border border-white/20"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center mb-4">
+                <div className="flex-shrink-0 w-10 h-10 bg-orange-100/80 backdrop-blur-sm rounded-full flex items-center justify-center">
+                  {/* Menggunakan AlertCircle (sudah diimport) karena ini aksi overwrite, bukan delete */}
+                  <AlertCircle className="w-6 h-6 text-orange-600" /> 
+                </div>
+                <div className="ml-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Konfirmasi Ganti Template Soal</h3>
+                  <p className="text-sm text-gray-500">Template akan diperbarui secara permanen.</p>
+                </div>
+              </div>
+
+              <div className="mb-6 p-4 bg-yellow-50/60 backdrop-blur-sm rounded-lg border border-yellow-200/50">
+                <p className="text-sm text-gray-700 font-medium">
+                  Apakah Anda yakin ingin mengganti template soal yang sudah tersimpan?
+                </p>
+                <p className="text-sm text-gray-600 mt-1">
+                  File baru yang Anda unggah akan digunakan sebagai template standar untuk fitur **Download Template Soal**.
+                </p>
+              </div>
+
+              <div className="flex justify-end space-x-3">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="px-4 py-2 text-gray-700 bg-gray-200/70 hover:bg-gray-300/70 backdrop-blur-sm rounded-lg transition-colors"
+                  onClick={handleCancelTemplateEdit}
+                >
+                  Batal
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="px-4 py-2 bg-orange-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center gap-2"
+                  onClick={handleConfirmTemplateEdit}
+                >
+                  {/* Ikon Upload untuk konfirmasi aksi ganti file */}
+                  <Upload className="w-4 h-4" /> 
+                  Ganti Template
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+        {/* AKHIR MODAL */}
+
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -512,16 +956,40 @@ const UploadPage = ({ currentUser }) => {
               <h2 className="text-2xl font-semibold mb-6 text-gray-900">Upload Files</h2>
 
               {renderFileInput('questions', 'Upload Soal', 'Format: PDF, DOCX, atau TXT', Upload)}
-              {renderFileInput('answers', 'Upload Kunci Jawaban', 'Format: PDF, DOCX, atau TXT', File)}
-              {renderFileInput('testCases', 'Upload Test Cases', 'Format: PDF, DOCX, atau TXT', AlertCircle)}
+              {renderAnswerFileInputs()}
+              {/* ✅ FIXED: Updated description for test cases */}
+              {renderFileInput('testCases', 'Upload Test Cases', 'Semua format file didukung', AlertCircle)}
             </div>
 
             {/* Template Soal Card */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg">
-              <h3 className="text-2xl font-semibold mb-6 text-gray-900">Template Soal</h3>
+           <div className="bg-white rounded-2xl p-8 shadow-lg">
+              {/* Container untuk Judul dan Tombol Edit */}
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-semibold text-gray-900">
+                  Template Soal
+                </h3>
+                
+                {/* Tombol/Ikon untuk Edit/Kelola Template */}
+                <motion.button
+                whileHover={{ scale: 1.05 }} // Sedikit diperkecil karena ada teks
+                whileTap={{ scale: 0.95 }}
+                // Styling disesuaikan untuk tombol dengan teks
+                className="px-3 py-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 hover:text-blue-700 transition-colors rounded-xl font-medium flex items-center gap-1.5"
+                onClick={handleEditTemplate}
+                aria-label="Kelola Template Soal"
+              >
+                {/* Ikon Settings (Roda Gigi) */}
+                <Settings className="w-5 h-5" />
+                {/* Tambahkan Teks Label */}
+                Ganti Template Soal
+              </motion.button>
+              </div>
+              
               <p className="text-sm text-gray-600 mb-4">
                 Unduh template soal dalam format DOCX untuk mempermudah pembuatan soal.
               </p>
+              
+              {/* Tombol DOWNLOAD (Aksi Utama, tetap menjadi fokus) */}
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}

@@ -13,6 +13,8 @@ import TaggingAdmin from './pages/admin/TaggingAdmin';
 import CourseTaggingAdmin from './pages/admin/CourseTaggingAdmin'; // New import
 import AdminPage from './pages/admin/AdminPage';
 import QuestionPreview from './pages/QuestionPreview';
+import QuestionSetsPreview from "./pages/QuestionSetsPreview";
+
 
 import DosenPage from './pages/admin/DosenPage';
 
@@ -114,6 +116,12 @@ export default function App() {
         <Route path="/question-sets" element={
           <ProtectedRoute>
             <QuestionSets currentUser={currentUser} />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/question-packages/:id" element={
+          <ProtectedRoute>
+            <QuestionSetsPreview currentUser={currentUser} />
           </ProtectedRoute>
         } />
         

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReelRental</title>
+    <link rel="stylesheet" href="css/Homepage.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <script> </script>
+</head>
+<body>
+    <header>
+        <a href="#" class ="brand">Rent Film</a>
+        <div class="menu-btn"></div>
+        <div class = "navigation">
+            <div class ="navigation-items">
+                <a href="#">Home</a>
+                <a href="#">About us</a>
+                <a href="#">Explore</a> 
+                <a href="#">Login</a>
+                <a href="#">Sign up</a>
+            </div>
+        </div>
+    </header>
+    <section  class ="home"> 
+        <video class ="video-slide active" src="Film/Avengers.mp4 " autoplay muted loop ></video>
+        <video class ="video-slide" src="Film/BlackClover.mp4" autoplay muted loop ></video>
+        <video class ="video-slide" src="Film/Transformers.mp4" autoplay muted loop ></video>
+         <video class ="video-slide" src="Film/Naruto.mp4" autoplay muted loop ></video>
+        <video class ="video-slide" src="Film/RushHour.mp4" autoplay muted loop ></video>
+
+                
+
+     
+        <div class ="content active">
+            <h1>Selamat Datang di ReelRental. <br> <span><h2></h2>Kenapa Memilih Kami?</span> </h1>
+            <p><ul>
+                <li>
+                    Koleksi Lengkap: Ribuan film dari berbagai genre dan aktor favorit </li>
+                    <li>Kemudahan Pencarian: Temukan film dengan filter berdasarkan genre, aktor, atau judul.</li>
+                    <li>Layanan Cepat: Sewa film kapan saja dan nikmati kemudahannya.</li>
+                    <li>Laporan Pemakaian: Cek riwayat penyewaan Anda dengan mudah.</li>
+            </ul>
+        </p>
+        <a href="#">Read More</a>
+        </div>
+        <div class="media-icons">
+            <a href="#"> <i class = "fab fa-facebook-f"></i></a>
+            <a href="#"> <i class = "fab fa-instagram"></i></a>
+            <a href="#">  <i class = "fab fa-twitter"></i></a>
+        </div>
+        <div class ="content">
+            <h1>Selamat Datang di ReelRental. <br> <span>Kenapa Memilih Kami?</span> </h1>
+            <p><ul>
+                <li>
+                    Koleksi Lengkap: Ribuan film dari berbagai genre dan aktor favorit </li>
+                    <li>Kemudahan Pencarian: Temukan film dengan filter berdasarkan genre, aktor, atau judul.</li>
+                    <li>Layanan Cepat: Sewa film kapan saja dan nikmati kemudahannya.</li>
+                    <li>Laporan Pemakaian: Cek riwayat penyewaan Anda dengan mudah.</li>
+            </ul>
+        </p>
+        <a href="#">Read More</a>
+        </div>
+        <div class ="content">
+            <h1>Avengers Infinity War <br> <span>GACOR</span> </h1>
+            <p><ul>
+                <li>
+                    Koleksi Lengkap: Ribuan film dari berbagai genre dan aktor favorit </li>
+                    <li>Kemudahan Pencarian: Temukan film dengan filter berdasarkan genre, aktor, atau judul.</li>
+                    <li>Layanan Cepat: Sewa film kapan saja dan nikmati kemudahannya.</li>
+                    <li>Laporan Pemakaian: Cek riwayat penyewaan Anda dengan mudah.</li>
+            </ul>
+        </p>
+        <a href="#">Read More</a>
+        </div>
+        <div class ="content">
+            <h1>Selamat Datang di ReelRental. <br> <span>Kenapa Memilih Kami?</span> </h1>
+            <p><ul>
+                <li>
+                    Koleksi Lengkap: Ribuan film dari berbagai genre dan aktor favorit </li>
+                    <li>Kemudahan Pencarian: Temukan film dengan filter berdasarkan genre, aktor, atau judul.</li>
+                    <li>Layanan Cepat: Sewa film kapan saja dan nikmati kemudahannya.</li>
+                    <li>Laporan Pemakaian: Cek riwayat penyewaan Anda dengan mudah.</li>
+            </ul>
+        </p>
+        <a href="#">Read More</a>
+        </div>
+        <div class ="content">
+            <h1>Selamat Datang di ReelRental. <br> <span>Kenapa Memilih Kami?</span> </h1>
+            <p><ul>
+                <li>
+                    Koleksi Lengkap: Ribuan film dari berbagai genre dan aktor favorit </li>
+                    <li>Kemudahan Pencarian: Temukan film dengan filter berdasarkan genre, aktor, atau judul.</li>
+                    <li>Layanan Cepat: Sewa film kapan saja dan nikmati kemudahannya.</li>
+                    <li>Laporan Pemakaian: Cek riwayat penyewaan Anda dengan mudah.</li>
+            </ul>
+        </p>
+        <a href="#">Read More</a>
+        </div>
+
+        <div class="slider-navigation"> 
+            <div class="nav-btn"></div>
+            <div class="nav-btn"></div>
+            <div class="nav-btn"></div>
+            <div class="nav-btn"></div>
+            <div class="nav-btn"></div>
+
+        </div>
+
+    </section>
+    <script type ="text/javascript">
+    const menuBtn = document.querySelector(".menu-btn");
+    const navigation = document.querySelector(".navigation");
+    menuBtn.addEventListener("click",()=> {
+    menuBtn.classList.toggle("active");
+    navigation.classList.toggle("active");
+    
+});
+    const btns = document.querySelectorAll(".nav-btn");
+    const slides = document.querySelectorAll(".video-slide");
+    const contents = document.querySelectorAll(".content");
+
+    var sliderNav = function(manual){
+        btns.forEach((btn) =>{
+         btn.classList.remove("active");   
+        });
+
+        slides.forEach((slide) => {
+        slide.classList.remove("active");
+        });
+
+        contents.forEach((content) => {
+        content.classList.remove("active");
+        });
+
+        btns[manual].classList.add("active");   
+        slides[manual].classList.add("active");
+        contents[manual].classList.add("active");      
+
+        
+    }
+    btns.forEach((btn,i)=> {
+        btn.addEventListener("click", () =>{
+            sliderNav(i);
+        });
+        
+    });
+    </script>
+</body>
+</html>

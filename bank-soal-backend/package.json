@@ -18,6 +18,7 @@
         "bank-soal-backend": "file:",
         "bcryptjs": "^3.0.2",
         "cors": "^2.8.5",
+        "dayjs": "^1.11.18",
         "docx-pdf": "^0.0.1",
         "dotenv": "^16.6.1",
         "express": "^4.21.2",
@@ -26,6 +27,7 @@
         "pdf-lib": "^1.17.1",
         "pg": "^8.16.3",
         "pg-hstore": "^2.3.4",
+        "react-syntax-highlighter": "^16.1.0",
         "request": "^2.88.2",
         "sequelize": "^6.37.7",
         "uuid": "^13.0.0"

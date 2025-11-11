@@ -1,0 +1,302 @@
+-- ============================================
+-- Database Setup for UNPAR Task Management System
+-- Run this script in pgAdmin Query Tool
+-- ============================================
+
+-- Pastikan Anda sudah membuat database 'unpar_task_management' terlebih dahulu
+-- CREATE DATABASE unpar_task_management;
+
+-- Connect ke database unpar_task_management lalu jalankan script ini
+
+-- ============================================
+-- 1. TABEL USERS (Base table untuk semua user)
+-- ============================================
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(50) NOT NULL CHECK (role IN ('admin', 'dosen', 'mahasiswa')),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
+-- 2. TABEL DOSEN PROFILES
+-- ============================================
+CREATE TABLE IF NOT EXISTS dosen_profiles (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    nip VARCHAR(50) UNIQUE,
+    nama_lengkap VARCHAR(255) NOT NULL,
+    departemen VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
+-- 3. TABEL MAHASISWA PROFILES
+-- ============================================
+CREATE TABLE IF NOT EXISTS mahasiswa_profiles (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    nim VARCHAR(50) UNIQUE,
+    nama_lengkap VARCHAR(255) NOT NULL,
+    angkatan INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
+-- 4. TABEL COURSE NAME (Master data mata kuliah)
+-- ============================================
+CREATE TABLE IF NOT EXISTS course_name (
+    id SERIAL PRIMARY KEY,
+    kode VARCHAR(20) UNIQUE NOT NULL,
+    nama VARCHAR(255) NOT NULL,
+    sks INTEGER NOT NULL,
+    deskripsi TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
+-- 5. TABEL COURSES (Penawaran mata kuliah per semester)
+-- ============================================
+CREATE TABLE IF NOT EXISTS courses (
+    id SERIAL PRIMARY KEY,
+    kode VARCHAR(20),
+    nama VARCHAR(255),
+    sks INTEGER,
+    course_name_id INTEGER REFERENCES course_name(id),
+    dosen_id INTEGER REFERENCES users(id),
+    semester VARCHAR(50) NOT NULL,
+    tahun_ajaran VARCHAR(20) NOT NULL,
+    deskripsi TEXT,
+    status VARCHAR(20) DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
+-- 6. TABEL CLASSES (Kelas-kelas dalam mata kuliah)
+-- ============================================
+CREATE TABLE IF NOT EXISTS classes (
+    id SERIAL PRIMARY KEY,
+    course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    dosen_id INTEGER REFERENCES users(id),
+    nama VARCHAR(100) NOT NULL, -- contoh: "Kelas A", "Kelas B"
+    kode VARCHAR(20), -- Kode kelas (opsional)
+    kapasitas INTEGER DEFAULT 40,
+    ruangan VARCHAR(50),
+    jadwal VARCHAR(100), -- contoh: "Senin, 08:00-10:00"
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
+-- 7. TABEL CLASS ENROLLMENTS (Pendaftaran mahasiswa ke kelas)
+-- ============================================
+CREATE TABLE IF NOT EXISTS class_enrollments (
+    id SERIAL PRIMARY KEY,
+    class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+    mahasiswa_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'completed')),
+    nilai_akhir DECIMAL(5,2),
+    enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(class_id, mahasiswa_id) -- Seorang mahasiswa hanya bisa terdaftar sekali di satu kelas
+);
+
+-- ============================================
+-- 8. CREATE INDEXES untuk Performance
+-- ============================================
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_dosen_profiles_user_id ON dosen_profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_mahasiswa_profiles_user_id ON mahasiswa_profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_mahasiswa_profiles_nim ON mahasiswa_profiles(nim);
+CREATE INDEX IF NOT EXISTS idx_courses_semester ON courses(semester, tahun_ajaran);
+CREATE INDEX IF NOT EXISTS idx_classes_course_id ON classes(course_id);
+CREATE INDEX IF NOT EXISTS idx_enrollments_class_id ON class_enrollments(class_id);
+CREATE INDEX IF NOT EXISTS idx_enrollments_mahasiswa_id ON class_enrollments(mahasiswa_id);
+
+-- ============================================
+-- 9. INSERT SAMPLE DATA
+-- ============================================
+
+-- Insert Admin User (password: admin123)
+INSERT INTO users (email, password_hash, role, is_active) 
+VALUES ('admin@unpar.ac.id', '$2b$10$3euPcmQFCiblsZeEu5s7p.9wvofPnMIHxHuhwJXIzPUhMjZVwjW0K', 'admin', true)
+ON CONFLICT (email) DO NOTHING;
+
+-- Insert Sample Dosen
+INSERT INTO users (email, password_hash, role, is_active) 
+VALUES 
+    ('dosen1@unpar.ac.id', '$2b$10$3euPcmQFCiblsZeEu5s7p.9wvofPnMIHxHuhwJXIzPUhMjZVwjW0K', 'dosen', true),
+    ('dosen2@unpar.ac.id', '$2b$10$3euPcmQFCiblsZeEu5s7p.9wvofPnMIHxHuhwJXIzPUhMjZVwjW0K', 'dosen', true)
+ON CONFLICT (email) DO NOTHING;
+
+-- Insert Dosen Profiles
+INSERT INTO dosen_profiles (user_id, nip, nama_lengkap, departemen)
+SELECT u.id, '123456789', 'Dr. John Doe', 'Informatika'
+FROM users u WHERE u.email = 'dosen1@unpar.ac.id'
+ON CONFLICT (nip) DO NOTHING;
+
+INSERT INTO dosen_profiles (user_id, nip, nama_lengkap, departemen)
+SELECT u.id, '987654321', 'Dr. Jane Smith', 'Informatika'
+FROM users u WHERE u.email = 'dosen2@unpar.ac.id'
+ON CONFLICT (nip) DO NOTHING;
+
+-- Insert Sample Mahasiswa
+INSERT INTO users (email, password_hash, role, is_active) 
+VALUES 
+    ('mahasiswa1@student.unpar.ac.id', '$2b$10$3euPcmQFCiblsZeEu5s7p.9wvofPnMIHxHuhwJXIzPUhMjZVwjW0K', 'mahasiswa', true),
+    ('mahasiswa2@student.unpar.ac.id', '$2b$10$3euPcmQFCiblsZeEu5s7p.9wvofPnMIHxHuhwJXIzPUhMjZVwjW0K', 'mahasiswa', true),
+    ('mahasiswa3@student.unpar.ac.id', '$2b$10$3euPcmQFCiblsZeEu5s7p.9wvofPnMIHxHuhwJXIzPUhMjZVwjW0K', 'mahasiswa', true),
+    ('mahasiswa4@student.unpar.ac.id', '$2b$10$3euPcmQFCiblsZeEu5s7p.9wvofPnMIHxHuhwJXIzPUhMjZVwjW0K', 'mahasiswa', true),
+    ('mahasiswa5@student.unpar.ac.id', '$2b$10$3euPcmQFCiblsZeEu5s7p.9wvofPnMIHxHuhwJXIzPUhMjZVwjW0K', 'mahasiswa', true)
+ON CONFLICT (email) DO NOTHING;
+
+-- Insert Mahasiswa Profiles
+INSERT INTO mahasiswa_profiles (user_id, nim, nama_lengkap, angkatan)
+SELECT u.id, '2021001', 'Ahmad Rizky', 2021
+FROM users u WHERE u.email = 'mahasiswa1@student.unpar.ac.id'
+ON CONFLICT (nim) DO NOTHING;
+
+INSERT INTO mahasiswa_profiles (user_id, nim, nama_lengkap, angkatan)
+SELECT u.id, '2021002', 'Sari Dewi', 2021
+FROM users u WHERE u.email = 'mahasiswa2@student.unpar.ac.id'
+ON CONFLICT (nim) DO NOTHING;
+
+INSERT INTO mahasiswa_profiles (user_id, nim, nama_lengkap, angkatan)
+SELECT u.id, '2021003', 'Budi Santoso', 2021
+FROM users u WHERE u.email = 'mahasiswa3@student.unpar.ac.id'
+ON CONFLICT (nim) DO NOTHING;
+
+INSERT INTO mahasiswa_profiles (user_id, nim, nama_lengkap, angkatan)
+SELECT u.id, '2021004', 'Citra Lestari', 2021
+FROM users u WHERE u.email = 'mahasiswa4@student.unpar.ac.id'
+ON CONFLICT (nim) DO NOTHING;
+
+INSERT INTO mahasiswa_profiles (user_id, nim, nama_lengkap, angkatan)
+SELECT u.id, '2021005', 'Dika Pratama', 2021
+FROM users u WHERE u.email = 'mahasiswa5@student.unpar.ac.id'
+ON CONFLICT (nim) DO NOTHING;
+
+-- Insert Course Names (Master Data)
+INSERT INTO course_name (kode, nama, sks, deskripsi) 
+VALUES 
+    ('IF101', 'Pemrograman Dasar', 3, 'Mata kuliah pengenalan pemrograman'),
+    ('IF102', 'Algoritma dan Struktur Data', 3, 'Mata kuliah algoritma dan struktur data'),
+    ('IF201', 'Pemrograman Berorientasi Objek', 3, 'Mata kuliah OOP dengan Java'),
+    ('IF301', 'Basis Data', 3, 'Mata kuliah database dan SQL')
+ON CONFLICT (kode) DO NOTHING;
+
+-- Insert Courses (Penawaran Semester)
+INSERT INTO courses (kode, nama, sks, course_name_id, dosen_id, semester, tahun_ajaran, deskripsi)
+SELECT 'IF101', 'Pemrograman Dasar', 3, cn.id, u.id, 'Ganjil', '2024/2025', 'Pemrograman dasar dengan Python'
+FROM course_name cn, users u, dosen_profiles dp
+WHERE cn.kode = 'IF101' AND u.id = dp.user_id AND dp.nip = '123456789'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO courses (kode, nama, sks, course_name_id, dosen_id, semester, tahun_ajaran, deskripsi)
+SELECT 'IF102', 'Algoritma dan Struktur Data', 3, cn.id, u.id, 'Ganjil', '2024/2025', 'ASD dengan Java'
+FROM course_name cn, users u, dosen_profiles dp
+WHERE cn.kode = 'IF102' AND u.id = dp.user_id AND dp.nip = '987654321'
+ON CONFLICT DO NOTHING;
+
+-- Insert Classes
+INSERT INTO classes (course_id, dosen_id, nama, kode, kapasitas, ruangan, jadwal)
+SELECT c.id, c.dosen_id, 'Kelas A', 'IF101A', 30, 'Lab 1', 'Senin, 08:00-11:00'
+FROM courses c WHERE c.kode = 'IF101'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO classes (course_id, dosen_id, nama, kode, kapasitas, ruangan, jadwal)
+SELECT c.id, c.dosen_id, 'Kelas B', 'IF101B', 30, 'Lab 2', 'Selasa, 08:00-11:00'
+FROM courses c WHERE c.kode = 'IF101'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO classes (course_id, dosen_id, nama, kode, kapasitas, ruangan, jadwal)
+SELECT c.id, c.dosen_id, 'Kelas A', 'IF102A', 25, 'Lab 3', 'Rabu, 13:00-16:00'
+FROM courses c WHERE c.kode = 'IF102'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO classes (course_id, dosen_id, nama, kode, kapasitas, ruangan, jadwal)
+SELECT c.id, c.dosen_id, 'Kelas B', 'IF102B', 25, 'Lab 4', 'Kamis, 13:00-16:00'
+FROM courses c WHERE c.kode = 'IF102'
+ON CONFLICT DO NOTHING;
+
+-- ============================================
+-- 10. VERIFICATION QUERIES
+-- ============================================
+
+-- Check semua tabel dan jumlah data
+SELECT 'users' as table_name, COUNT(*) as record_count FROM users
+UNION ALL
+SELECT 'dosen_profiles', COUNT(*) FROM dosen_profiles
+UNION ALL
+SELECT 'mahasiswa_profiles', COUNT(*) FROM mahasiswa_profiles
+UNION ALL
+SELECT 'course_name', COUNT(*) FROM course_name
+UNION ALL
+SELECT 'courses', COUNT(*) FROM courses
+UNION ALL
+SELECT 'classes', COUNT(*) FROM classes
+UNION ALL
+SELECT 'class_enrollments', COUNT(*) FROM class_enrollments;
+
+-- ============================================
+-- 11. USEFUL QUERIES untuk Testing
+-- ============================================
+
+-- Query untuk melihat semua user dan profile
+/*
+SELECT 
+    u.id, 
+    u.email, 
+    u.role,
+    COALESCE(dp.nama_lengkap, mp.nama_lengkap) as nama_lengkap,
+    dp.nip,
+    mp.nim,
+    mp.angkatan
+FROM users u
+LEFT JOIN dosen_profiles dp ON u.id = dp.user_id
+LEFT JOIN mahasiswa_profiles mp ON u.id = mp.user_id
+ORDER BY u.role, u.id;
+*/
+
+-- Query untuk melihat courses dengan dosen
+/*
+SELECT 
+    c.id,
+    c.kode,
+    c.nama,
+    c.semester,
+    c.tahun_ajaran,
+    dp.nama_lengkap as dosen_nama
+FROM courses c
+JOIN users u ON c.dosen_id = u.id
+JOIN dosen_profiles dp ON u.id = dp.user_id
+ORDER BY c.id;
+*/
+
+-- Query untuk melihat classes dengan course info
+/*
+SELECT 
+    cl.id,
+    cl.nama as class_name,
+    cl.kode as class_code,
+    c.nama as course_name,
+    c.kode as course_code,
+    cl.ruangan,
+    cl.jadwal,
+    cl.kapasitas
+FROM classes cl
+JOIN courses c ON cl.course_id = c.id
+ORDER BY c.kode, cl.nama;
+*/
+
+-- ============================================
+-- SELESAI! 
+-- Database siap digunakan dengan sample data
+-- ============================================
+
+-- Login credentials untuk testing:
+-- Admin: admin@unpar.ac.id / admin123
+-- Dosen: dosen1@unpar.ac.id / admin123
+-- Mahasiswa: mahasiswa1@student.unpar.ac.id / admin123

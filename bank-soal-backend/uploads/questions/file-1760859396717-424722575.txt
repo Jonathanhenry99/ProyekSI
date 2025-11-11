@@ -1,0 +1,6 @@
+import React, { useState } from 'react';
+import { 
+  FileText, Calendar, Clock, CheckCircle, Upload, Download, 
+  Eye, AlertCircle, Star, User, Users, Play, Paperclip, X, ArrowLeft, ArrowRight
+} from 'lucide-react';
+import MahasiswaGroupView from './MahasiswaGroupView';
