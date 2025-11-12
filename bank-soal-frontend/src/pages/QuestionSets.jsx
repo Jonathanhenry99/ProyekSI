@@ -481,6 +481,14 @@ Universitas Katolik Parahyangan
 
   const filteredData = filterData();
   const navigate = useNavigate();
+
+  // Tambahkan fungsi ini di dalam Komponen Anda (misalnya: di dalam ListPage)
+const getLevelColor = (level) => {
+  if (!level || level === 'N/A') return 'bg-gray-100 text-gray-800';
+  if (level.toLowerCase().includes('mudah')) return 'bg-green-100 text-green-800';
+  if (level.toLowerCase().includes('sedang')) return 'bg-yellow-100 text-yellow-800';
+  return 'bg-red-100 text-red-800';
+};
   
   // Filter dropdown data berdasarkan input pencarian
   const filteredLevels = difficultyLevels.filter(level => 
@@ -1142,113 +1150,135 @@ Universitas Katolik Parahyangan
             </motion.div>
           ) : (
             <motion.div
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              className="space-y-4"
+                className="overflow-x-auto max-w-7xl mx-auto bg-white rounded-xl shadow-lg"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                key="table-ui-in-grid-mode" // Kunci unik untuk AnimatePresence
             >
-              {filteredData.map((item) => {
-                const isDownloading = downloadingItems.has(item.id);
-                const userCanDelete = canDelete(item.created_by);
-                
-                return (
-                  <motion.div
-                    key={item.id}
-                    variants={itemVariants}
-                    className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all p-4 cursor-pointer group"
-                    onClick={() => handleCardClick(item.id)}
-                  >
-                    <div className="flex flex-col md:flex-row md:items-center">
-                      <div className="flex-1">
-                        <div className="flex items-center mb-2">
-                          <div className="bg-blue-100 p-2 rounded-lg mr-3 group-hover:bg-blue-200 transition-colors">
-                            <Book className="w-6 h-6 text-blue-600" />
-                          </div>
-                          <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-700 transition-colors flex-1">{item.title}</h3>
-                          {userCanDelete && (
-                            <button
-                              onClick={(e) => openDeleteModal(e, item.id, item.title)}
-                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors ml-2"
-                              title="Hapus paket soal"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                        
-                        <p className="text-gray-600 text-sm mb-3">{item.description}</p>
-                        
-                        <div className="flex flex-wrap gap-4 mb-2">
-                          <div className="flex items-center text-sm text-gray-500">
-                            <User className="w-4 h-4 mr-1" />
-                            <span>{item.creator?.full_name || "Tidak diketahui"}</span>
-                          </div>
-                          
-                          <div className="flex items-center text-sm text-gray-500">
-                            <Tag className="w-4 h-4 mr-1" />
-                            <span>{item.items?.length || 0} soal</span>
-                          </div>
-                          
-                          <div className="flex items-center text-sm text-gray-500">
-                            <Clock className="w-4 h-4 mr-1" />
-                            {new Date(item.created_at).toLocaleDateString('id-ID', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric'
-                            })}
-                          </div>
-                          
-                          <div className="flex items-center text-sm text-gray-500">
-                            <Download className="w-4 h-4 mr-1" />
-                            {item.downloads || 0}
-                          </div>
-                        </div>
-                        
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-medium">
-                            {item.course?.name || "Tanpa Mata Kuliah"}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-4 md:mt-0 md:ml-4 flex md:flex-col justify-end">
-                        <motion.button
-                          whileHover={{ scale: isDownloading ? 1 : 1.05 }}
-                          whileTap={{ scale: isDownloading ? 1 : 0.95 }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!isDownloading) {
-                              handleDownloadPackage(item.id, item.title);
-                            }
-                          }}
-                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
-                            isDownloading 
-                              ? 'bg-gray-400 text-white cursor-not-allowed' 
-                              : 'bg-blue-600 text-white hover:bg-blue-700'
-                          }`}
-                          disabled={isDownloading}
-                        >
-                          {isDownloading ? (
-                            <>
-                              <motion.div
-                                animate={{ rotate: 360 }}
-                                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                                className="w-3 h-3 border-2 border-white border-t-transparent rounded-full"
-                              />
-                              Unduh...
-                            </>
-                          ) : (
-                            <>
-                              <Download className="w-3 h-3" />
-                              Unduh
-                            </>
-                          )}
-                        </motion.button>
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <div className="flex items-center gap-1 cursor-pointer hover:text-gray-700">
+                                    Nama File <ArrowUpDown className="w-3 h-3" />
+                                </div>
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <div className="flex items-center gap-1 cursor-pointer hover:text-gray-700">
+                                    Mata Kuliah <ArrowUpDown className="w-3 h-3" />
+                                </div>
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <div className="flex items-center gap-1 cursor-pointer hover:text-gray-700">
+                                    Tingkat Kesulitan <ArrowUpDown className="w-3 h-3" />
+                                </div>
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <div className="flex items-center gap-1 cursor-pointer hover:text-gray-700">
+                                    Dosen <ArrowUpDown className="w-3 h-3" />
+                                </div>
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <div className="flex items-center gap-1 cursor-pointer hover:text-gray-700">
+                                    Tanggal <ArrowUpDown className="w-3 h-3" />
+                                </div>
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Aksi
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {filteredData.map((item) => {
+                            const isDownloading = downloadingItems.has(item.id);
+                            const userCanDelete = canDelete(item.created_by); 
+
+                            // Mapping data dari Card View ke kolom Tabel
+                            const namaFile = item.title; 
+                            const mataKuliah = item.course?.name || "N/A";
+                            const dosen = item.creator?.full_name || "Tidak diketahui";
+                            const tanggal = new Date(item.created_at).toLocaleDateString('id-ID', {
+                                year: 'numeric', month: 'short', day: 'numeric'
+                            });
+                            // item.level digunakan dari data yang diasumsikan ada di kedua mode
+
+                            return (
+                                <motion.tr
+                                    key={item.id}
+                                    variants={itemVariants}
+                                    className="hover:bg-gray-50"
+                                >
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {namaFile}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                        {mataKuliah}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        {/* Menggunakan getLevelColor dan item.level */}
+                                        <span className={`px-3 py-1 rounded-full text-xs ${getLevelColor(item.level || 'N/A')}`}>
+                                            {item.level || 'N/A'}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                        {dosen}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                        {tanggal}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center">
+                                        <div className="flex items-center justify-center gap-2">
+                                            <motion.button
+                                                whileHover={{ scale: isDownloading ? 1 : 1.05 }}
+                                                whileTap={{ scale: isDownloading ? 1 : 0.95 }}
+                                                className={`inline-flex items-center px-3 py-1 rounded-lg text-sm text-white transition-colors ${
+                                                    isDownloading 
+                                                        ? 'bg-gray-400 cursor-not-allowed' 
+                                                        : 'bg-blue-600 hover:bg-blue-700'
+                                                }`}
+                                                onClick={() => {
+                                                    if (!isDownloading) {
+                                                        // Menggunakan handler download Card View
+                                                        handleDownloadPackage(item.id, item.title);
+                                                    }
+                                                }}
+                                                disabled={isDownloading}
+                                            >
+                                                {isDownloading ? (
+                                                    <>
+                                                        <motion.div
+                                                            animate={{ rotate: 360 }}
+                                                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                                            className="w-3 h-3 border-2 border-white border-t-transparent rounded-full mr-1"
+                                                        />
+                                                        Unduh...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Download className="w-3 h-3 mr-1" />
+                                                        Unduh ZIP
+                                                    </>
+                                                )}
+                                            </motion.button>
+                                            {userCanDelete && (
+                                                <motion.button
+                                                    whileHover={{ scale: 1.05 }}
+                                                    whileTap={{ scale: 0.95 }}
+                                                    className="inline-flex items-center px-3 py-1 rounded-lg text-sm text-white bg-red-600 hover:bg-red-700"
+                                                    onClick={(e) => openDeleteModal(e, item.id, item.title)} // Menggunakan handler delete Card View
+                                                >
+                                                    <Trash2 className="w-3 h-3 mr-1" />
+                                                    Hapus
+                                                </motion.button>
+                                            )}
+                                        </div>
+                                    </td>
+                                </motion.tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
             </motion.div>
           )}
         </AnimatePresence>
@@ -1267,63 +1297,63 @@ Universitas Katolik Parahyangan
 
       {/* Modal Konfirmasi Delete */}
       {deleteModal.show && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-          onClick={() => !deleting && closeDeleteModal()}
-        >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6"
-          >
-            <div className="flex items-start mb-4">
-              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
-                <AlertTriangle className="w-6 h-6 text-red-600" />
-              </div>
-              <div className="ml-4 flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Hapus Paket Soal?
-                </h3>
-                <p className="text-sm text-gray-600">
-                  Apakah Anda yakin ingin menghapus paket <strong>"{deleteModal.packageTitle}"</strong>?
-                </p>
-                <p className="text-sm text-red-600 mt-2 font-medium">
-                  ⚠️ Semua soal di dalam paket ini juga akan terhapus!
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={closeDeleteModal}
-                disabled={deleting}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-              >
-                Batal
-              </button>
-              <button
-                onClick={handleDeletePackage}
-                disabled={deleting}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center"
-              >
-                {deleting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
-                    Menghapus...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="w-4 h-4 mr-1" />
-                    Hapus
-                  </>
-                )}
-              </button>
-            </div>
-          </motion.div>
+    <div 
+      // MODIFIKASI BERIKUT: bg-black diganti menjadi bg-white/70 dan ditambahkan backdrop-blur-md
+      className="fixed inset-0 bg-white/70 backdrop-blur-md flex items-center justify-center z-50 p-4"
+      onClick={() => !deleting && closeDeleteModal()}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6"
+      >
+        <div className="flex items-start mb-4">
+          <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+            <AlertTriangle className="w-6 h-6 text-red-600" />
+          </div>
+          <div className="ml-4 flex-1">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Hapus Paket Soal?
+            </h3>
+            <p className="text-sm text-gray-600">
+              Apakah Anda yakin ingin menghapus paket <strong>"{deleteModal.packageTitle}"</strong>?
+            </p>
+            <p className="text-sm text-red-600 mt-2 font-medium">
+              ⚠️ Semua soal di dalam paket ini juga akan terhapus!
+            </p>
+          </div>
         </div>
-      )}
-      
+
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={closeDeleteModal}
+            disabled={deleting}
+            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            Batal
+          </button>
+          <button
+            onClick={handleDeletePackage}
+            disabled={deleting}
+            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+          >
+            {deleting ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                Menghapus...
+              </>
+            ) : (
+              <>
+                <Trash2 className="w-4 h-4 mr-1" />
+                Hapus
+              </>
+            )}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+)}
       <Footer />
     </div>
   );

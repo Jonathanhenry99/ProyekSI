@@ -625,12 +625,27 @@ const UploadPage = ({ currentUser }) => {
     }
   };
   // ✅ FIXED: Render file input with dynamic accept attribute
-  const renderFileInput = (type, label, description, icon) => {
+const renderFileInput = (type, label, description, icon) => {
     const IconComponent = icon;
     const status = uploadStatus[type];
     
     // ✅ Dynamic accept based on file type
     const acceptTypes = type === 'questions' ? '.pdf,.docx,.txt' : '*';
+    
+    // Handler untuk mereset file tunggal
+    const resetFile = (e) => {
+        e.stopPropagation();
+        
+        // 1. CLEAR STATE
+        setFiles(prev => ({ ...prev, [type]: null }));
+        setUploadStatus(prev => ({ ...prev, [type]: null }));
+        
+        // 2. CLEAR DOM INPUT VALUE (SOLUSI BUG FILE INPUT)
+        const fileInput = document.getElementById(`file-${type}`);
+        if (fileInput) {
+            fileInput.value = ''; 
+        }
+    };
     
     return (
       <div className="mb-6">
@@ -641,9 +656,10 @@ const UploadPage = ({ currentUser }) => {
             'border-gray-300 hover:border-blue-400'
           }`}
         >
+          {/* Input file DIBIARKAN DI BAWAH (tanpa z-index) */}
           <input
             type="file"
-            id={`file-${type}`}
+            id={`file-${type}`} 
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             onChange={(e) => handleFileChange(e, type)}
             accept={acceptTypes}
@@ -666,11 +682,9 @@ const UploadPage = ({ currentUser }) => {
             {files[type] && (
               <button
                 type="button"
-                className="p-1 rounded-full bg-gray-200 hover:bg-gray-300"
-                onClick={() => {
-                  setFiles(prev => ({ ...prev, [type]: null }));
-                  setUploadStatus(prev => ({ ...prev, [type]: null }));
-                }}
+                // PERBAIKAN: Menambah z-index dan posisi relatif
+                className="p-1 rounded-full bg-gray-200 hover:bg-gray-300 relative z-20" 
+                onClick={resetFile}
               >
                 <X className="w-4 h-4" />
               </button>
