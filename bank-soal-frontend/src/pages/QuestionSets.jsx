@@ -132,6 +132,14 @@ const QuestionSetsPage = ({ currentUser }) => {
       return; // Prevent multiple downloads
     }
 
+    const token = getAuthToken();
+    const authHeaders = token
+      ? {
+          "x-access-token": token,
+          Authorization: `Bearer ${token}`
+        }
+      : {};
+
     try {
       setDownloadingItems(prev => new Set(prev).add(packageId));
       
@@ -340,6 +348,34 @@ Universitas Katolik Parahyangan
       
       // Show success message
       alert(`Berhasil mengunduh paket soal "${packageTitle}"!\n\nTotal: ${totalDownloadedFiles} file dalam ${packageData.items.length} set soal`);
+      
+      let updatedDownloadCount = null;
+      if (token) {
+        try {
+          const incrementResponse = await axios.post(
+            `${API_URL}/question-packages/${packageId}/increment-download`,
+            {},
+            { headers: authHeaders }
+          );
+          updatedDownloadCount = incrementResponse.data?.downloads ?? null;
+        } catch (persistError) {
+          console.error("⚠️ Failed to persist package download count:", persistError);
+        }
+      }
+
+      setPackages(prev =>
+        prev.map(pkg =>
+          pkg.id === packageId
+            ? {
+                ...pkg,
+                downloads:
+                  updatedDownloadCount !== null
+                    ? updatedDownloadCount
+                    : (pkg.downloads || 0) + 1
+              }
+            : pkg
+        )
+      );
       
     } catch (error) {
       console.error("❌ Error downloading package:", error);

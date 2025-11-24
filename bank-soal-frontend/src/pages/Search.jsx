@@ -943,27 +943,47 @@ Universitas Katolik Parahyangan
     );
   };
 
-  // Effects
   useEffect(() => {
-    const initializeData = async () => {
+    let isMounted = true; // Prevent updates on unmounted component
+  
+    const initialize = async () => {
+      console.log("🔄 Initializing SearchPage data...");
+      const startTime = performance.now();
+  
       try {
-        console.log('🔄 Initializing SearchPage data...');
-        
+        // Step 1: Load courses
+        console.log("⏳ Fetching course options...");
         const courses = await fetchCourseOptions();
-        
-        await Promise.all([
-          fetchDropdownData(),
-          fetchQuestionSets(courses)
-        ]);
-        
-        console.log('✅ SearchPage data initialization complete');
-      } catch (error) {
-        console.error('❌ Error initializing data:', error);
+        if (!isMounted) return;
+        console.log("✅ Course options loaded");
+  
+        // Step 2: Load question sets based on courses
+        console.log("⏳ Fetching question sets...");
+        await fetchQuestionSets(courses);
+        if (!isMounted) return;
+        console.log("✅ Question sets loaded");
+  
+        // Step 3: Load dropdown data in parallel (non-blocking)
+        console.log("⏳ Fetching dropdown data (parallel)...");
+        fetchDropdownData().catch(err =>
+          console.error("⚠️ Dropdown fetch failed:", err)
+        );
+  
+        const endTime = performance.now();
+        console.log(`✨ Initialization complete in ${(endTime - startTime).toFixed(0)} ms`);
+      } catch (err) {
+        console.error("❌ Initialization failed:", err);
       }
     };
-    
-    initializeData();
+  
+    initialize();
+  
+    // Cleanup
+    return () => {
+      isMounted = false;
+    };
   }, []);
+  
 
   // Re-transform question sets ketika courseOptions ter-load/update
   // Ini memastikan subject ID selalu di-resolve ke nama mata kuliah
@@ -1601,14 +1621,14 @@ Universitas Katolik Parahyangan
                   <AlertTriangle className="w-6 h-6 text-red-600" />
                 </div>
                 <div className="ml-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Konfirmasi Hapus</h3>
-                  <p className="text-sm text-gray-500">Soal akan dihapus dari daftar utama</p>
+                  <h3 className="text-lg font-semibold text-gray-900">Masukan Ke Arsip</h3>
+                  <p className="text-sm text-gray-500">Soal akan dimasukan ke dalam arsip</p>
                 </div>
               </div>
 
               {itemToDelete && (
                 <div className="mb-6 p-4 bg-gray-50/60 backdrop-blur-sm rounded-lg border border-gray-200/50">
-                  <p className="text-sm text-gray-600">Anda akan menghapus:</p>
+                  <p className="text-sm text-gray-600">Anda Memasukan Ke Arsip:</p>
                   <p className="font-medium text-gray-900">{itemToDelete.fileName}</p>
                   <p className="text-sm text-gray-500">Mata Kuliah: {itemToDelete.subject}</p>
                   <p className="text-sm text-gray-500">Dosen: {itemToDelete.lecturer}</p>

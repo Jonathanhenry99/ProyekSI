@@ -6,11 +6,13 @@ import Upload from './pages/Upload';
 import Create from './pages/Create';
 import History from './pages/History';
 import Login from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword'; // NEW IMPORT
+import ResetPassword from './pages/ResetPassword'; // NEW IMPORT
 import AuthService from './services/auth.service';
 import QuestionSets from './pages/QuestionSets';
 import MataKuliahAdmin from './pages/admin/MataKuliahAdmin';
 import TaggingAdmin from './pages/admin/TaggingAdmin';
-import CourseTaggingAdmin from './pages/admin/CourseTaggingAdmin'; // New import
+import CourseTaggingAdmin from './pages/admin/CourseTaggingAdmin';
 import AdminPage from './pages/admin/AdminPage';
 import QuestionPreview from './pages/QuestionPreview';
 import QuestionSetsPreview from "./pages/QuestionSetsPreview";
@@ -97,6 +99,12 @@ export default function App() {
         <Route path="/" element={<Home currentUser={currentUser} />} />
         <Route path="/login" element={<Login setCurrentUser={setCurrentUser} />} />
         
+        {/* ========================================
+            PASSWORD RESET ROUTES (NEW)
+            ======================================== */}
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        
         {/* User Protected Routes */}
         <Route path="/search" element={
           <ProtectedRoute>
@@ -153,7 +161,7 @@ export default function App() {
           </AdminRoute>
         } />
         
-        {/* Admin Course Tagging Management - NEW ROUTE */}
+        {/* Admin Course Tagging Management */}
         <Route path="/admin/course-tagging" element={
           <AdminRoute>
             <CourseTaggingAdmin currentUser={currentUser} />
@@ -172,12 +180,11 @@ export default function App() {
               </div>
             } />
             <Route path="/dev/admin/tagging" element={<TaggingAdmin currentUser={currentUser} />} />
-            {/* Development Course Tagging Route - NEW */}
             <Route path="/dev/admin/course-tagging" element={<CourseTaggingAdmin currentUser={currentUser} />} />
           </>
         )}
         
-        {/* Tambahkan route baru untuk preview soal */}
+        {/* Preview Routes */}
         <Route path="/preview/:id" element={<QuestionPreview currentUser={currentUser} />} />
         
         {/* 404 Route */}

@@ -13,13 +13,13 @@ const API_URL = "http://localhost:8080/api";
 const UploadPage = ({ currentUser }) => {
   const [files, setFiles] = useState({
     questions: null,
-    answers: [], // Changed to array for multiple files
+    answers: [],
     testCases: null
   });
 
   const [uploadStatus, setUploadStatus] = useState({
     questions: null,
-    answers: [], // Changed to array for multiple files
+    answers: [],
     testCases: null
   });
 
@@ -34,14 +34,16 @@ const UploadPage = ({ currentUser }) => {
     lecturer: currentUser?.username || ''
   });
 
-  // States for database data
   const [courseTags, setCourseTags] = useState([]);
   const [materialTags, setMaterialTags] = useState([]);
   const [filteredMaterialTags, setFilteredMaterialTags] = useState([]);
+  const [lecturerOptions, setLecturerOptions] = useState([]);
+  const [loadingLecturers, setLoadingLecturers] = useState(false);
+  const [lecturerSearchTerm, setLecturerSearchTerm] = useState('');
+  const [showLecturerDropdown, setShowLecturerDropdown] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [loadingMaterials, setLoadingMaterials] = useState(false);
   
-  // States for searchable dropdown
   const [courseSearchTerm, setCourseSearchTerm] = useState('');
   const [showCourseDropdown, setShowCourseDropdown] = useState(false);
   const [filteredCourseTags, setFilteredCourseTags] = useState([]);
@@ -50,188 +52,45 @@ const UploadPage = ({ currentUser }) => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
-  // Template file management
   const templateFileInputRef = useRef(null);
   const [localTemplateFile, setLocalTemplateFile] = useState(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [templateSuccess, setTemplateSuccess] = useState(null);
 
-  const handleTemplateFileUpload = (event) => {
-    const file = event.target.files[0];
+  // ✅ VALIDASI FORMAT FILE
+  const validateFileType = (fileName, type) => {
+    const extension = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
     
-    if (file) {
-      if (file.name.toLowerCase().endsWith('.docx')) {
-        console.log("File template DOCX dipilih:", file.name);
-        
-        // ⭐️ PERBAIKAN PENTING: SET STATE localTemplateFile
-        setLocalTemplateFile(file); // <--- BARIS INI HILANG SEBELUMNYA
-        
-        const successMessage = `Template soal berhasil diganti dengan: ${file.name}`;
-        setTemplateSuccess(successMessage);
-        
-        // Atur waktu agar notifikasi menghilang setelah 4 detik
-        setTimeout(() => {
-          setTemplateSuccess(null);
-        }, 4000);
-        
-      } else {
-        // Biarkan alert jika terjadi error, atau gunakan toast error terpisah
-        alert("Gagal: Hanya file dengan format .DOCX yang diizinkan untuk template.");
-      }
-    }
-    event.target.value = null;
-  };
-
-  const handleDownloadTemplate = async () => {
-    // PRIORITAS 1: Download dari file lokal (jika ada)
-    if (localTemplateFile) {
-      console.log("Downloading local template file:", localTemplateFile.name);
-      // Membuat Blob dari objek File dan langsung mendownloadnya
-      saveAs(localTemplateFile, localTemplateFile.name);
-      return; // Berhenti di sini
-    }
-    
-    // PRIORITAS 2: Download dari server (jika tidak ada file lokal)
-    try {
-      const response = await axios.get(`${API_URL}/files/download-template`, {
-        responseType: "blob",
-      });
-
-      const blob = new Blob([response.data], {
-        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-      });
-
-      // Menggunakan nama default dari server jika tidak ada file lokal
-      saveAs(blob, "Template_Soal.docx");
-    } catch (error) {
-      console.error("Error downloading file from server:", error);
-      alert("Gagal mendownload template dari server.");
-    }
-  };
-
-  const handleEditTemplate = () => {
-      setShowTemplateModal(true);
-  };
-
-  const handleConfirmTemplateEdit = () => {
-    setShowTemplateModal(false);
-    // Panggil aksi utama: memicu input file
-    templateFileInputRef.current.click();
-  };
-
-  const handleCancelTemplateEdit = () => {
-    setShowTemplateModal(false);
-  };
-
-  // Fetch data from database on component mount
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const user = JSON.parse(localStorage.getItem('user'));
-        if (!user || !user.accessToken) {
-          setError("Anda belum login atau sesi telah berakhir. Silakan login kembali.");
-          return;
-        }
-
-        const token = user.accessToken;
-        const headers = {
-          'x-access-token': token
-        };
-
-        // Fetch course tags only (material tags will be fetched based on selected course)
-        const courseTagsResponse = await axios.get(`${API_URL}/course-tags`, { headers });
-
-        setCourseTags(courseTagsResponse.data || []);
-        setFilteredCourseTags(courseTagsResponse.data || []);
-        
-        // Set lecturer to current user's username
-        setMetadata(prev => ({
-          ...prev,
-          lecturer: currentUser?.username || user.username || ''
-        }));
-
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        setError("Gagal memuat data mata kuliah dan topik.");
-      } finally {
-        setLoadingData(false);
-      }
+    const allowedFormats = {
+      questions: ['.pdf', '.docx', '.doc'],
+      answers: [
+        '.js', '.jsx', '.ts', '.tsx',
+        '.py',
+        '.java',
+        '.c', '.cpp', '.cc', '.cxx', '.h', '.hpp',
+        '.cs',
+        '.php',
+        '.rb',
+        '.go',
+        '.rs',
+        '.kt',
+        '.swift',
+        '.dart',
+        '.scala',
+        '.r',
+        '.m',
+        '.sh', '.bash',
+        '.sql',
+        '.html', '.css', '.scss', '.sass', '.less',
+        '.xml', '.json', '.yaml', '.yml'
+      ],
+      testCases: ['.zip', '.rar', '.txt']
     };
 
-    fetchData();
-  }, [currentUser]);
-
-  // Fixed function to fetch materials by course
-  const fetchMaterialTagsByCourse = async (courseId) => {
-    if (!courseId) {
-      setFilteredMaterialTags([]);
-      return;
-    }
-
-    setLoadingMaterials(true);
-    try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      if (!user || !user.accessToken) {
-        setError("Token tidak valid. Silakan login kembali.");
-        return;
-      }
-
-      const token = user.accessToken;
-      const headers = {
-        'x-access-token': token,
-        'Content-Type': 'application/json'
-      };
-      
-      console.log('Fetching materials for course:', courseId);
-      
-      // Updated endpoint to match your routes
-      const response = await axios.get(`${API_URL}/course-material-assignments/course/${courseId}/materials-for-upload`, {
-        headers
-      });
-      
-      console.log('Materials response:', response.data);
-      
-      // Your API returns {success: true, data: [...]}
-      const materials = response.data.success ? response.data.data : [];
-      setFilteredMaterialTags(materials);
-      
-      // Reset selected topics when course changes
-      setMetadata(prev => ({
-        ...prev,
-        topics: []
-      }));
-      
-    } catch (error) {
-      console.error('Error fetching course materials:', error);
-      
-      if (error.response?.status === 404) {
-        // No materials found for this course
-        setFilteredMaterialTags([]);
-      } else if (error.response?.status === 403) {
-        setError("Akses ditolak. Silakan login kembali.");
-      } else {
-        setError("Gagal memuat materi untuk mata kuliah ini.");
-      }
-      
-      setFilteredMaterialTags([]);
-    } finally {
-      setLoadingMaterials(false);
-    }
+    return allowedFormats[type]?.includes(extension) || false;
   };
 
-  // Filter course tags based on search term
-  useEffect(() => {
-    if (courseSearchTerm) {
-      const filtered = courseTags.filter(tag =>
-        tag.name.toLowerCase().includes(courseSearchTerm.toLowerCase())
-      );
-      setFilteredCourseTags(filtered);
-    } else {
-      setFilteredCourseTags(courseTags);
-    }
-  }, [courseSearchTerm, courseTags]);
-
-  // Helper function to get file extension and language
+  // Helper function untuk mendapatkan info file
   const getFileInfo = (fileName) => {
     const extension = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
     const languageMap = {
@@ -267,11 +126,9 @@ const UploadPage = ({ currentUser }) => {
       '.json': 'JSON',
       '.yaml': 'YAML',
       '.yml': 'YAML',
-      '.md': 'Markdown',
-      '.txt': 'Text',
-      '.pdf': 'PDF',
-      '.docx': 'Word Document',
-      '.doc': 'Word Document'
+      '.zip': 'ZIP Archive',
+      '.rar': 'RAR Archive',
+      '.txt': 'Text'
     };
     
     return {
@@ -280,12 +137,232 @@ const UploadPage = ({ currentUser }) => {
     };
   };
 
-  // ✅ FIXED: Handle file change with proper validation
+  const handleTemplateFileUpload = (event) => {
+    const file = event.target.files[0];
+    
+    if (file) {
+      if (file.name.toLowerCase().endsWith('.docx')) {
+        console.log("File template DOCX dipilih:", file.name);
+        setLocalTemplateFile(file);
+        
+        const successMessage = `Template soal berhasil diganti dengan: ${file.name}`;
+        setTemplateSuccess(successMessage);
+        
+        setTimeout(() => {
+          setTemplateSuccess(null);
+        }, 4000);
+        
+      } else {
+        alert("Gagal: Hanya file dengan format .DOCX yang diizinkan untuk template.");
+      }
+    }
+    event.target.value = null;
+  };
+
+  const handleDownloadTemplate = async () => {
+    if (localTemplateFile) {
+      console.log("Downloading local template file:", localTemplateFile.name);
+      saveAs(localTemplateFile, localTemplateFile.name);
+      return;
+    }
+    
+    try {
+      const response = await axios.get(`${API_URL}/files/download-template`, {
+        responseType: "blob",
+      });
+
+      const blob = new Blob([response.data], {
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      });
+
+      saveAs(blob, "Template_Soal.docx");
+    } catch (error) {
+      console.error("Error downloading file from server:", error);
+      alert("Gagal mendownload template dari server.");
+    }
+  };
+
+  const handleEditTemplate = () => {
+    setShowTemplateModal(true);
+  };
+
+  const handleConfirmTemplateEdit = () => {
+    setShowTemplateModal(false);
+    templateFileInputRef.current.click();
+  };
+
+  const handleCancelTemplateEdit = () => {
+    setShowTemplateModal(false);
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user || !user.accessToken) {
+          setError("Anda belum login atau sesi telah berakhir. Silakan login kembali.");
+          return;
+        }
+
+        const token = user.accessToken;
+        const headers = {
+          'x-access-token': token
+        };
+
+        setLoadingLecturers(true);
+        const [courseTagsResponse, lecturersResponse] = await Promise.all([
+          axios.get(`${API_URL}/course-tags`, { headers }),
+          axios.get(`${API_URL}/admin/dosen`, { headers })
+        ]);
+
+        setCourseTags(courseTagsResponse.data || []);
+        setFilteredCourseTags(courseTagsResponse.data || []);
+        setLecturerOptions(lecturersResponse.data || []);
+        if (!metadata.lecturer && lecturersResponse.data && lecturersResponse.data.length > 0) {
+          setMetadata(prev => ({
+            ...prev,
+            lecturer: lecturersResponse.data[0].nama
+          }));
+        }
+        
+        setMetadata(prev => ({
+          ...prev,
+          lecturer: prev.lecturer || currentUser?.username || user.username || ''
+        }));
+
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        setError("Gagal memuat data mata kuliah dan topik.");
+      } finally {
+        setLoadingData(false);
+        setLoadingLecturers(false);
+      }
+    };
+
+    fetchData();
+  }, [currentUser]);
+
+  const fetchMaterialTagsByCourse = async (courseId) => {
+    if (!courseId) {
+      setFilteredMaterialTags([]);
+      return;
+    }
+
+    setLoadingMaterials(true);
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (!user || !user.accessToken) {
+        setError("Token tidak valid. Silakan login kembali.");
+        return;
+      }
+
+      const token = user.accessToken;
+      const headers = {
+        'x-access-token': token,
+        'Content-Type': 'application/json'
+      };
+      
+      console.log('Fetching materials for course:', courseId);
+      
+      const response = await axios.get(`${API_URL}/course-material-assignments/course/${courseId}/materials-for-upload`, {
+        headers
+      });
+      
+      console.log('Materials response:', response.data);
+      
+      const materials = response.data.success ? response.data.data : [];
+      setFilteredMaterialTags(materials);
+      
+      setMetadata(prev => ({
+        ...prev,
+        topics: []
+      }));
+      
+    } catch (error) {
+      console.error('Error fetching course materials:', error);
+      
+      if (error.response?.status === 404) {
+        setFilteredMaterialTags([]);
+      } else if (error.response?.status === 403) {
+        setError("Akses ditolak. Silakan login kembali.");
+      } else {
+        setError("Gagal memuat materi untuk mata kuliah ini.");
+      }
+      
+      setFilteredMaterialTags([]);
+    } finally {
+      setLoadingMaterials(false);
+    }
+  };
+
+  useEffect(() => {
+    if (courseSearchTerm) {
+      const filtered = courseTags.filter(tag =>
+        tag.name.toLowerCase().includes(courseSearchTerm.toLowerCase())
+      );
+      setFilteredCourseTags(filtered);
+    } else {
+      setFilteredCourseTags(courseTags);
+    }
+  }, [courseSearchTerm, courseTags]);
+
+  useEffect(() => {
+    setLecturerSearchTerm(metadata.lecturer || '');
+  }, [metadata.lecturer]);
+
+  useEffect(() => {
+    const handleClickOutsideLecturer = (event) => {
+      if (!event.target.closest('.lecturer-dropdown')) {
+        setShowLecturerDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutsideLecturer);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutsideLecturer);
+    };
+  }, []);
+
+  // ✅ HANDLE FILE CHANGE DENGAN VALIDASI KETAT
   const handleFileChange = (e, type, index = null) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
+      const fileName = selectedFile.name;
+      const fileExtension = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+      
+      // Validasi format file
+      if (!validateFileType(fileName, type)) {
+        let errorMessage = '';
+        
+        if (type === 'questions') {
+          errorMessage = `Format file ${fileExtension} tidak didukung untuk soal. Hanya PDF dan DOCX yang diizinkan.`;
+        } else if (type === 'answers') {
+          errorMessage = `Format file ${fileExtension} tidak didukung untuk kunci jawaban. Hanya file bahasa pemrograman yang diizinkan (Python, Java, JavaScript, C++, dll).`;
+        } else if (type === 'testCases') {
+          errorMessage = `Format file ${fileExtension} tidak didukung untuk test cases. Hanya ZIP, RAR, dan TXT yang diizinkan.`;
+        }
+        
+        setError(errorMessage);
+        
+        if (type === 'answers' && index !== null) {
+          setUploadStatus(prev => {
+            const newAnswerStatus = [...prev.answers];
+            newAnswerStatus[index] = 'error';
+            return { ...prev, answers: newAnswerStatus };
+          });
+        } else {
+          setUploadStatus(prev => ({
+            ...prev,
+            [type]: 'error'
+          }));
+        }
+        
+        e.target.value = '';
+        return;
+      }
+      
+      // File valid
       if (type === 'answers' && index !== null) {
-        // Handle multiple answer files - accept all types
         setFiles(prev => {
           const newAnswers = [...prev.answers];
           newAnswers[index] = selectedFile;
@@ -303,31 +380,7 @@ const UploadPage = ({ currentUser }) => {
             answers: newAnswerStatus
           };
         });
-      } else if (type === 'questions') {
-        // Questions: only PDF, DOCX, TXT
-        const validTypes = ['.pdf', '.docx', '.txt'];
-        const fileExt = selectedFile.name.substring(selectedFile.name.lastIndexOf('.')).toLowerCase();
-        
-        if (!validTypes.includes(fileExt)) {
-          setUploadStatus(prev => ({
-            ...prev,
-            [type]: 'error'
-          }));
-          setError(`Format file ${fileExt} tidak didukung untuk soal. Gunakan PDF, DOCX, atau TXT.`);
-          return;
-        }
-        
-        setFiles(prev => ({
-          ...prev,
-          [type]: selectedFile
-        }));
-        
-        setUploadStatus(prev => ({
-          ...prev,
-          [type]: 'ready'
-        }));
       } else {
-        // ✅ Test cases: accept all file types (like answers)
         setFiles(prev => ({
           ...prev,
           [type]: selectedFile
@@ -343,7 +396,6 @@ const UploadPage = ({ currentUser }) => {
     }
   };
 
-  // Add new answer file slot
   const addAnswerFile = () => {
     setFiles(prev => ({
       ...prev,
@@ -355,7 +407,6 @@ const UploadPage = ({ currentUser }) => {
     }));
   };
 
-  // Remove answer file
   const removeAnswerFile = (index) => {
     setFiles(prev => ({
       ...prev,
@@ -375,22 +426,18 @@ const UploadPage = ({ currentUser }) => {
     }));
   };
 
-  // Handle course search input
   const handleCourseSearch = (e) => {
     const value = e.target.value;
     setCourseSearchTerm(value);
     setMetadata(prev => ({
       ...prev,
       subject: value,
-      selectedCourseId: null // Reset course ID when typing
+      selectedCourseId: null
     }));
     setShowCourseDropdown(true);
-    
-    // Clear materials when searching
     setFilteredMaterialTags([]);
   };
 
-  // Handle course selection from dropdown
   const handleCourseSelect = (courseName, courseId = null) => {
     setMetadata(prev => ({
       ...prev,
@@ -400,7 +447,6 @@ const UploadPage = ({ currentUser }) => {
     setCourseSearchTerm(courseName);
     setShowCourseDropdown(false);
     
-    // Fetch materials for selected course
     if (courseId) {
       fetchMaterialTagsByCourse(courseId);
     } else {
@@ -408,19 +454,16 @@ const UploadPage = ({ currentUser }) => {
     }
   };
 
-  // Handle focus and blur for course input
   const handleCourseFocus = () => {
     setShowCourseDropdown(true);
   };
 
   const handleCourseBlur = () => {
-    // Delay hiding dropdown to allow for selection
     setTimeout(() => {
       setShowCourseDropdown(false);
     }, 200);
   };
 
-  // Handle keyboard navigation for course dropdown
   const handleCourseKeyDown = (e) => {
     if (e.key === 'Escape') {
       setShowCourseDropdown(false);
@@ -435,20 +478,21 @@ const UploadPage = ({ currentUser }) => {
     }
   };
 
-  // Handle topic selection (multi-select)
+  const filteredLecturerOptions = lecturerOptions.filter((lecturer) =>
+    lecturer.nama.toLowerCase().includes((lecturerSearchTerm || '').toLowerCase())
+  );
+
   const handleTopicChange = (tagId, tagName) => {
     setMetadata(prev => {
       const currentTopics = prev.topics || [];
       const topicExists = currentTopics.some(topic => topic.id === tagId);
       
       if (topicExists) {
-        // Remove topic if already selected
         return {
           ...prev,
           topics: currentTopics.filter(topic => topic.id !== tagId)
         };
       } else {
-        // Add topic if not selected
         return {
           ...prev,
           topics: [...currentTopics, { id: tagId, name: tagName }]
@@ -483,7 +527,6 @@ const UploadPage = ({ currentUser }) => {
     setSuccess(null);
     
     try {
-      // 1. Buat question set baru
       const questionSetResponse = await axios.post(
         `${API_URL}/questionsets`,
         {
@@ -507,10 +550,8 @@ const UploadPage = ({ currentUser }) => {
       const questionSetId = questionSetResponse.data.questionSet.id;
       console.log('Question set created:', questionSetId);
       
-      // 2. Upload files sequentially with better error handling
       const uploadPromises = [];
       
-      // Upload questions file
       if (files.questions) {
         const formData = new FormData();
         formData.append('file', files.questions);
@@ -532,7 +573,6 @@ const UploadPage = ({ currentUser }) => {
         );
       }
       
-      // ✅ Upload multiple answer files with proper indexing
       files.answers.forEach((file, index) => {
         if (file) {
           const formData = new FormData();
@@ -556,7 +596,6 @@ const UploadPage = ({ currentUser }) => {
         }
       });
       
-      // Upload test cases file
       if (files.testCases) {
         const formData = new FormData();
         formData.append('file', files.testCases);
@@ -578,7 +617,6 @@ const UploadPage = ({ currentUser }) => {
         );
       }
       
-      // Wait for all uploads to complete
       await Promise.all(uploadPromises);
       
       console.log('All files uploaded successfully');
@@ -586,7 +624,6 @@ const UploadPage = ({ currentUser }) => {
       window.scrollTo({top:0,behavior: "smooth"});
       setSuccess("Soal berhasil diupload!");
       
-      // Reset form
       setFiles({
         questions: null,
         answers: [],
@@ -599,6 +636,13 @@ const UploadPage = ({ currentUser }) => {
         testCases: null
       });
       
+      const defaultLecturer =
+        lecturerOptions.find(opt => opt.status !== 'Nonaktif')?.nama ||
+        lecturerOptions[0]?.nama ||
+        currentUser?.username ||
+        user.username ||
+        '';
+
       setMetadata({
         title: '',
         subject: '',
@@ -607,7 +651,7 @@ const UploadPage = ({ currentUser }) => {
         difficulty: '',
         description: '',
         year: new Date().getFullYear(),
-        lecturer: currentUser?.username || user.username || ''
+        lecturer: defaultLecturer
       });
       
       setFilteredMaterialTags([]);
@@ -624,27 +668,28 @@ const UploadPage = ({ currentUser }) => {
       setLoading(false);
     }
   };
-  // ✅ FIXED: Render file input with dynamic accept attribute
-const renderFileInput = (type, label, description, icon) => {
+
+  // ✅ RENDER FILE INPUT DENGAN ACCEPT STRICT
+  const renderFileInput = (type, label, description, icon) => {
     const IconComponent = icon;
     const status = uploadStatus[type];
     
-    // ✅ Dynamic accept based on file type
-    const acceptTypes = type === 'questions' ? '.pdf,.docx,.txt' : '*';
+    let acceptTypes = '';
+    if (type === 'questions') {
+      acceptTypes = '.pdf,.docx,.doc';
+    } else if (type === 'testCases') {
+      acceptTypes = '.zip,.rar,.txt';
+    }
     
-    // Handler untuk mereset file tunggal
     const resetFile = (e) => {
-        e.stopPropagation();
-        
-        // 1. CLEAR STATE
-        setFiles(prev => ({ ...prev, [type]: null }));
-        setUploadStatus(prev => ({ ...prev, [type]: null }));
-        
-        // 2. CLEAR DOM INPUT VALUE (SOLUSI BUG FILE INPUT)
-        const fileInput = document.getElementById(`file-${type}`);
-        if (fileInput) {
-            fileInput.value = ''; 
-        }
+      e.stopPropagation();
+      setFiles(prev => ({ ...prev, [type]: null }));
+      setUploadStatus(prev => ({ ...prev, [type]: null }));
+      
+      const fileInput = document.getElementById(`file-${type}`);
+      if (fileInput) {
+        fileInput.value = ''; 
+      }
     };
     
     return (
@@ -656,7 +701,6 @@ const renderFileInput = (type, label, description, icon) => {
             'border-gray-300 hover:border-blue-400'
           }`}
         >
-          {/* Input file DIBIARKAN DI BAWAH (tanpa z-index) */}
           <input
             type="file"
             id={`file-${type}`} 
@@ -682,7 +726,6 @@ const renderFileInput = (type, label, description, icon) => {
             {files[type] && (
               <button
                 type="button"
-                // PERBAIKAN: Menambah z-index dan posisi relatif
                 className="p-1 rounded-full bg-gray-200 hover:bg-gray-300 relative z-20" 
                 onClick={resetFile}
               >
@@ -695,140 +738,142 @@ const renderFileInput = (type, label, description, icon) => {
     );
   };
 
-  // Render multiple answer file inputs
-const renderAnswerFileInputs = () => {
-  return (
-    <div className="mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-gray-900">Upload Kunci Jawaban</h3>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          type="button"
-          onClick={addAnswerFile}
-          className="flex items-center gap-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
-        >
-          <Plus className="w-4 h-4" />
-          Tambah File
-        </motion.button>
-      </div>
-      
-      {files.answers.length === 0 && (
-        <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center">
-          <File className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-          <p className="text-sm text-gray-500 mb-3">Belum ada file kunci jawaban</p>
-          <button
+  // ✅ RENDER ANSWER FILES DENGAN ACCEPT STRICT
+  const renderAnswerFileInputs = () => {
+    const answerAcceptTypes = '.js,.jsx,.ts,.tsx,.py,.java,.c,.cpp,.cc,.cxx,.h,.hpp,.cs,.php,.rb,.go,.rs,.kt,.swift,.dart,.scala,.r,.m,.sh,.bash,.sql,.html,.css,.scss,.sass,.less,.xml,.json,.yaml,.yml';
+    
+    return (
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-gray-900">Upload Kunci Jawaban</h3>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             type="button"
             onClick={addAnswerFile}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+            className="flex items-center gap-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
           >
             <Plus className="w-4 h-4" />
-            Tambah File Jawaban
-          </button>
+            Tambah File
+          </motion.button>
         </div>
-      )}
-      
-      {files.answers.map((file, index) => {
-        const status = uploadStatus.answers[index];
-        const fileInfo = file ? getFileInfo(file.name) : null;
         
-        return (
-          <div
-            key={index}
-            className={`relative border-2 border-dashed rounded-xl p-4 mb-3 transition-all cursor-pointer ${
-              status === 'ready' ? 'border-blue-400 bg-blue-50' :
-              status === 'error' ? 'border-red-400 bg-red-50' :
-              'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
-            }`}
-          >
-            {/* ✅ File input sekarang menutupi seluruh area */}
-            <input
-              type="file"
-              id={`answer-file-${index}`}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-              onChange={(e) => handleFileChange(e, 'answers', index)}
-              accept="*"
-            />
-            
-            <div className="flex items-center gap-3 relative pointer-events-none">
-              <div className="flex-shrink-0">
-                {status === 'ready' ? (
-                  <CheckCircle className="w-6 h-6 text-blue-500" />
-                ) : status === 'error' ? (
-                  <AlertCircle className="w-6 h-6 text-red-500" />
-                ) : (
-                  <File className="w-6 h-6 text-blue-500" />
-                )}
-              </div>
+        {files.answers.length === 0 && (
+          <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center">
+            <File className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+            <p className="text-sm text-gray-500 mb-3">Belum ada file kunci jawaban</p>
+            <button
+              type="button"
+              onClick={addAnswerFile}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Tambah File Jawaban
+            </button>
+          </div>
+        )}
+        
+        {files.answers.map((file, index) => {
+          const status = uploadStatus.answers[index];
+          const fileInfo = file ? getFileInfo(file.name) : null;
+          
+          return (
+            <div
+              key={index}
+              className={`relative border-2 border-dashed rounded-xl p-4 mb-3 transition-all cursor-pointer ${
+                status === 'ready' ? 'border-blue-400 bg-blue-50' :
+                status === 'error' ? 'border-red-400 bg-red-50' :
+                'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
+              }`}
+            >
+              <input
+                type="file"
+                id={`answer-file-${index}`}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                onChange={(e) => handleFileChange(e, 'answers', index)}
+                accept={answerAcceptTypes}
+              />
               
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-medium text-gray-700">
-                    Jawaban {index + 1}
-                  </span>
-                  {fileInfo && (
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">
-                      {fileInfo.language}
-                    </span>
+              <div className="flex items-center gap-3 relative pointer-events-none">
+                <div className="flex-shrink-0">
+                  {status === 'ready' ? (
+                    <CheckCircle className="w-6 h-6 text-blue-500" />
+                  ) : status === 'error' ? (
+                    <AlertCircle className="w-6 h-6 text-red-500" />
+                  ) : (
+                    <File className="w-6 h-6 text-blue-500" />
                   )}
                 </div>
-                {file ? (
-                  <div>
-                    <p className="text-sm text-blue-600 truncate">{file.name}</p>
-                    <p className="text-xs text-gray-500">
-                      {(file.size / 1024).toFixed(1)} KB • {fileInfo?.extension}
-                    </p>
+                
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-medium text-gray-700">
+                      Jawaban {index + 1}
+                    </span>
+                    {fileInfo && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">
+                        {fileInfo.language}
+                      </span>
+                    )}
                   </div>
-                ) : (
-                  <p className="text-sm text-gray-500">Klik di mana saja untuk memilih file</p>
-                )}
-              </div>
-              
-              {/* ✅ Tombol dengan pointer-events-auto agar tetap bisa diklik */}
-              <div className="flex gap-2 pointer-events-auto relative z-20">
-                {file && (
+                  {file ? (
+                    <div>
+                      <p className="text-sm text-blue-600 truncate">{file.name}</p>
+                      <p className="text-xs text-gray-500">
+                        {(file.size / 1024).toFixed(1)} KB • {fileInfo?.extension}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">Klik untuk memilih file bahasa pemrograman</p>
+                  )}
+                </div>
+                
+                <div className="flex gap-2 pointer-events-auto relative z-20">
+                  {file && (
+                    <button
+                      type="button"
+                      className="p-1 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFiles(prev => {
+                          const newAnswers = [...prev.answers];
+                          newAnswers[index] = null;
+                          return { ...prev, answers: newAnswers };
+                        });
+                        setUploadStatus(prev => {
+                          const newAnswerStatus = [...prev.answers];
+                          newAnswerStatus[index] = null;
+                          return { ...prev, answers: newAnswerStatus };
+                        });
+                        const fileInput = document.getElementById(`answer-file-${index}`);
+                        if (fileInput) fileInput.value = '';
+                      }}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
                   <button
                     type="button"
-                    className="p-1 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors"
+                    className="p-1 rounded-full bg-red-100 hover:bg-red-200 text-red-600 transition-colors"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setFiles(prev => {
-                        const newAnswers = [...prev.answers];
-                        newAnswers[index] = null;
-                        return { ...prev, answers: newAnswers };
-                      });
-                      setUploadStatus(prev => {
-                        const newAnswerStatus = [...prev.answers];
-                        newAnswerStatus[index] = null;
-                        return { ...prev, answers: newAnswerStatus };
-                      });
+                      removeAnswerFile(index);
                     }}
                   >
-                    <X className="w-4 h-4" />
+                    <Trash2 className="w-4 h-4" />
                   </button>
-                )}
-                <button
-                  type="button"
-                  className="p-1 rounded-full bg-red-100 hover:bg-red-200 text-red-600 transition-colors"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeAnswerFile(index);
-                  }}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                </div>
               </div>
             </div>
-          </div>
-        );
-      })}
-      
-      <p className="text-xs text-gray-500 mt-2">
-        Mendukung semua jenis file dan bahasa pemrograman (Python, JavaScript, Java, C++, dll.)
-      </p>
-    </div>
-  );
-};
+          );
+        })}
+        
+        <p className="text-xs text-gray-500 mt-2">
+          Hanya file bahasa pemrograman yang didukung (Python, JavaScript, Java, C++, PHP, Ruby, dll.)
+        </p>
+      </div>
+    );
+  };
 
   if (loadingData) {
     return (
@@ -845,7 +890,6 @@ const renderAnswerFileInputs = () => {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-blue-50">
       <Header currentUser={currentUser} />
 
-      {/* KOMPONEN TOAST SUKSES TEMPLATE BARU */}
       <AnimatePresence>
         {templateSuccess && (
           <motion.div
@@ -865,25 +909,23 @@ const renderAnswerFileInputs = () => {
           </motion.div>
         )}
       </AnimatePresence>
-      {/* AKHIR KOMPONEN TOAST */}
 
       <div className="container mx-auto px-4 py-8">
         <input 
-        type="file"
-        ref={templateFileInputRef}
-        onChange={handleTemplateFileUpload}
-        accept=".docx" // Filter hanya DOCX
-        style={{ display: 'none' }} // Sembunyikan input
-      />
+          type="file"
+          ref={templateFileInputRef}
+          onChange={handleTemplateFileUpload}
+          accept=".docx"
+          style={{ display: 'none' }}
+        />
 
-      {/* MODAL KONFIRMASI PENGGANTIAN TEMPLATE BARU */}
         {showTemplateModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 backdrop-blur-md bg-white/30 flex items-center justify-center z-50 p-4"
-            onClick={handleCancelTemplateEdit} // Menutup modal saat klik di luar
+            onClick={handleCancelTemplateEdit}
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
@@ -894,8 +936,7 @@ const renderAnswerFileInputs = () => {
             >
               <div className="flex items-center mb-4">
                 <div className="flex-shrink-0 w-10 h-10 bg-orange-100/80 backdrop-blur-sm rounded-full flex items-center justify-center">
-                  {/* Menggunakan AlertCircle (sudah diimport) karena ini aksi overwrite, bukan delete */}
-                  <AlertCircle className="w-6 h-6 text-orange-600" /> 
+                  <AlertCircle className="w-6 h-6 text-orange-600" />
                 </div>
                 <div className="ml-4">
                   <h3 className="text-lg font-semibold text-gray-900">Konfirmasi Ganti Template Soal</h3>
@@ -908,7 +949,7 @@ const renderAnswerFileInputs = () => {
                   Apakah Anda yakin ingin mengganti template soal yang sudah tersimpan?
                 </p>
                 <p className="text-sm text-gray-600 mt-1">
-                  File baru yang Anda unggah akan digunakan sebagai template standar untuk fitur **Download Template Soal**.
+                  File baru yang Anda unggah akan digunakan sebagai template standar untuk fitur Download Template Soal.
                 </p>
               </div>
 
@@ -927,15 +968,13 @@ const renderAnswerFileInputs = () => {
                   className="px-4 py-2 bg-orange-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center gap-2"
                   onClick={handleConfirmTemplateEdit}
                 >
-                  {/* Ikon Upload untuk konfirmasi aksi ganti file */}
-                  <Upload className="w-4 h-4" /> 
+                  <Upload className="w-4 h-4" />
                   Ganti Template
                 </motion.button>
               </div>
             </motion.div>
           </motion.div>
         )}
-        {/* AKHIR MODAL */}
 
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -959,66 +998,53 @@ const renderAnswerFileInputs = () => {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* File Upload Section */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             className="flex flex-col gap-8"
           >
-            {/* Upload Files Card */}
             <div className="bg-white rounded-2xl p-8 shadow-lg">
               <h2 className="text-2xl font-semibold mb-6 text-gray-900">Upload Files</h2>
 
-              {renderFileInput('questions', 'Upload Soal', 'Format: PDF, DOCX, atau TXT', Upload)}
+              {renderFileInput('questions', 'Upload Soal', 'Format: PDF atau DOCX', Upload)}
               {renderAnswerFileInputs()}
-              {/* ✅ FIXED: Updated description for test cases */}
-              {renderFileInput('testCases', 'Upload Test Cases', 'Semua format file didukung', AlertCircle)}
+              {renderFileInput('testCases', 'Upload Test Cases', 'Format: ZIP, RAR, atau TXT', AlertCircle)}
             </div>
 
-            {/* Template Soal Card */}
-           <div className="bg-white rounded-2xl p-8 shadow-lg">
-              {/* Container untuk Judul dan Tombol Edit */}
+            <div className="bg-white rounded-2xl p-8 shadow-lg">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-2xl font-semibold text-gray-900">
                   Template Soal
                 </h3>
                 
-                {/* Tombol/Ikon untuk Edit/Kelola Template */}
                 <motion.button
-                whileHover={{ scale: 1.05 }} // Sedikit diperkecil karena ada teks
-                whileTap={{ scale: 0.95 }}
-                // Styling disesuaikan untuk tombol dengan teks
-                className="px-3 py-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 hover:text-blue-700 transition-colors rounded-xl font-medium flex items-center gap-1.5"
-                onClick={handleEditTemplate}
-                aria-label="Kelola Template Soal"
-              >
-                {/* Ikon Settings (Roda Gigi) */}
-                <Settings className="w-5 h-5" />
-                {/* Tambahkan Teks Label */}
-                Ganti Template Soal
-              </motion.button>
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-3 py-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 hover:text-blue-700 transition-colors rounded-xl font-medium flex items-center gap-1.5"
+                  onClick={handleEditTemplate}
+                  aria-label="Kelola Template Soal"
+                >
+                  <Settings className="w-5 h-5" />
+                  Ganti Template Soal
+                </motion.button>
               </div>
               
               <p className="text-sm text-gray-600 mb-4">
                 Unduh template soal dalam format DOCX untuk mempermudah pembuatan soal.
               </p>
               
-              {/* Tombol DOWNLOAD (Aksi Utama, tetap menjadi fokus) */}
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="w-full mt-8 bg-blue-600 text-white py-4 rounded-xl font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
                 onClick={handleDownloadTemplate}
               >
-                <>
-                  <Upload className="w-5 h-5" />
-                  Download Template Soal
-                </>
+                <Upload className="w-5 h-5" />
+                Download Template Soal
               </motion.button>
             </div>
           </motion.div>
 
-          {/* Metadata Section */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -1039,7 +1065,6 @@ const renderAnswerFileInputs = () => {
                 />
               </div>
 
-              {/* Course Tags Searchable Dropdown */}
               <div>
                 <label className="block text-sm font-medium mb-2 text-gray-700">Mata Kuliah</label>
                 <div className="relative">
@@ -1053,7 +1078,6 @@ const renderAnswerFileInputs = () => {
                     className="w-full px-4 py-3 pr-10 bg-gray-50 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                     placeholder="Ketik atau pilih mata kuliah..."
                   />
-                  {/* Icon indicator */}
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center">
                     {metadata.selectedCourseId && (
                       <CheckCircle className="w-5 h-5 text-green-500 mr-1" />
@@ -1061,7 +1085,6 @@ const renderAnswerFileInputs = () => {
                     <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${showCourseDropdown ? 'rotate-180' : ''}`} />
                   </div>
                   
-                  {/* Dropdown List */}
                   {showCourseDropdown && (
                     <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                       {filteredCourseTags.length > 0 ? (
@@ -1097,7 +1120,6 @@ const renderAnswerFileInputs = () => {
                 </p>
               </div>
 
-              {/* Material Tags Multi-Select - Filtered by selected course */}
               <div>
                 <label className="block text-sm font-medium mb-2 text-gray-700">
                   Topik Materi
@@ -1108,7 +1130,6 @@ const renderAnswerFileInputs = () => {
                   )}
                 </label>
                 <div className="bg-gray-50 rounded-xl border border-gray-300 p-3 min-h-[100px]">
-                  {/* Selected Topics */}
                   <div className="flex flex-wrap gap-2 mb-2">
                     {metadata.topics.map((topic) => (
                       <span
@@ -1128,7 +1149,6 @@ const renderAnswerFileInputs = () => {
                     ))}
                   </div>
                   
-                  {/* Available Topics */}
                   <div className="border-t border-gray-200 pt-3">
                     {!metadata.selectedCourseId ? (
                       <div className="text-center py-6">
@@ -1198,21 +1218,78 @@ const renderAnswerFileInputs = () => {
                 </select>
               </div>
 
-              {/* Lecturer - Read Only */}
-              <div>
+              <div className="lecturer-dropdown">
                 <label className="block text-sm font-medium mb-2 text-gray-700">Dosen</label>
-                <div className="flex items-center gap-2 px-4 py-3 bg-gray-100 rounded-xl border border-gray-300">
-                  <User className="w-5 h-5 text-gray-400" />
+                <div className="relative">
+                  <User className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     name="lecturer"
                     value={metadata.lecturer}
-                    readOnly
-                    className="flex-1 bg-transparent border-none focus:ring-0 text-gray-600"
-                    placeholder="Username dosen"
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setMetadata(prev => ({ ...prev, lecturer: value }));
+                      setLecturerSearchTerm(value);
+                      setShowLecturerDropdown(true);
+                    }}
+                    onFocus={() => {
+                      if (!loadingLecturers) setShowLecturerDropdown(true);
+                    }}
+                    placeholder={loadingLecturers ? 'Memuat daftar dosen...' : 'Ketik nama dosen atau pilih dari daftar'}
+                    disabled={loadingLecturers}
+                    className="w-full pl-10 pr-10 py-3 bg-gray-50 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:opacity-60"
                   />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!loadingLecturers) setShowLecturerDropdown(prev => !prev);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    tabIndex={-1}
+                  >
+                    <ChevronDown className={`w-5 h-5 transition-transform ${showLecturerDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  <AnimatePresence>
+                    {showLecturerDropdown && !loadingLecturers && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -6 }}
+                        className="absolute z-10 mt-2 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-56 overflow-y-auto"
+                      >
+                        {filteredLecturerOptions.length > 0 ? (
+                          filteredLecturerOptions.map((lecturer) => (
+                            <button
+                              type="button"
+                              key={lecturer.id}
+                              className="w-full text-left px-4 py-2 hover:bg-blue-50 flex justify-between text-sm"
+                              onMouseDown={() => {
+                                setMetadata(prev => ({ ...prev, lecturer: lecturer.nama }));
+                                setLecturerSearchTerm(lecturer.nama);
+                                setShowLecturerDropdown(false);
+                              }}
+                            >
+                              <span>{lecturer.nama}</span>
+                              {lecturer.status === 'Nonaktif' && (
+                                <span className="text-xs text-red-500">Nonaktif</span>
+                              )}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-sm text-gray-500">
+                            Tidak ditemukan. Lanjutkan mengetik untuk input manual.
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Otomatis terisi berdasarkan akun yang login</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {loadingLecturers
+                    ? 'Sedang mengambil daftar dosen dari server...'
+                    : 'Ketik beberapa huruf untuk mencari, atau pilih langsung dari daftar'}
+                </p>
               </div>
 
               <div>

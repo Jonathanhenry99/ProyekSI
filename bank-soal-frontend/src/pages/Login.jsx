@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from "framer-motion";
 import { Mail, Lock, LogIn, EyeOff, Eye, AlertCircle } from 'lucide-react';
 import Footer from '../components/Footer';
@@ -12,9 +12,26 @@ const LoginPage = ({ setCurrentUser }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [rememberMe, setRememberMe] = useState(false);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
+
+    // Load saved credentials when component mounts
+    useEffect(() => {
+        const savedEmail = localStorage.getItem('rememberedEmail');
+        const savedPassword = localStorage.getItem('rememberedPassword');
+        const wasRemembered = localStorage.getItem('rememberMe') === 'true';
+
+        if (wasRemembered && savedEmail) {
+            setEmail(savedEmail);
+            setRememberMe(true);
+            // Optionally load password (less secure, consider removing)
+            if (savedPassword) {
+                setPassword(atob(savedPassword)); // decode from base64
+            }
+        }
+    }, []);
 
     const handleLogin = (e) => {
         e.preventDefault();
@@ -31,6 +48,20 @@ const LoginPage = ({ setCurrentUser }) => {
         // Call the authentication service
         AuthService.login(email, password)
             .then((response) => {
+                // Handle Remember Me
+                if (rememberMe) {
+                    localStorage.setItem('rememberedEmail', email);
+                    // Store password in base64 (still not super secure, but better than plain text)
+                    // Consider removing this line if you don't want to store passwords
+                    localStorage.setItem('rememberedPassword', btoa(password));
+                    localStorage.setItem('rememberMe', 'true');
+                } else {
+                    // Clear remembered credentials if unchecked
+                    localStorage.removeItem('rememberedEmail');
+                    localStorage.removeItem('rememberedPassword');
+                    localStorage.removeItem('rememberMe');
+                }
+
                 // Update current user in parent component
                 setCurrentUser(response);
                 
@@ -41,7 +72,7 @@ const LoginPage = ({ setCurrentUser }) => {
                     } else {
                         navigate('/');
                     }
-                }, 100); // beri delay kecil agar state update
+                }, 100);
             })
             .catch(error => {
                 setIsLoading(false);
@@ -230,6 +261,8 @@ const LoginPage = ({ setCurrentUser }) => {
                                         <input
                                             id="remember-me"
                                             type="checkbox"
+                                            checked={rememberMe}
+                                            onChange={(e) => setRememberMe(e.target.checked)}
                                             className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                                         />
                                         <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
@@ -237,12 +270,13 @@ const LoginPage = ({ setCurrentUser }) => {
                                         </label>
                                     </div>
                                     <div className="text-sm">
-                                        <a
-                                            href="#"
+                                        <button
+                                            type="button"
+                                            onClick={() => navigate('/forgot-password')}
                                             className="font-medium text-blue-600 hover:text-blue-500 hover:underline"
                                         >
                                             Lupa password?
-                                        </a>
+                                        </button>
                                     </div>
                                 </div>
 
@@ -270,8 +304,6 @@ const LoginPage = ({ setCurrentUser }) => {
                                     )}
                                 </motion.button>
                             </form>
-
-
                         </div>
                     </motion.div>
                 </div>

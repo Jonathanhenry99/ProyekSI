@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from "framer-motion";
-// Di bagian import tambahkan:
 import LogoUnpar from "../assets/LogoUnpar.png";
 import LogoIF from "../assets/LogoIF.jpg";
 
@@ -11,20 +10,17 @@ import {
 
 const normalizeTopics = (topics) => {
     if (!topics) return [];
-
     if (Array.isArray(topics)) {
         return topics
             .map(topic => (typeof topic === 'string' ? topic.trim() : topic))
             .filter(topic => typeof topic === 'string' && topic.length > 0);
     }
-
     if (typeof topics === 'string') {
         return topics
             .split(',')
             .map(topic => topic.trim())
             .filter(topic => topic.length > 0);
     }
-
     return [];
 };
 
@@ -35,10 +31,9 @@ const transformQuestionData = (data = []) => {
     }));
 };
 
-// Header Component
+// Header Component (Tidak Berubah)
 const Header = ({ currentUser }) => {
     const handleLogout = () => {
-        // Implement logout logic
         window.location.href = '/login';
     };
 
@@ -51,17 +46,9 @@ const Header = ({ currentUser }) => {
         >
             <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
-                    <img
-                        src={LogoUnpar}
-                        alt="Logo Unpar"
-                        className="h-10 w-auto"
-                    />
+                    <img src={LogoUnpar} alt="Logo Unpar" className="h-10 w-auto" />
                     <div className="h-8 w-px bg-gray-300"></div>
-                    <img
-                        src={LogoIF}
-                        alt="Logo IF"
-                        className="h-10 w-auto rounded"
-                    />
+                    <img src={LogoIF} alt="Logo IF" className="h-10 w-auto rounded" />
                 </div>
 
                 <nav className="flex items-center space-x-7">
@@ -122,37 +109,28 @@ const Header = ({ currentUser }) => {
     );
 };
 
-// Custom Course Dropdown Component
-const CourseDropdown = ({ 
-    formSubject, 
-    setFormSubject, 
-    courseList, 
-    isCourseLoading 
-}) => {
+// Course Dropdown (Tidak Berubah)
+const CourseDropdown = ({ formSubject, setFormSubject, courseList, isCourseLoading }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const dropdownRef = useRef(null);
 
-    // Close dropdown when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setIsOpen(false);
             }
         };
-
         document.addEventListener('mousedown', handleClickOutside);
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, []);
 
-    // Filter courses based on search term
     const filteredCourses = courseList.filter(course =>
         course.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    // Get selected course name
     const selectedCourse = courseList.find(course => course.id === formSubject);
 
     const handleSelectCourse = (course) => {
@@ -167,16 +145,12 @@ const CourseDropdown = ({
                 Mata Kuliah Paket Soal (Wajib)
             </label>
             
-            {/* Selected course display */}
             {selectedCourse && (
                 <div className="mb-2">
                     <span className="inline-flex items-center gap-2 bg-blue-100 text-blue-800 text-sm px-3 py-1.5 rounded-full">
                         <BookOpen className="w-4 h-4" />
                         {selectedCourse.name}
-                        <button 
-                            onClick={() => setFormSubject("")}
-                            className="hover:text-blue-900 ml-1"
-                        >
+                        <button onClick={() => setFormSubject("")} className="hover:text-blue-900 ml-1">
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
@@ -185,7 +159,6 @@ const CourseDropdown = ({
                 </div>
             )}
 
-            {/* Dropdown trigger */}
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
@@ -196,22 +169,15 @@ const CourseDropdown = ({
                     <div className="flex items-center gap-3">
                         <BookOpen className="w-5 h-5 text-gray-400" />
                         <span className={`${selectedCourse ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>
-                            {isCourseLoading 
-                                ? "Memuat mata kuliah..." 
-                                : selectedCourse 
-                                    ? selectedCourse.name 
-                                    : "Pilih mata kuliah..."
-                            }
+                            {isCourseLoading ? "Memuat mata kuliah..." : selectedCourse ? selectedCourse.name : "Pilih mata kuliah..."}
                         </span>
                     </div>
                     <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
                 </div>
             </button>
 
-            {/* Dropdown menu */}
             {isOpen && !isCourseLoading && (
                 <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-hidden">
-                    {/* Search input */}
                     <div className="p-3 border-b border-gray-100">
                         <div className="relative">
                             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
@@ -226,11 +192,9 @@ const CourseDropdown = ({
                         </div>
                     </div>
 
-                    {/* Options list */}
                     <div className="max-h-48 overflow-y-auto">
                         {filteredCourses.length > 0 ? (
                             <>
-                                {/* Clear selection option */}
                                 {selectedCourse && (
                                     <button
                                         type="button"
@@ -247,26 +211,18 @@ const CourseDropdown = ({
                                         <span className="font-medium">Hapus Pilihan</span>
                                     </button>
                                 )}
-                                
-                                {/* Course options */}
                                 {filteredCourses.map((course) => (
                                     <button
                                         key={course.id}
                                         type="button"
                                         onClick={() => handleSelectCourse(course)}
                                         className={`w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors duration-150 flex items-center gap-3 ${
-                                            formSubject === course.id 
-                                                ? 'bg-blue-100 text-blue-900 font-medium' 
-                                                : 'text-gray-700 hover:text-blue-700'
+                                            formSubject === course.id ? 'bg-blue-100 text-blue-900 font-medium' : 'text-gray-700 hover:text-blue-700'
                                         }`}
                                     >
-                                        <BookOpen className={`w-4 h-4 ${
-                                            formSubject === course.id ? 'text-blue-600' : 'text-gray-400'
-                                        }`} />
+                                        <BookOpen className={`w-4 h-4 ${formSubject === course.id ? 'text-blue-600' : 'text-gray-400'}`} />
                                         <span className="flex-grow">{course.name}</span>
-                                        {formSubject === course.id && (
-                                            <Check className="w-4 h-4 text-blue-600" />
-                                        )}
+                                        {formSubject === course.id && <Check className="w-4 h-4 text-blue-600" />}
                                     </button>
                                 ))}
                             </>
@@ -274,7 +230,6 @@ const CourseDropdown = ({
                             <div className="px-4 py-6 text-center text-gray-500">
                                 <BookOpen className="w-8 h-8 mx-auto mb-2 text-gray-300" />
                                 <p className="text-sm font-medium">Tidak ada mata kuliah ditemukan</p>
-                                <p className="text-xs">Coba kata kunci lain</p>
                             </div>
                         )}
                     </div>
@@ -295,35 +250,27 @@ const FormCreatorPage = ({ currentUser }) => {
     const [courseList, setCourseList] = useState([]);
     const [isCourseLoading, setIsCourseLoading] = useState(true);
     
-    // State untuk questions dari API
     const [questions, setQuestions] = useState([]);
-    
-    // State untuk dropdown data dari API
     const [courseTagOptions, setCourseTagOptions] = useState([]);
     const [materialTagOptions, setMaterialTagOptions] = useState([]);
     const [difficultyLevels, setDifficultyLevels] = useState([]);
     const [isLoadingDropdowns, setIsLoadingDropdowns] = useState(true);
     
-    // State untuk tag mata kuliah
     const [selectedCourseTags, setSelectedCourseTags] = useState([]);
     const [courseTagSearch, setCourseTagSearch] = useState("");
     const [showCourseTagDropdown, setShowCourseTagDropdown] = useState(false);
     
-    // State untuk tag materi
     const [selectedMaterialTags, setSelectedMaterialTags] = useState([]);
     const [materialTagSearch, setMaterialTagSearch] = useState("");
     const [showMaterialTagDropdown, setShowMaterialTagDropdown] = useState(false);
     
-    // State untuk difficulty level
     const [selectedDifficulty, setSelectedDifficulty] = useState("");
-    const [showDifficultyDropdown, setShowDifficultyDropdown] = useState(false);
 
-    // Fetch dropdown data dari API
+    // Fetch dropdown data
     useEffect(() => {
         const fetchDropdownData = async () => {
             try {
                 setIsLoadingDropdowns(true);
-                
                 const response = await fetch("http://localhost:8080/api/dropdown/all-dropdown-data");
                 const data = await response.json();
                 
@@ -331,37 +278,25 @@ const FormCreatorPage = ({ currentUser }) => {
                     setCourseTagOptions(data.data.courseTags || []);
                     setMaterialTagOptions(data.data.materialTags || []);
                     setDifficultyLevels(data.data.difficultyLevels || []);
-                    console.log("Dropdown data loaded:", data.data);
                 } else {
-                    console.error("Failed to fetch dropdown data:", data.message);
-                    setDifficultyLevels([
-                        { level: 'Mudah' },
-                        { level: 'Sedang' },
-                        { level: 'Sulit' }
-                    ]);
+                    setDifficultyLevels([{ level: 'Mudah' }, { level: 'Sedang' }, { level: 'Sulit' }]);
                 }
             } catch (error) {
                 console.error("Error fetching dropdown data:", error);
-                setDifficultyLevels([
-                    { level: 'Mudah' },
-                    { level: 'Sedang' },
-                    { level: 'Sulit' }
-                ]);
+                setDifficultyLevels([{ level: 'Mudah' }, { level: 'Sedang' }, { level: 'Sulit' }]);
             } finally {
                 setIsLoadingDropdowns(false);
             }
         };
-
         fetchDropdownData();
     }, []);
 
-    // Fetch questions dari API
+    // Fetch questions
     useEffect(() => {
         const fetchQuestions = async () => {
             try {
                 const response = await fetch("http://localhost:8080/api/questionSets");
                 const data = await response.json();
-                console.log("Questions data dari backend:", data);
                 const transformed = transformQuestionData(data);
                 setQuestions(transformed);
                 setFilteredQuestions(transformed);
@@ -369,11 +304,34 @@ const FormCreatorPage = ({ currentUser }) => {
                 console.error("Error fetch question sets:", error);
             }
         };
-
         fetchQuestions();
     }, []);
 
-    // Fungsi untuk menambah tag mata kuliah
+    // Fetch Courses
+    useEffect(() => {
+        const fetchCourses = async () => {
+            try {
+                setIsCourseLoading(true);
+                const token = localStorage.getItem("token");
+                const response = await fetch("http://localhost:8080/api/course-tags", {
+                    headers: { "x-access-token": token },
+                });
+                const data = await response.json();
+                setCourseList(data);
+                // Debugging log untuk melihat tipe data ID (String vs Number)
+                if (data.length > 0) {
+                    console.log("Sample Course Data:", data[0]);
+                }
+            } catch (error) {
+                console.error("Error mengambil daftar mata kuliah:", error);
+            } finally {
+                setIsCourseLoading(false);
+            }
+        };
+        fetchCourses();
+    }, []);
+
+    // --- Helper Functions ---
     const addSelectedCourseTag = (tag) => {
         if (!selectedCourseTags.some(selected => selected.id === tag.id)) {
             setSelectedCourseTags([...selectedCourseTags, tag]);
@@ -382,14 +340,12 @@ const FormCreatorPage = ({ currentUser }) => {
         setShowCourseTagDropdown(false);
     };
     
-    // Fungsi untuk menghapus tag mata kuliah
     const removeSelectedCourseTag = (index) => {
         const newTags = [...selectedCourseTags];
         newTags.splice(index, 1);
         setSelectedCourseTags(newTags);
     };
     
-    // Fungsi untuk menambah tag materi
     const addSelectedMaterialTag = (tag) => {
         if (!selectedMaterialTags.some(selected => selected.id === tag.id)) {
             setSelectedMaterialTags([...selectedMaterialTags, tag]);
@@ -398,71 +354,53 @@ const FormCreatorPage = ({ currentUser }) => {
         setShowMaterialTagDropdown(false);
     };
     
-    // Fungsi untuk menghapus tag materi
     const removeSelectedMaterialTag = (index) => {
         const newTags = [...selectedMaterialTags];
         newTags.splice(index, 1);
         setSelectedMaterialTags(newTags);
     };
 
-    // State for drag and drop
+    // Drag and drop
     const [draggedItemIndex, setDraggedItemIndex] = useState(null);
     const [dragOverItemIndex, setDragOverItemIndex] = useState(null);
 
-    // Handle drag and drop functionality
-    const handleDragStart = (index) => {
-        setDraggedItemIndex(index);
-    };
-
+    const handleDragStart = (index) => setDraggedItemIndex(index);
     const handleDragOver = (e, index) => {
         e.preventDefault();
         setDragOverItemIndex(index);
     };
-
     const handleDrop = (e) => {
         e.preventDefault();
         if (draggedItemIndex !== null && dragOverItemIndex !== null) {
             const items = Array.from(selectedQuestions);
             const draggedItem = items[draggedItemIndex];
-
             items.splice(draggedItemIndex, 1);
             items.splice(dragOverItemIndex, 0, draggedItem);
-
             setSelectedQuestions(items);
         }
-
         setDraggedItemIndex(null);
         setDragOverItemIndex(null);
     };
 
-    // Handle question selection from bank
     const handleAddQuestion = (question) => {
         setSelectedQuestions([...selectedQuestions, question]);
-
         const notification = document.createElement('div');
-        notification.className =
-        'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+        notification.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
         notification.textContent = 'Soal berhasil ditambahkan!';
         document.body.appendChild(notification);
-
-        setTimeout(() => {
-        notification.remove();
-        }, 2000);
+        setTimeout(() => notification.remove(), 2000);
     };
 
-    // Handle question removal
     const handleRemoveQuestion = (index) => {
         const newQuestions = [...selectedQuestions];
         newQuestions.splice(index, 1);
         setSelectedQuestions(newQuestions);
     };
 
-    // Handle search functionality - DIPERBAIKI
     const handleSearch = () => {
         setIsSearching(true);
         let results = questions;
 
-        // Filter berdasarkan search term (hanya title dan description)
         if (searchTerm.trim()) {
             results = results.filter(q =>
                 q.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -471,29 +409,21 @@ const FormCreatorPage = ({ currentUser }) => {
             );
         }
 
-        // Filter berdasarkan course tags
         if (selectedCourseTags.length > 0) {
             results = results.filter(q => 
-                selectedCourseTags.some(tag => 
-                    q.subject?.toLowerCase().includes(tag.name?.toLowerCase())
-                )
+                selectedCourseTags.some(tag => q.subject?.toLowerCase().includes(tag.name?.toLowerCase()))
             );
         }
 
-        // Filter berdasarkan material tags
         if (selectedMaterialTags.length > 0) {
             results = results.filter(q => 
                 selectedMaterialTags.some(tag => {
                     const tagName = tag.name?.toLowerCase().trim();
-                    if (!tagName) {
-                        return false;
-                    }
-                    return q.topicsList?.some(topic => topic.toLowerCase().includes(tagName));
+                    return tagName && q.topicsList?.some(topic => topic.toLowerCase().includes(tagName));
                 })
             );
         }
 
-        // Filter berdasarkan difficulty
         if (selectedDifficulty) {
             results = results.filter(q => q.level === selectedDifficulty);
         }
@@ -501,7 +431,6 @@ const FormCreatorPage = ({ currentUser }) => {
         setFilteredQuestions(results);
     };
 
-    // Auto search ketika filter berubah
     useEffect(() => {
         handleSearch();
     }, [searchTerm, selectedCourseTags, selectedMaterialTags, selectedDifficulty, questions]);
@@ -522,74 +451,30 @@ const FormCreatorPage = ({ currentUser }) => {
             : formTitle.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_');
 
         const url = `http://localhost:8080/api/files/download-bundle?ids=${questionSetIds}&formTitle=${cleanFormTitle}`;
-        
         window.location.href = url;
 
         const notification = document.createElement('div');
         notification.className = 'fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50';
         notification.textContent = 'Download Bundle ZIP Soal dimulai...';
         document.body.appendChild(notification);
-
-        setTimeout(() => {
-            notification.remove();
-        }, 3000);
+        setTimeout(() => notification.remove(), 3000);
     };
 
-    // Format date helper
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
         const date = new Date(dateString);
         return date.toLocaleDateString('id-ID', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
+            year: 'numeric', month: 'short', day: 'numeric'
         });
     };
-
-    useEffect(() => {
-        const fetchCourses = async () => {
-            try {
-                setIsCourseLoading(true);
-                const token = localStorage.getItem("token");
-                console.log("Token:", token);
-
-                const response = await fetch("http://localhost:8080/api/course-tags", {
-                    headers: {
-                        "x-access-token": token,
-                    },
-                });
-
-                console.log("Response status:", response.status);
-                const data = await response.json();
-                console.log("Data mata kuliah:", data);
-
-                setCourseList(data);
-            } catch (error) {
-                console.error("Error mengambil daftar mata kuliah:", error);
-            } finally {
-                setIsCourseLoading(false);
-            }
-        };
-
-        fetchCourses();
-    }, []);
 
     const handleSaveQuestionPackage = async () => {
         const token = localStorage.getItem("token");
         if (!token) return alert("Token tidak ditemukan, silakan login ulang");
     
-        // ✅ TAMBAHKAN VALIDASI INI
-        if (!formTitle.trim()) {
-            return alert("⚠️ Judul paket soal tidak boleh kosong!");
-        }
-    
-        if (!formSubject) {
-            return alert("⚠️ Silakan pilih mata kuliah terlebih dahulu!");
-        }
-    
-        if (selectedQuestions.length === 0) {
-            return alert("⚠️ Minimal pilih 1 soal untuk membuat paket soal!");
-        }
+        if (!formTitle.trim()) return alert("⚠️ Judul paket soal tidak boleh kosong!");
+        if (!formSubject) return alert("⚠️ Silakan pilih mata kuliah terlebih dahulu!");
+        if (selectedQuestions.length === 0) return alert("⚠️ Minimal pilih 1 soal untuk membuat paket soal!");
     
         try {
             const payload = {
@@ -598,8 +483,6 @@ const FormCreatorPage = ({ currentUser }) => {
                 course_id: formSubject,
                 questionSetIds: selectedQuestions.map(q => q.id)
             };
-    
-            console.log("Payload dikirim ke backend:", payload);
     
             const response = await fetch("http://localhost:8080/api/question-packages", {
                 method: "POST",
@@ -615,19 +498,41 @@ const FormCreatorPage = ({ currentUser }) => {
                 throw new Error(errorData.message || "Gagal menyimpan paket soal");
             }
     
-            const savedPackage = await response.json();
             alert("✅ Paket soal berhasil disimpan!");
-            console.log(savedPackage);
-    
             setFormTitle("");
             setFormDescription("");
             setFormSubject("");
+            setSelectedQuestions([]);
         
         } catch (err) {
             console.error("Error saving question package:", err);
             alert(`❌ Error: ${err.message}`);
         }
     };
+
+    // --- FIX UTAMA DISINI ---
+    // Helper untuk mengubah ID mata kuliah menjadi Nama Mata Kuliah
+    const getSubjectName = (identifier) => {
+        if (!identifier) return "-";
+        if (courseList.length === 0) return identifier; // Tunggu data load
+
+        // 1. Convert ke String agar aman (mengatasi masalah beda tipe data "1" vs 1)
+        // 2. Cek apakah identifier adalah ID
+        const foundById = courseList.find(c => String(c.id) === String(identifier));
+        
+        if (foundById) return foundById.name;
+
+        // 3. Fallback: Kembalikan identifier itu sendiri (jika ternyata itu sudah berupa Nama)
+        return identifier;
+    };
+
+    // Helper wrapper untuk menangani properti yang mungkin berbeda
+    const resolveSubjectDisplay = (question) => {
+        // Cek subject ATAU course_id ATAU courseId
+        const idToCheck = question.subject || question.course_id || question.courseId;
+        return getSubjectName(idToCheck);
+    };
+    // ------------------------
 
     return (
         <div className="min-h-screen bg-gray-50 text-gray-800">
@@ -639,11 +544,10 @@ const FormCreatorPage = ({ currentUser }) => {
                     animate={{ opacity: 1, y: 0 }}
                     className="text-center mb-8"
                 >
-                    <h1 className="text-4xl font-bold mb-4 text-gray-900">Pembuat Form  Paket Soal</h1>
-                  
+                    <h1 className="text-4xl font-bold mb-4 text-gray-900">Pembuat Form Paket Soal</h1>
                 </motion.div>
 
-                {/* Filter Section - DIPERBAIKI */}
+                {/* Filter Section */}
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -670,19 +574,13 @@ const FormCreatorPage = ({ currentUser }) => {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             {/* 1. Tag Mata Kuliah */}
                             <div className="space-y-2">
-                                <label className="block text-sm font-medium text-gray-700">
-                                    Tag Mata Kuliah
-                                </label>
-                                
+                                <label className="block text-sm font-medium text-gray-700">Tag Mata Kuliah</label>
                                 {selectedCourseTags.length > 0 && (
                                     <div className="flex flex-wrap gap-2 mb-2">
                                         {selectedCourseTags.map((tag, index) => (
                                             <span key={index} className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs px-2.5 py-1 rounded-full">
                                                 {tag.name}
-                                                <button 
-                                                    onClick={() => removeSelectedCourseTag(index)}
-                                                    className="hover:text-blue-900"
-                                                >
+                                                <button onClick={() => removeSelectedCourseTag(index)} className="hover:text-blue-900">
                                                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                                     </svg>
@@ -691,7 +589,6 @@ const FormCreatorPage = ({ currentUser }) => {
                                         ))}
                                     </div>
                                 )}
-                                
                                 <div className="relative">
                                     <input
                                         type="text"
@@ -704,13 +601,10 @@ const FormCreatorPage = ({ currentUser }) => {
                                     />
                                     <BookOpen className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
                                 </div>
-                                
                                 {showCourseTagDropdown && courseTagOptions.length > 0 && (
                                     <div className="absolute z-30 mt-1 w-full max-w-[calc(25%-1rem)] bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                                         {courseTagOptions
-                                            .filter(tag => 
-                                                tag.name?.toLowerCase().includes(courseTagSearch.toLowerCase())
-                                            )
+                                            .filter(tag => tag.name?.toLowerCase().includes(courseTagSearch.toLowerCase()))
                                             .map((tag, index) => (
                                                 <button
                                                     key={index} 
@@ -719,27 +613,20 @@ const FormCreatorPage = ({ currentUser }) => {
                                                 >
                                                     {tag.name}
                                                 </button>
-                                            ))
-                                        }
+                                            ))}
                                     </div>
                                 )}
                             </div>
 
                             {/* 2. Tag Materi */}
                             <div className="space-y-2">
-                                <label className="block text-sm font-medium text-gray-700">
-                                    Tag Materi
-                                </label>
-                                
+                                <label className="block text-sm font-medium text-gray-700">Tag Materi</label>
                                 {selectedMaterialTags.length > 0 && (
                                     <div className="flex flex-wrap gap-2 mb-2">
                                         {selectedMaterialTags.map((tag, index) => (
                                             <span key={index} className="inline-flex items-center gap-1 bg-green-100 text-green-800 text-xs px-2.5 py-1 rounded-full">
                                                 {tag.name}
-                                                <button 
-                                                    onClick={() => removeSelectedMaterialTag(index)}
-                                                    className="hover:text-green-900"
-                                                >
+                                                <button onClick={() => removeSelectedMaterialTag(index)} className="hover:text-green-900">
                                                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                                     </svg>
@@ -748,7 +635,6 @@ const FormCreatorPage = ({ currentUser }) => {
                                         ))}
                                     </div>
                                 )}
-                                
                                 <div className="relative">
                                     <input
                                         type="text"
@@ -761,13 +647,10 @@ const FormCreatorPage = ({ currentUser }) => {
                                     />
                                     <FileText className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
                                 </div>
-                                
                                 {showMaterialTagDropdown && materialTagOptions.length > 0 && (
                                     <div className="absolute z-30 mt-1 w-full max-w-[calc(25%-1rem)] bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                                         {materialTagOptions
-                                            .filter(tag => 
-                                                tag.name?.toLowerCase().includes(materialTagSearch.toLowerCase())
-                                            )
+                                            .filter(tag => tag.name?.toLowerCase().includes(materialTagSearch.toLowerCase()))
                                             .map((tag, index) => (
                                                 <button
                                                     key={index} 
@@ -776,26 +659,19 @@ const FormCreatorPage = ({ currentUser }) => {
                                                 >
                                                     {tag.name}
                                                 </button>
-                                            ))
-                                        }
+                                            ))}
                                     </div>
                                 )}
                             </div>
 
                             {/* 3. Tingkat Kesulitan */}
                             <div className="space-y-2">
-                                <label className="block text-sm font-medium text-gray-700">
-                                    Tingkat Kesulitan
-                                </label>
-                                
+                                <label className="block text-sm font-medium text-gray-700">Tingkat Kesulitan</label>
                                 {selectedDifficulty && (
                                     <div className="flex flex-wrap gap-2 mb-2">
                                         <span className="inline-flex items-center gap-1 bg-purple-100 text-purple-800 text-xs px-2.5 py-1 rounded-full">
                                             {selectedDifficulty}
-                                            <button 
-                                                onClick={() => setSelectedDifficulty("")}
-                                                className="hover:text-purple-900"
-                                            >
+                                            <button onClick={() => setSelectedDifficulty("")} className="hover:text-purple-900">
                                                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                                 </svg>
@@ -803,7 +679,6 @@ const FormCreatorPage = ({ currentUser }) => {
                                         </span>
                                     </div>
                                 )}
-                                
                                 <div className="relative">
                                     <select
                                         className="w-full pl-10 pr-4 py-2.5 bg-gray-50 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all appearance-none text-sm"
@@ -813,29 +688,21 @@ const FormCreatorPage = ({ currentUser }) => {
                                     >
                                         <option value="">Semua Tingkat</option>
                                         {difficultyLevels.map((level, index) => (
-                                            <option key={index} value={level.level}>
-                                                {level.level}
-                                            </option>
+                                            <option key={index} value={level.level}>{level.level}</option>
                                         ))}
                                     </select>
                                     <ChevronDown className="w-4 h-4 text-gray-400 absolute left-3 top-3 pointer-events-none" />
                                 </div>
                             </div>
 
-                            {/* Search Box - Dipindah ke kolom terakhir */}
+                            {/* Search Box */}
                             <div className="space-y-2">
-                                <label className="block text-sm font-medium text-gray-700">
-                                    Cari Soal
-                                </label>
-                                
+                                <label className="block text-sm font-medium text-gray-700">Cari Soal</label>
                                 {searchTerm && (
                                     <div className="flex flex-wrap gap-2 mb-2">
                                         <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-800 text-xs px-2.5 py-1 rounded-full">
                                             "{searchTerm}"
-                                            <button 
-                                                onClick={() => setSearchTerm("")}
-                                                className="hover:text-gray-900"
-                                            >
+                                            <button onClick={() => setSearchTerm("")} className="hover:text-gray-900">
                                                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                                 </svg>
@@ -843,7 +710,6 @@ const FormCreatorPage = ({ currentUser }) => {
                                         </span>
                                     </div>
                                 )}
-                                
                                 <div className="relative">
                                     <input
                                         type="text"
@@ -866,7 +732,6 @@ const FormCreatorPage = ({ currentUser }) => {
                         animate={{ opacity: 1, x: 0 }}
                         className="bg-white rounded-2xl p-8 shadow-sm border border-gray-200"
                     >
-                        {/* Form title and description */}
                         <div className="mb-8 border-b pb-6">
                             <input
                                 type="text"
@@ -883,7 +748,6 @@ const FormCreatorPage = ({ currentUser }) => {
                                 rows="2"
                             />
 
-                            {/* Custom Course Dropdown */}
                             <CourseDropdown 
                                 formSubject={formSubject}
                                 setFormSubject={setFormSubject}
@@ -915,8 +779,9 @@ const FormCreatorPage = ({ currentUser }) => {
                                         onDragStart={() => handleDragStart(index)}
                                         onDragOver={(e) => handleDragOver(e, index)}
                                         onDrop={handleDrop}
-                                        className={`bg-gray-50 border border-gray-200 rounded-lg p-4 flex items-start cursor-move hover:shadow-md transition-all ${dragOverItemIndex === index ? "border-2 border-blue-500 bg-blue-50" : ""
-                                            }`}
+                                        className={`bg-gray-50 border border-gray-200 rounded-lg p-4 flex items-start cursor-move hover:shadow-md transition-all ${
+                                            dragOverItemIndex === index ? "border-2 border-blue-500 bg-blue-50" : ""
+                                        }`}
                                     >
                                         <div className="flex-shrink-0 w-8 text-center font-medium mr-4 text-gray-600">
                                             {index + 1}
@@ -925,12 +790,9 @@ const FormCreatorPage = ({ currentUser }) => {
                                             <div className="flex justify-between items-start mb-2">
                                                 <h3 className="font-semibold text-gray-900">{question.title}</h3>
                                                 <div className={`text-xs px-2 py-1 rounded-full ${
-                                                    question.level === "Mudah"
-                                                   
-                                                    ? "bg-green-100 text-green-800"
-                                                    : question.level === "Sedang"
-                                                    ? "bg-yellow-100 text-yellow-800"
-                                                    : "bg-red-100 text-red-800"
+                                                    question.level === "Mudah" ? "bg-green-100 text-green-800" : 
+                                                    question.level === "Sedang" ? "bg-yellow-100 text-yellow-800" : 
+                                                    "bg-red-100 text-red-800"
                                                 }`}>
                                                     {question.level}
                                                 </div>
@@ -938,14 +800,16 @@ const FormCreatorPage = ({ currentUser }) => {
                                             {question.description && (
                                                 <p className="text-sm text-gray-600 mb-2 line-clamp-2">{question.description}</p>
                                             )}
-                                            <div className="text-sm text-gray-700 mb-1">{question.subject}</div>
+                                            
+                                            {/* FIX: Gunakan resolveSubjectDisplay agar aman ID vs Name */}
+                                            <div className="text-sm text-gray-700 mb-1 font-medium text-blue-600">
+                                                {resolveSubjectDisplay(question)}
+                                            </div>
+                                            
                                             {question.topicsList?.length > 0 && (
                                                 <div className="flex flex-wrap gap-2 mb-2">
                                                     {question.topicsList.map((topic, topicIndex) => (
-                                                        <span
-                                                            key={`${question.id || index}-selected-topic-${topicIndex}`}
-                                                            className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full"
-                                                        >
+                                                        <span key={`${question.id || index}-selected-topic-${topicIndex}`} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
                                                             {topic}
                                                         </span>
                                                     ))}
@@ -966,10 +830,7 @@ const FormCreatorPage = ({ currentUser }) => {
                                             <button className="p-2 hover:bg-gray-200 rounded transition-colors">
                                                 <Move className="w-4 h-4 text-gray-400" />
                                             </button>
-                                            <button
-                                                onClick={() => handleRemoveQuestion(index)}
-                                                className="p-2 hover:bg-red-100 rounded transition-colors"
-                                            >
+                                            <button onClick={() => handleRemoveQuestion(index)} className="p-2 hover:bg-red-100 rounded transition-colors">
                                                 <Trash2 className="w-4 h-4 text-red-400 hover:text-red-600" />
                                             </button>
                                         </div>
@@ -978,30 +839,27 @@ const FormCreatorPage = ({ currentUser }) => {
                             )}
                         </div>
 
-                        {/* Save button */}
                         {selectedQuestions.length > 0 && (
-                        <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            className="w-full bg-green-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2 mb-3"
-                            onClick={handleSaveQuestionPackage}
-                        >
-                            <Check className="w-5 h-5" />
-                            Simpan Paket Soal 
-                        </motion.button>
-                        )}
-                        
-                        {/* Download button */}
-                        {selectedQuestions.length > 0 && (
-                            <motion.button
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
-                                className="w-full bg-blue-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                                onClick={handleDownloadZipBundle} 
-                            >
-                                <Download className="w-5 h-5" />
-                                Download Paket Soal
-                            </motion.button>
+                            <>
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    className="w-full bg-green-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2 mb-3"
+                                    onClick={handleSaveQuestionPackage}
+                                >
+                                    <Check className="w-5 h-5" />
+                                    Simpan Paket Soal 
+                                </motion.button>
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    className="w-full bg-blue-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                                    onClick={handleDownloadZipBundle} 
+                                >
+                                    <Download className="w-5 h-5" />
+                                    Download Paket Soal
+                                </motion.button>
+                            </>
                         )}
                     </motion.div>
 
@@ -1021,26 +879,21 @@ const FormCreatorPage = ({ currentUser }) => {
                             </div>
                         </div>
 
-                        {/* Question Grid Layout */}
                         <div className="space-y-4 max-h-[calc(100vh-320px)] overflow-y-auto">
                             {filteredQuestions.map((q) => (
                                 <motion.div
-                                key={q.id}
-                                className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all duration-200"
-                                whileHover={{ scale: 1.01 }}
+                                    key={q.id}
+                                    className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all duration-200"
+                                    whileHover={{ scale: 1.01 }}
                                 >
                                     <div className="flex justify-between items-start mb-3">
                                         <h3 className="font-semibold text-gray-900 text-base leading-tight">{q.title}</h3>
-                                        <span
-                                        className={`text-xs px-2 py-1 rounded-full flex-shrink-0 ml-2 ${
-                                            q.level === "Mudah"
-                                            ? "bg-green-100 text-green-800"
-                                            : q.level === "Sedang"
-                                            ? "bg-yellow-100 text-yellow-800"
-                                            : "bg-red-100 text-red-800"
-                                        }`}
-                                        >
-                                        {q.level}
+                                        <span className={`text-xs px-2 py-1 rounded-full flex-shrink-0 ml-2 ${
+                                            q.level === "Mudah" ? "bg-green-100 text-green-800" : 
+                                            q.level === "Sedang" ? "bg-yellow-100 text-yellow-800" : 
+                                            "bg-red-100 text-red-800"
+                                        }`}>
+                                            {q.level}
                                         </span>
                                     </div>
                                     
@@ -1053,7 +906,10 @@ const FormCreatorPage = ({ currentUser }) => {
                                     <div className="space-y-2 mb-4">
                                         <div className="flex items-center gap-2 text-sm text-gray-700">
                                             <BookOpen className="w-4 h-4 text-blue-500 flex-shrink-0" />
-                                            <span className="font-medium">{q.subject}</span>
+                                            {/* FIX: Gunakan resolveSubjectDisplay agar aman ID vs Name */}
+                                            <span className="font-medium">
+                                                {resolveSubjectDisplay(q)}
+                                            </span>
                                         </div>
                                         
                                         <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -1076,10 +932,7 @@ const FormCreatorPage = ({ currentUser }) => {
                                         {q.topicsList?.length > 0 && (
                                             <div className="flex flex-wrap gap-2 pt-1">
                                                 {q.topicsList.map((topic, topicIndex) => (
-                                                    <span
-                                                        key={`${q.id}-topic-${topicIndex}`}
-                                                        className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full"
-                                                    >
+                                                    <span key={`${q.id}-topic-${topicIndex}`} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
                                                         {topic}
                                                     </span>
                                                 ))}
@@ -1121,14 +974,12 @@ const FormCreatorPage = ({ currentUser }) => {
                 </div>
             </div>
 
-            {/* Footer */}
             <footer className="bg-white border-t border-gray-200 py-6 mt-12">
                 <div className="container mx-auto px-6 text-center text-gray-600 text-sm">
                     © 2024 Form Creator. All rights reserved.
                 </div>
             </footer>
 
-            {/* Click outside handlers */}
             {(showCourseTagDropdown || showMaterialTagDropdown) && (
                 <div 
                     className="fixed inset-0 z-10" 
