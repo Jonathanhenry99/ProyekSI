@@ -111,3 +111,33 @@ exports.delete = async (req, res) => {
     res.status(500).send({ message: err.message });
   }
 };
+
+// INCREMENT DOWNLOAD COUNT
+exports.incrementDownload = async (req, res) => {
+  try {
+    const packageId = req.params.id;
+
+    if (!packageId || isNaN(packageId)) {
+      return res.status(400).send({ message: "ID paket soal tidak valid." });
+    }
+
+    const pkg = await QuestionPackage.findByPk(packageId);
+
+    if (!pkg) {
+      return res.status(404).send({ message: "Paket soal tidak ditemukan." });
+    }
+
+    const currentDownloads = pkg.downloads || 0;
+    pkg.downloads = currentDownloads + 1;
+    await pkg.save();
+
+    res.status(200).send({
+      message: "Download paket berhasil dicatat.",
+      id: pkg.id,
+      downloads: pkg.downloads
+    });
+  } catch (err) {
+    console.error("❌ Error incrementing package downloads:", err);
+    res.status(500).send({ message: "Gagal memperbarui jumlah unduhan." });
+  }
+};

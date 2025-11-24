@@ -30,6 +30,10 @@ module.exports = (sequelize, Sequelize) => {
       },
       onDelete: "CASCADE"
     },
+    downloads: {
+      type: Sequelize.INTEGER,
+      defaultValue: 0
+    },
     created_at: {
       type: Sequelize.DATE,
       defaultValue: Sequelize.NOW

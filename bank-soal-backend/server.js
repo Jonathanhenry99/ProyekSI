@@ -17,13 +17,6 @@ app.use(express.json());
 // Parse URL-encoded requests
 app.use(express.urlencoded({ extended: true }));
 
-// Database connection
-db.sequelize.sync({ alter: true }).then(() => {
-    console.log("Database synchronized");
-}).catch(err => {
-    console.error("Failed to sync database:", err.message);
-});
-
 // Routes
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
@@ -35,10 +28,8 @@ const materialRoutes = require('./routes/materialTag.routes');
 const dropdownRoutes = require('./routes/dropdown.routes');
 const courseMaterialRoutes = require('./routes/courseMaterial.routes');
 const questionPackageRoutes = require('./routes/questionPackage.routes');
-// const editSoalRoutes = require('./routes/editsoal.routes'); // Import the correct router
 
-// // Use routes
-// app.use('/api', editSoalRoutes); // Register editSoal routes under /api
+// Use routes
 courseMaterialRoutes(app);
 authRoutes(app);
 userRoutes(app);
@@ -50,21 +41,19 @@ materialRoutes(app);
 dropdownRoutes(app);
 questionPackageRoutes(app);
 
-// Set port and start server
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}.`);
-});
-
-db.sequelize.sync({ alter: true }) // <- kode ini
+// Database connection and server start (FIXED - only once!)
+db.sequelize.sync({ alter: true })
   .then(() => {
-    console.log("Database synchronized");
-    // Mulai server setelah DB sinkron
-    const PORT = process.env.PORT || 8080;
+    console.log("✅ Database synchronized successfully");
+    
+    // Start server ONLY after DB sync is successful
+    const PORT = process.env.PORT || 8080; // CHANGED FROM 8081 to 8080
     app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}.`);
+      console.log(`🚀 Server is running on port ${PORT}`);
+ 
     });
   })
   .catch(err => {
-    console.error("Failed to sync database:", err);
+    console.error("❌ Failed to sync database:", err);
+    process.exit(1); // Exit if database sync fails
   });

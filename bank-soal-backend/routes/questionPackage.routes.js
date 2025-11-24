@@ -12,6 +12,9 @@ module.exports = app => {
   // >>> GET satu paket soal
   router.get("/:id", [authJwt.verifyToken], questionPackages.findOne);
 
+  // >>> Increment download count
+  router.post("/:id/increment-download", [authJwt.verifyToken], questionPackages.incrementDownload);
+
   // >>> DELETE paket soal
   router.delete("/:id", [authJwt.verifyToken], questionPackages.delete);
 

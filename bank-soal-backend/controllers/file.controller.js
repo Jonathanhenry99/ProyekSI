@@ -64,11 +64,11 @@ exports.uploadFile = async (req, res) => {
       }
     }
     else if (fileCategory === 'testCases') {
-      const allowedExtensions = ['.txt'];
+      const allowedExtensions = ['.txt', '.zip', '.rar'];
       if (!allowedExtensions.includes(ext)) {
         fs.unlinkSync(req.file.path);
         return res.status(400).send({ 
-          message: `Format file ${ext} tidak didukung untuk test cases. Gunakan TXT.` 
+          message: `Format file ${ext} tidak didukung untuk test cases. Gunakan TXT, ZIP, atau RAR.` 
         });
       }
     }
