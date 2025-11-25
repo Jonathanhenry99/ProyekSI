@@ -141,3 +141,47 @@ exports.incrementDownload = async (req, res) => {
     res.status(500).send({ message: "Gagal memperbarui jumlah unduhan." });
   }
 };
+
+// GET HISTORY BY QUESTION SET ID
+exports.getHistoryByQuestionId = async (req, res) => {
+  try {
+    const questionId = req.params.questionId;
+
+    if (!questionId || isNaN(questionId)) {
+      return res.status(400).send({ message: "ID soal tidak valid." });
+    }
+
+    const history = await QuestionPackageItem.findAll({
+      where: { question_id: questionId },
+      include: [
+        {
+          model: QuestionPackage,
+          as: "package",
+          attributes: ["id", "title"],
+          include: [
+            {
+              model: CourseTag,
+              as: "course",
+              attributes: ["id", "name"]
+            }
+          ]
+        }
+      ],
+      attributes: ["id", "created_at"],
+      order: [["created_at", "DESC"]]
+    });
+
+    // Format response
+    const formattedHistory = history.map(item => ({
+      id: item.id,
+      title: item.package ? item.package.title : null,
+      courseName: item.package && item.package.course ? item.package.course.name : null,
+      createdAt: item.created_at
+    }));
+
+    res.status(200).send(formattedHistory);
+  } catch (err) {
+    console.error("❌ Error fetching question history:", err);
+    res.status(500).send({ message: err.message || "Gagal mengambil history soal." });
+  }
+};

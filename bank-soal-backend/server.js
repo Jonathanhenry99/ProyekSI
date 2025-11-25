@@ -47,7 +47,7 @@ db.sequelize.sync({ alter: true })
     console.log("✅ Database synchronized successfully");
     
     // Start server ONLY after DB sync is successful
-    const PORT = process.env.PORT || 8080; // CHANGED FROM 8081 to 8080
+    const PORT = process.env.PORT || 8080; 
     app.listen(PORT, () => {
       console.log(`🚀 Server is running on port ${PORT}`);
  

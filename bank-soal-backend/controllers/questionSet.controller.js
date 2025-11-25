@@ -6,6 +6,8 @@ const CourseTag = db.courseTag;
 const fs = require("fs");
 const { Op } = require("sequelize");
 
+
+
 // Helper function untuk mendapatkan nama course berdasarkan ID
 const getCourseNameById = async (subjectName) => {
   try {
@@ -418,7 +420,6 @@ exports.permanentDeleteQuestionSet = async (req, res) => {
   }
 };
 
-// ==================== UPDATE FUNCTIONS ====================
 
 // UPDATE SEDERHANA TANPA FILE - UNTUK FRONTEND EDIT MODAL
 exports.updateQuestionSetSimple = async (req, res) => {
@@ -480,19 +481,43 @@ exports.updateQuestionSetSimple = async (req, res) => {
       console.log("Fallback conversion:", processedTopics);
     }
 
+    // ============ PERBAIKAN DI SINI ============
+    let finalSubjectName = questionSet.subject; // Default: pakai yang lama
+
+    // Jika user mengirim subject baru (berupa ID)
+    if (req.body.subject) {
+      console.log("=== SUBJECT CONVERSION DEBUG ===");
+      console.log("Received subject ID:", req.body.subject);
+      
+      // Cari course berdasarkan ID
+      const course = await CourseTag.findByPk(req.body.subject);
+      
+      if (course) {
+        finalSubjectName = course.name; // Ambil NAMA dari course
+        console.log("Converted subject ID to name:", finalSubjectName);
+      } else {
+        console.log("Course not found for ID:", req.body.subject);
+        // Jika ID tidak ditemukan, tetap gunakan yang lama
+        finalSubjectName = questionSet.subject;
+      }
+    }
+    
+    console.log("Final subject name to save:", finalSubjectName);
+    
     const updateData = {
-      title: req.body.title.trim(),
-      description: req.body.description ? req.body.description.trim() : questionSet.description,
-      subject: req.body.subject,
-      year: parseInt(req.body.year) || questionSet.year,
-      level: req.body.difficulty || questionSet.level,
-      lecturer: req.body.lecturer ? req.body.lecturer.trim() : questionSet.lecturer,
-      topics: processedTopics,
-      last_updated: new Date()
+        title: req.body.title.trim(),
+        description: req.body.description ? req.body.description.trim() : questionSet.description,
+        
+        subject: finalSubjectName, // Simpan NAMA, bukan ID
+        
+        year: parseInt(req.body.year) || questionSet.year,
+        level: req.body.difficulty || questionSet.level,
+        lecturer: req.body.lecturer ? req.body.lecturer.trim() : questionSet.lecturer,
+        topics: processedTopics,
+        last_updated: new Date()
     };
 
-    console.log("Final updateData topics:", typeof updateData.topics, updateData.topics);
-    console.log("Updating with data:", updateData);
+    console.log("Final updateData:", updateData);
 
     await questionSet.update(updateData);
     console.log("Question set updated successfully");
@@ -512,27 +537,18 @@ exports.updateQuestionSetSimple = async (req, res) => {
       ]
     });
 
-    let courseName = req.body.subjectName || null;
-    
-    if (!courseName) {
-      courseName = await getCourseNameById(updatedQuestionSet.subject);
-    }
-
-    console.log("Course name resolved:", courseName);
-
+    // Untuk response, subject sudah berupa nama
     const responseData = {
       ...updatedQuestionSet.toJSON(),
-      courseName: courseName,
-      subjectName: courseName,
+      courseName: updatedQuestionSet.subject, // subject sudah berupa nama
+      subjectName: updatedQuestionSet.subject,
       subject: updatedQuestionSet.subject
     };
 
     console.log("Final response data:", {
       id: responseData.id,
       title: responseData.title,
-      subject: responseData.subject,
-      courseName: responseData.courseName,
-      subjectName: responseData.subjectName
+      subject: responseData.subject
     });
 
     res.status(200).send({ 
@@ -549,7 +565,6 @@ exports.updateQuestionSetSimple = async (req, res) => {
     });
   }
 };
-
 // Mengupdate question set (original method)
 exports.updateQuestionSet = async (req, res) => {
   try {
@@ -566,10 +581,26 @@ exports.updateQuestionSet = async (req, res) => {
       });
     }
 
+    // ============ KONVERSI ID KE NAMA ============
+    let finalSubjectName = questionSet.subject; // Default: pakai yang lama
+
+    if (req.body.subject) {
+      console.log("Converting subject ID to name:", req.body.subject);
+      const course = await CourseTag.findByPk(req.body.subject);
+      
+      if (course) {
+        finalSubjectName = course.name;
+        console.log("Subject name:", finalSubjectName);
+      } else {
+        console.log("Course not found, keeping old subject");
+      }
+    }
+    // ============================================
+
     await questionSet.update({
       title: req.body.title || questionSet.title,
       description: req.body.description || questionSet.description,
-      subject: req.body.subject || questionSet.subject,
+      subject: finalSubjectName, // ← SIMPAN NAMA, BUKAN ID
       year: req.body.year || questionSet.year,
       level: req.body.difficulty || questionSet.level,
       lecturer: req.body.lecturer || questionSet.lecturer,
@@ -579,11 +610,11 @@ exports.updateQuestionSet = async (req, res) => {
       last_updated: new Date()
     });
 
-    const courseName = await getCourseNameById(questionSet.subject);
+    // Subject sudah berupa nama, jadi bisa langsung dipakai
     const responseData = {
       ...questionSet.toJSON(),
-      courseName: courseName,
-      subjectName: courseName
+      courseName: questionSet.subject, // subject sudah nama
+      subjectName: questionSet.subject
     };
 
     res.status(200).send({ 

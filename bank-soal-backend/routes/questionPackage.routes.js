@@ -15,6 +15,9 @@ module.exports = app => {
   // >>> Increment download count
   router.post("/:id/increment-download", [authJwt.verifyToken], questionPackages.incrementDownload);
 
+  // >>> GET history by question set id
+  router.get("/history/:questionId", questionPackages.getHistoryByQuestionId);
+
   // >>> DELETE paket soal
   router.delete("/:id", [authJwt.verifyToken], questionPackages.delete);
 

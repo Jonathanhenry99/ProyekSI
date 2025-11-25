@@ -2,22 +2,18 @@
 -- BANK SOAL INFORMATIKA DATABASE SCHEMA
 -- ========================================
 
--- Drop existing tables if they exist (in reverse order of dependencies)
+-- Drop existing tables if they exist (in reverse order of dependencies) yang kepake cuman ini
 DROP TABLE IF EXISTS question_history CASCADE;
-DROP TABLE IF EXISTS question_material_tags CASCADE;
-DROP TABLE IF EXISTS question_course_tags CASCADE;
-DROP TABLE IF EXISTS answers CASCADE;
 DROP TABLE IF EXISTS files CASCADE;
 DROP TABLE IF EXISTS question_set_items CASCADE;
-DROP TABLE IF EXISTS questions CASCADE;
 DROP TABLE IF EXISTS course_material_assignments CASCADE;
 DROP TABLE IF EXISTS material_tags CASCADE;
-DROP TABLE IF EXISTS course_tags CASCADE;
-DROP TABLE IF EXISTS courses CASCADE;
+DROP TABLE IF EXISTS course_tags CASCADE
 DROP TABLE IF EXISTS user_roles CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS roles CASCADE;
 DROP TABLE IF EXISTS question_sets CASCADE;
+
 
 -- ========================================
 -- CORE TABLES
@@ -32,16 +28,6 @@ CREATE TABLE users (
     full_name VARCHAR(100) NOT NULL,
     role VARCHAR(20) NOT NULL DEFAULT 'ROLE_USER' CHECK (role IN ('ROLE_USER', 'ROLE_ADMIN')),
     is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Courses table
-CREATE TABLE courses (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    code VARCHAR(50) NOT NULL UNIQUE,
-    description TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -73,7 +59,7 @@ CREATE TABLE course_material_assignments (
 );
 
 -- Question sets table
-CREATE TABLE question_sets (
+CREATE TABLE question_sets ( --ini untuk tabel soal individu
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     description TEXT,
@@ -103,41 +89,13 @@ CREATE TABLE files (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Questions table
-CREATE TABLE questions (
-    id SERIAL PRIMARY KEY,
-    title VARCHAR(255) NOT NULL,
-    content TEXT NOT NULL,
-    difficulty_level VARCHAR(50) NOT NULL CHECK (difficulty_level IN ('Mudah', 'Sedang', 'Sulit')),
-    question_type VARCHAR(50) NOT NULL CHECK (question_type IN ('Essay', 'Coding', 'Multiple Choice')),
-    created_by INTEGER REFERENCES users(id),
-    course_id INTEGER REFERENCES courses(id),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+-- Questions tabl
 
--- Question-Course tags junction table
-CREATE TABLE question_course_tags (
-    question_id INTEGER REFERENCES questions(id) ON DELETE CASCADE,
-    course_tag_id INTEGER REFERENCES course_tags(id) ON DELETE CASCADE,
-    PRIMARY KEY (question_id, course_tag_id)
-);
 
--- Question-Material tags junction table
-CREATE TABLE question_material_tags (
-    question_id INTEGER REFERENCES questions(id) ON DELETE CASCADE,
-    material_tag_id INTEGER REFERENCES material_tags(id) ON DELETE CASCADE,
-    PRIMARY KEY (question_id, material_tag_id)
-);
 
--- Answers table
-CREATE TABLE answers (
-    id SERIAL PRIMARY KEY,
-    question_id INTEGER REFERENCES questions(id) ON DELETE CASCADE,
-    content TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+
+
+
 
 -- Question history table
 CREATE TABLE question_history (

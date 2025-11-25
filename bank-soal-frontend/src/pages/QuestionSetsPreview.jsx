@@ -405,7 +405,7 @@ const QuestionSetsPreview = ({ currentUser }) => {
             className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6"
           >
             <div className="flex items-start mb-4">
-              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+              <div className="shrink-0 w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
                 <AlertTriangle className="w-6 h-6 text-red-600" />
               </div>
               <div className="ml-4 flex-1">

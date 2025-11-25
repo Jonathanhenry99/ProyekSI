@@ -1006,6 +1006,8 @@ const QuestionPreview = ({ currentUser }) => {
   const [tabUploadModal, setTabUploadModal] = useState({ isOpen: false, category: '', questionSetId: null });
   const [currentAnswerPage, setCurrentAnswerPage] = useState(1);
   const [itemsPerPage] = useState(1); // 1 jawaban per halaman
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => {
     const user = AuthService?.getCurrentUser ? AuthService.getCurrentUser() : null;
@@ -1033,7 +1035,23 @@ const QuestionPreview = ({ currentUser }) => {
     }
 
     fetchQuestionSetDetails();
+    fetchHistory();
   }, [id]);
+
+  const fetchHistory = async () => {
+    if (!id) return;
+    
+    try {
+      setHistoryLoading(true);
+      const response = await axios.get(`${API_URL}/question-packages/history/${id}`);
+      setHistory(response.data || []);
+    } catch (error) {
+      console.error("Error fetching history:", error);
+      setHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (questionSet && questionSet.id) {
@@ -1535,6 +1553,60 @@ const QuestionPreview = ({ currentUser }) => {
                   Upload {activeTab === 'questions' ? 'Soal' : activeTab === 'answers' ? 'Kunci Jawaban' : 'Test Cases'}
                 </motion.button>
               )}
+            </div>
+          )}
+        </div>
+
+        {/* History Section */}
+        <div className="bg-white rounded-xl shadow-md p-6 mt-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">History Paket Soal</h2>
+          {historyLoading ? (
+            <div className="flex items-center justify-center p-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+          ) : history.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Judul Paket</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Mata Kuliah</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Tanggal Ditambahkan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map((item, index) => (
+                    <motion.tr
+                      key={item.id || index}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {item.title || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {item.courseName || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {item.createdAt ? new Date(item.createdAt).toLocaleString('id-ID', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        }) : '-'}
+                      </td>
+                    </motion.tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-500">Belum ada history paket soal untuk soal ini</p>
             </div>
           )}
         </div>

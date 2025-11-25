@@ -4,10 +4,10 @@ import Home from './pages/Home';
 import Search from './pages/Search';
 import Upload from './pages/Upload';
 import Create from './pages/Create';
-import History from './pages/History';
+// import History from './pages/History';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword'; // NEW IMPORT
-import ResetPassword from './pages/ResetPassword'; // NEW IMPORT
+// import ResetPassword from './pages/ResetPassword'; // NEW IMPORT
 import AuthService from './services/auth.service';
 import QuestionSets from './pages/QuestionSets';
 import MataKuliahAdmin from './pages/admin/MataKuliahAdmin';
@@ -103,7 +103,7 @@ export default function App() {
             PASSWORD RESET ROUTES (NEW)
             ======================================== */}
         <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
+        {/* <Route path="/reset-password" element={<ResetPassword />} /> */}
         
         {/* User Protected Routes */}
         <Route path="/search" element={

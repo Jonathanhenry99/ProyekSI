@@ -100,6 +100,12 @@ db.question_package_items.belongsTo(db.questionSet, {
   as: "question"
 });
 
+//Item paket soal mengacu ke QuestionPackage
+db.question_package_items.belongsTo(db.question_packages, {
+  foreignKey: "question_package_id",
+  as: "package"
+});
+
 //QuestionSet bisa berada di banyak paket soal
 db.questionSet.hasMany(db.question_package_items, {
   foreignKey: "question_id",
