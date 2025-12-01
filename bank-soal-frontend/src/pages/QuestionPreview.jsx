@@ -1,164 +1,1095 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from "framer-motion";
-import { ArrowLeft, Download, FileText, File, BookOpen } from 'lucide-react';
+import { ArrowLeft, Download, FileText, File, BookOpen, Trash2, AlertTriangle, Upload, RotateCcw, X, CheckCircle, Code, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import EditModal from '../components/EditModal';
 import axios from 'axios';
+import AuthService from '../services/auth.service';
 
 const API_URL = "http://localhost:8080/api";
 
-// PDF Viewer Component
-const PDFViewer = ({ fileId }) => {
-  const [pdfUrl, setPdfUrl] = useState(null);
+// Setup axios interceptor for authentication
+axios.interceptors.request.use(
+  (config) => {
+    let token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    
+    if (!token) {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          token = user.accessToken;
+        } catch (e) {
+          console.error('Error parsing user from localStorage:', e);
+        }
+      }
+    }
+    
+    if (token) {
+      config.headers['x-access-token'] = token;
+      delete config.headers['Authorization'];
+    }
+    
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// ✅ Get language mapping for syntax highlighting
+const getLanguageForHighlighting = (extension) => {
+  const langMap = {
+    '.js': 'javascript',
+    '.jsx': 'jsx',
+    '.ts': 'typescript',
+    '.tsx': 'tsx',
+    '.py': 'python',
+    '.java': 'java',
+    '.c': 'c',
+    '.cpp': 'cpp',
+    '.cc': 'cpp',
+    '.cxx': 'cpp',
+    '.h': 'c',
+    '.hpp': 'cpp',
+    '.cs': 'csharp',
+    '.php': 'php',
+    '.rb': 'ruby',
+    '.go': 'go',
+    '.rs': 'rust',
+    '.kt': 'kotlin',
+    '.kts': 'kotlin',
+    '.swift': 'swift',
+    '.dart': 'dart',
+    '.scala': 'scala',
+    '.r': 'r',
+    '.m': 'matlab',
+    '.sh': 'bash',
+    '.bash': 'bash',
+    '.sql': 'sql',
+    '.html': 'html',
+    '.htm': 'html',
+    '.css': 'css',
+    '.scss': 'scss',
+    '.sass': 'sass',
+    '.json': 'json',
+    '.xml': 'xml',
+    '.yaml': 'yaml',
+    '.yml': 'yaml',
+    '.txt': 'text',
+    '.md': 'markdown'
+  };
+  
+  return langMap[extension.toLowerCase()] || 'text';
+};
+
+// ✅ Get language display name
+const getLanguageDisplayName = (extension) => {
+  const displayMap = {
+    '.js': 'JavaScript',
+    '.jsx': 'React JSX',
+    '.ts': 'TypeScript',
+    '.tsx': 'TypeScript React',
+    '.py': 'Python',
+    '.java': 'Java',
+    '.c': 'C',
+    '.cpp': 'C++',
+    '.cc': 'C++',
+    '.cxx': 'C++',
+    '.h': 'C Header',
+    '.hpp': 'C++ Header',
+    '.cs': 'C#',
+    '.php': 'PHP',
+    '.rb': 'Ruby',
+    '.go': 'Go',
+    '.rs': 'Rust',
+    '.kt': 'Kotlin',
+    '.swift': 'Swift',
+    '.dart': 'Dart',
+    '.scala': 'Scala',
+    '.r': 'R',
+    '.m': 'MATLAB',
+    '.sh': 'Shell Script',
+    '.bash': 'Bash',
+    '.sql': 'SQL',
+    '.html': 'HTML',
+    '.css': 'CSS',
+    '.scss': 'SCSS',
+    '.json': 'JSON',
+    '.xml': 'XML',
+    '.yaml': 'YAML',
+    '.txt': 'Plain Text',
+    '.md': 'Markdown'
+  };
+  
+  return displayMap[extension.toLowerCase()] || 'Code';
+};
+
+// ✅ Code Preview Component with Syntax Highlighting
+const CodePreview = ({ file }) => {
+  const [code, setCode] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [theme, setTheme] = useState('dark');
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    const fetchPDF = async () => {
+    const fetchCode = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`${API_URL}/files/blob/${fileId}`, {
-          responseType: 'blob'
+        const response = await axios.get(`${API_URL}/files/preview/${file.id}`, {
+          responseType: 'text'
         });
-        
-        // Create blob URL
-        const blob = new Blob([response.data], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
-        setPdfUrl(url);
+        setCode(response.data);
         setError(null);
       } catch (err) {
-        console.error("Error loading PDF:", err);
-        setError("Gagal memuat PDF");
+        console.error('Error loading code:', err);
+        setError('Gagal memuat file');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchPDF();
+    fetchCode();
+  }, [file.id]);
 
-    // Cleanup blob URL when component unmounts
-    return () => {
-      if (pdfUrl) {
-        URL.revokeObjectURL(pdfUrl);
-      }
-    };
-  }, [fileId]);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-[600px] bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      <div className="flex items-center justify-center p-10 border border-gray-300 rounded-lg">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-[600px] bg-gray-50">
-        <FileText className="w-16 h-16 text-red-500 mb-4" />
-        <p className="text-red-600">{error}</p>
+      <div className="flex flex-col items-center justify-center p-10 border border-gray-300 rounded-lg">
+        <Code size={64} className="text-red-500 mb-4" />
+        <p className="text-lg font-medium text-red-600 mb-2">{error}</p>
       </div>
     );
   }
 
+  const ext = file.originalname.substring(file.originalname.lastIndexOf('.')).toLowerCase();
+  const language = getLanguageForHighlighting(ext);
+  const displayName = getLanguageDisplayName(ext);
+
   return (
-    <div className="w-full h-[600px] border border-gray-300 rounded-lg overflow-hidden">
-      <iframe 
-        src={pdfUrl}
-        className="w-full h-full"
-        title="PDF Viewer"
-      />
+    <div className="border border-gray-300 rounded-lg overflow-hidden">
+      {/* Header with language info and theme toggle */}
+      <div className="bg-gray-100 px-4 py-2 flex items-center justify-between border-b">
+        <div className="flex items-center">
+          <Code className="w-5 h-5 text-gray-600 mr-2" />
+          <span className="font-medium text-gray-700">{displayName}</span>
+          <span className="ml-3 text-sm text-gray-500">
+            {code.split('\n').length} lines
+          </span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="px-3 py-1 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+          >
+            {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+          </button>
+          <button
+            onClick={handleCopy}
+            className={`px-3 py-1 text-sm rounded transition-colors ${
+              copied 
+                ? 'bg-green-600 text-white' 
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+          >
+            {copied ? '✓ Copied!' : '📋 Copy'}
+          </button>
+        </div>
+      </div>
+
+      {/* Code display with syntax highlighting */}
+      <div className="max-h-[600px] overflow-auto">
+        <SyntaxHighlighter
+          language={language}
+          style={theme === 'dark' ? vscDarkPlus : vs}
+          showLineNumbers={true}
+          wrapLines={true}
+          customStyle={{
+            margin: 0,
+            borderRadius: 0,
+            fontSize: '14px',
+            lineHeight: '1.5'
+          }}
+          lineNumberStyle={{
+            minWidth: '3em',
+            paddingRight: '1em',
+            color: theme === 'dark' ? '#858585' : '#999',
+            userSelect: 'none'
+          }}
+        >
+          {code}
+        </SyntaxHighlighter>
+      </div>
     </div>
   );
 };
 
-// Combined PDF Viewer Component
-const CombinedPDFViewer = ({ questionSetId, type = 'questions' }) => {
+// Upload Modal Component
+const UploadFileModal = ({ isOpen, onClose, questionSetId, fileCategory, onFileUploaded, replaceFileId = null }) => {
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleFileChange = (file) => {
+    if (!file) return;
+
+    // Different validation based on category
+    if (fileCategory === 'questions' || fileCategory === 'soal') {
+      const validTypes = ['.pdf', '.docx', '.doc'];
+      const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+      
+      if (!validTypes.includes(fileExt)) {
+        setError(`Format file ${fileExt} tidak didukung untuk soal. Gunakan PDF, DOCX, atau DOC.`);
+        return;
+      }
+    } else if (fileCategory === 'testCases' || fileCategory === 'test') {
+      const validTypes = ['.txt'];
+      const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+      
+      if (!validTypes.includes(fileExt)) {
+        setError(`Format file ${fileExt} tidak didukung untuk test cases. Gunakan TXT.`);
+        return;
+      }
+    }
+    // For answers/kunci: accept all programming language files
+
+    setSelectedFile(file);
+    setError(null);
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+
+    setUploading(true);
+    setError(null);
+
+    try {
+      // Jika replaceFileId ada, hapus file lama terlebih dahulu
+      if (replaceFileId) {
+        try {
+          await axios.delete(`${API_URL}/files/${replaceFileId}`);
+          console.log('✅ File lama berhasil dihapus, melanjutkan upload file baru...');
+        } catch (deleteErr) {
+          console.error('⚠️ Error menghapus file lama:', deleteErr);
+          // Lanjutkan upload meskipun gagal hapus (mungkin file sudah tidak ada)
+          // Tapi tetap tampilkan warning jika perlu
+          if (deleteErr.response?.status !== 404) {
+            setError('Gagal menghapus file lama. Silakan coba lagi.');
+            setUploading(false);
+            return;
+          }
+        }
+      }
+
+      // Upload file baru menggunakan endpoint yang sudah ada
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('questionSetId', questionSetId);
+      formData.append('fileCategory', fileCategory);
+
+      const response = await axios.post(`${API_URL}/files/upload`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      if (onFileUploaded) {
+        onFileUploaded(response.data.file);
+      }
+
+      onClose();
+    } catch (err) {
+      console.error('Error uploading file:', err);
+      setError(err.response?.data?.message || 'Gagal mengupload file. Silakan coba lagi.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedFile(null);
+      setError(null);
+      setDragOver(false);
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const getCategoryDisplayName = (category) => {
+    switch (category) {
+      case 'soal':
+      case 'questions':
+        return 'Soal';
+      case 'kunci':
+      case 'answers':
+        return 'Kunci Jawaban';
+      case 'test':
+      case 'testCases':
+        return 'Test Cases';
+      default:
+        return 'File';
+    }
+  };
+
+  const getAcceptedTypes = () => {
+    if (fileCategory === 'questions' || fileCategory === 'soal') {
+      return '.pdf,.docx,.doc';
+    } else if (fileCategory === 'testCases' || fileCategory === 'test') {
+      return '.txt';
+    } else {
+      return '.txt,.js,.jsx,.ts,.tsx,.py,.java,.c,.cpp,.cc,.cxx,.h,.hpp,.cs,.php,.rb,.go,.rs,.kt,.swift,.dart,.scala,.r,.m,.sh,.bash,.sql,.html,.css,.json,.xml,.yaml,.yml';
+    }
+  };
+
+  const getAcceptedTypesDisplay = () => {
+    if (fileCategory === 'questions' || fileCategory === 'soal') {
+      return 'PDF, DOCX, DOC';
+    } else if (fileCategory === 'testCases' || fileCategory === 'test') {
+      return 'TXT';
+    } else {
+      return 'Semua bahasa pemrograman + TXT';
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 flex items-center justify-center z-50 p-4"
+      style={{ 
+        background: 'rgba(255, 255, 255, 0.9)',
+        backdropFilter: 'blur(10px)'
+      }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-gray-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center">
+            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
+              <Upload className="w-6 h-6 text-blue-600" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">
+                {replaceFileId ? 'Upload Ulang' : 'Upload'} {getCategoryDisplayName(fileCategory)}
+              </h2>
+              <p className="text-gray-500 text-sm">
+                {replaceFileId ? 'File baru akan menimpa file yang sedang dilihat' : 'Tambahkan file baru'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            {error}
+          </div>
+        )}
+
+        <div
+          className={`relative border-2 border-dashed rounded-xl p-6 transition-all mb-6 ${
+            dragOver ? 'border-blue-400 bg-blue-50' :
+            selectedFile ? 'border-green-400 bg-green-50' :
+            'border-gray-300 hover:border-blue-400'
+          }`}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            const files = Array.from(e.dataTransfer.files);
+            if (files.length > 0) handleFileChange(files[0]);
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+          }}
+        >
+          <input
+            type="file"
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            onChange={(e) => handleFileChange(e.target.files[0])}
+            accept={getAcceptedTypes()}
+          />
+          
+          <div className="text-center">
+            {selectedFile ? (
+              <div className="flex items-center justify-center">
+                <CheckCircle className="w-8 h-8 text-green-500 mr-3" />
+                <div>
+                  <p className="font-medium text-gray-900">{selectedFile.name}</p>
+                  <p className="text-sm text-gray-500">
+                    {(selectedFile.size / 1024).toFixed(1)} KB
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-700 mb-2">Pilih file {getCategoryDisplayName(fileCategory)}</p>
+                <p className="text-sm text-gray-500">Drag & drop atau klik untuk memilih</p>
+                <p className="text-xs text-gray-400 mt-2">Format: {getAcceptedTypesDisplay()}</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex space-x-3">
+          <button
+            onClick={onClose}
+            disabled={uploading}
+            className="flex-1 px-4 py-3 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+          >
+            Batal
+          </button>
+          <button
+            onClick={handleUpload}
+            disabled={!selectedFile || uploading}
+            className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+          >
+            {uploading ? (
+              <>
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  className="w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"
+                />
+                Mengupload...
+              </>
+            ) : (
+              <>
+                <Upload className="w-4 h-4 mr-2" />
+                Upload File
+              </>
+            )}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+// ✅ Pagination Component
+const Pagination = ({ currentPage, totalPages, onPageChange }) => {
+  const pages = [];
+  const maxVisible = 5;
+  
+  let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+  let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+  
+  if (endPage - startPage < maxVisible - 1) {
+    startPage = Math.max(1, endPage - maxVisible + 1);
+  }
+  
+  for (let i = startPage; i <= endPage; i++) {
+    pages.push(i);
+  }
+
+  return (
+    <div className="flex items-center justify-center space-x-2 mt-6">
+      <button
+        onClick={() => onPageChange(currentPage - 1)}
+        disabled={currentPage === 1}
+        className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      >
+        <ChevronLeft className="w-5 h-5" />
+      </button>
+      
+      {startPage > 1 && (
+        <>
+          <button
+            onClick={() => onPageChange(1)}
+            className="px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 transition-colors"
+          >
+            1
+          </button>
+          {startPage > 2 && <span className="px-2 text-gray-500">...</span>}
+        </>
+      )}
+      
+      {pages.map(page => (
+        <button
+          key={page}
+          onClick={() => onPageChange(page)}
+          className={`px-3 py-2 rounded-lg border transition-colors ${
+            currentPage === page
+              ? 'bg-blue-600 text-white border-blue-600'
+              : 'border-gray-300 hover:bg-gray-100'
+          }`}
+        >
+          {page}
+        </button>
+      ))}
+      
+      {endPage < totalPages && (
+        <>
+          {endPage < totalPages - 1 && <span className="px-2 text-gray-500">...</span>}
+          <button
+            onClick={() => onPageChange(totalPages)}
+            className="px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 transition-colors"
+          >
+            {totalPages}
+          </button>
+        </>
+      )}
+      
+      <button
+        onClick={() => onPageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+        className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      >
+        <ChevronRight className="w-5 h-5" />
+      </button>
+    </div>
+  );
+};
+
+// Enhanced Combined PDF Viewer Component with Code Preview Support and Pagination
+const CombinedPDFViewer = ({ questionSetId, type = 'questions', isAuthenticated, onFileUploaded }) => {
   const [pdfUrl, setPdfUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [filesList, setFilesList] = useState([]);
+  const [contentType, setContentType] = useState('pdf'); // 'pdf' or 'code'
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(1); // Show 1 file per page for focused view
 
-  useEffect(() => {
-    const fetchCombinedPDF = async () => {
-      try {
-        setLoading(true);
-        const response = await axios.get(`${API_URL}/files/combine-preview/${questionSetId}?type=${type}`, {
-          responseType: 'blob'
-        });
+  const fetchFiles = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/questionsets/${questionSetId}`);
+      const questionSet = response.data;
+      
+      const activeFiles = questionSet.files.filter(file => 
+        file.is_deleted !== true && file.isDeleted !== true
+      );
+      
+      // Filter files by type
+      let filteredFiles = [];
+      if (type === 'answers') {
+        filteredFiles = activeFiles.filter(f => 
+          f.filecategory === 'kunci' || f.filecategory === 'answers'
+        );
+      } else if (type === 'questions') {
+        filteredFiles = activeFiles.filter(f => 
+          f.filecategory === 'soal' || f.filecategory === 'questions' || 
+          f.filecategory === 'test' || f.filecategory === 'testCases'
+        );
+      }
+      
+      return filteredFiles;
+    } catch (err) {
+      console.error('Error fetching files:', err);
+      return [];
+    }
+  };
+
+  const isCodeOrTextFile = (filename) => {
+    const ext = filename.substring(filename.lastIndexOf('.')).toLowerCase();
+    const codeExtensions = [
+      '.js', '.jsx', '.ts', '.tsx', '.py', '.java',
+      '.c', '.cpp', '.cc', '.cxx', '.h', '.hpp',
+      '.cs', '.php', '.rb', '.go', '.rs', '.kt',
+      '.swift', '.dart', '.scala', '.r', '.m',
+      '.sh', '.bash', '.sql', '.html', '.css',
+      '.json', '.xml', '.yaml', '.yml', '.txt', '.md'
+    ];
+    return codeExtensions.includes(ext);
+  };
+
+  const fetchCombinedContent = async (forceRefresh = false) => {
+    try {
+      setLoading(true);
+      
+      if (pdfUrl) {
+        URL.revokeObjectURL(pdfUrl);
+        setPdfUrl(null);
+      }
+      
+      // Fetch files to check content type
+      const files = await fetchFiles();
+      setFilesList(files);
+      
+      if (files.length === 0) {
+        throw new Error('NO_FILES');
+      }
+      
+      // Check if all files are code files (for answers type)
+      const allCodeFiles = files.every(f => isCodeOrTextFile(f.originalname));
+      
+      if (type === 'answers' && allCodeFiles && files.length > 0) {
+        // Show code preview for answers
+        setContentType('code');
+        setError(null);
+      } else {
+        // Show PDF for questions or mixed content
+        setContentType('pdf');
+        const timestamp = forceRefresh ? `&_t=${Date.now()}` : '';
+        const response = await axios.get(
+          `${API_URL}/files/combine-preview/${questionSetId}?type=${type}${timestamp}`, 
+          {
+            responseType: 'blob',
+            headers: forceRefresh ? {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            } : {}
+          }
+        );
         
-        // Create blob URL
         const blob = new Blob([response.data], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
         setPdfUrl(url);
         setError(null);
-      } catch (err) {
-        console.error(`Error loading ${type} PDF:`, err);
-        setError(`Gagal memuat ${type === 'questions' ? 'soal dan test cases' : 'kunci jawaban'}`);
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (err) {
+      console.error(`Error loading ${type} content:`, err);
+      
+      if (err.message === 'NO_FILES' || err.response?.status === 404) {
+        setError(`Belum ada file ${type === 'questions' ? 'soal dan test cases' : 'kunci jawaban'} untuk ditampilkan`);
+      } else if (err.response?.status === 500) {
+        setError(`Gagal memproses file ${type === 'questions' ? 'soal dan test cases' : 'kunci jawaban'}`);
+      } else {
+        setError(`Gagal memuat ${type === 'questions' ? 'soal dan test cases' : 'kunci jawaban'}`);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     if (questionSetId) {
-      fetchCombinedPDF();
+      fetchCombinedContent();
     }
 
-    // Cleanup blob URL when component unmounts
     return () => {
       if (pdfUrl) {
         URL.revokeObjectURL(pdfUrl);
       }
     };
-  }, [questionSetId, type]);
+  }, [questionSetId, type, refreshKey]);
+
+  // Reset to page 1 when files list changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filesList.length]);
+
+  const getUploadCategory = (type) => {
+    switch (type) {
+      case 'questions':
+        return 'questions';
+      case 'answers':
+        return 'answers';
+      default:
+        return 'testCases';
+    }
+  };
+
+  const handleFileUploaded = async (file) => {
+    console.log('File uploaded:', file);
+    
+    if (onFileUploaded) {
+      onFileUploaded(file);
+    }
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    setRefreshKey(prev => prev + 1);
+    await fetchCombinedContent(true);
+  };
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filesList.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentFiles = filesList.slice(startIndex, endIndex);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[600px] bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Memuat {type === 'questions' ? 'soal dan test cases' : 'kunci jawaban'}...</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-[600px] bg-gray-50">
-        <FileText className="w-16 h-16 text-red-500 mb-4" />
-        <p className="text-red-600">{error}</p>
+      <div className="flex flex-col items-center justify-center h-[600px] bg-gray-50 border border-gray-200 rounded-lg">
+        <FileText className="w-16 h-16 text-gray-400 mb-4" />
+        <p className="text-gray-600 text-center max-w-md mb-4">{error}</p>
+        <p className="text-sm text-gray-500 mb-6 text-center">
+          {type === 'questions' ? 
+            'Upload file soal atau test cases untuk melihat preview' : 
+            'Upload file kunci jawaban untuk melihat preview'
+          }
+        </p>
+        
+        {isAuthenticated && (
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setUploadModalOpen(true)}
+            className="flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md"
+          >
+            <Upload className="w-5 h-5 mr-2" />
+            Upload {type === 'questions' ? 'Soal/Test Cases' : 'Kunci Jawaban'}
+          </motion.button>
+        )}
+
+        <UploadFileModal
+          isOpen={uploadModalOpen}
+          onClose={() => setUploadModalOpen(false)}
+          questionSetId={questionSetId}
+          fileCategory={getUploadCategory(type)}
+          onFileUploaded={handleFileUploaded}
+        />
       </div>
     );
   }
 
+  // Render code preview for answers with pagination
+  if (contentType === 'code' && filesList.length > 0) {
+    return (
+      <div className="relative flex flex-col h-full">
+        <div className="space-y-4 flex-1">
+          {/* File counter with improved styling for single file view */}
+          <div className="flex items-center justify-between mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center">
+              <FileText className="w-5 h-5 text-blue-600 mr-2" />
+              <span className="text-sm font-medium text-blue-900">
+                File {currentPage} dari {filesList.length}
+              </span>
+            </div>
+            <span className="text-xs text-blue-600 bg-white px-3 py-1 rounded-full">
+              {filesList.length} file tersedia
+            </span>
+          </div>
+          
+          {currentFiles.map((file, index) => (
+            <div key={`preview-${file.id}-${index}`} className="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+              <div className="bg-gray-100 px-4 py-3 border-b flex items-center justify-between">
+                <div className="flex items-center">
+                  <Code className="w-5 h-5 text-gray-600 mr-2" />
+                  <div>
+                    <span className="font-medium text-gray-900 block">{file.originalname}</span>
+                    <span className="text-xs text-gray-500">
+                      {getLanguageDisplayName(file.originalname.substring(file.originalname.lastIndexOf('.')))}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded">
+                    {Math.round(file.filesize / 1024)} KB
+                  </span>
+                </div>
+              </div>
+              <CodePreview file={file} />
+            </div>
+          ))}
+          
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <Pagination 
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
+          )}
+        </div>
+        
+        {isAuthenticated && (
+          <button
+            onClick={() => {
+              setRefreshKey(prev => prev + 1);
+              fetchCombinedContent(true);
+            }}
+            className="absolute top-4 right-4 p-2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full shadow-md transition-all z-10"
+            title="Refresh Preview"
+          >
+            <RotateCcw className="w-4 h-4 text-gray-600" />
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Render PDF for questions or mixed content
   return (
-    <div className="w-full h-[600px] border border-gray-300 rounded-lg overflow-hidden">
-      <iframe 
-        src={pdfUrl}
-        className="w-full h-full"
-        title={`${type === 'questions' ? 'Soal dan Test Cases' : 'Kunci Jawaban'} Viewer`}
-      />
+    <div className="relative flex flex-col h-full">
+      <div className="w-full flex-1 min-h-[600px] border border-gray-300 rounded-lg overflow-hidden">
+        <iframe 
+          key={`pdf-${refreshKey}`}
+          src={pdfUrl}
+          className="w-full h-full"
+          title={`${type === 'questions' ? 'Soal dan Test Cases' : 'Kunci Jawaban'} Viewer`}
+          allow="fullscreen"
+        />
+      </div>
+      
+      {isAuthenticated && (
+        <button
+          onClick={() => {
+            setRefreshKey(prev => prev + 1);
+            fetchCombinedContent(true);
+          }}
+          className="absolute top-4 right-4 p-2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full shadow-md transition-all"
+          title="Refresh Preview"
+        >
+          <RotateCcw className="w-4 h-4 text-gray-600" />
+        </button>
+      )}
     </div>
   );
 };
 
+// Delete Confirmation Modal Component
+const DeleteConfirmationModal = ({ isOpen, onClose, file, onConfirm, loading }) => {
+  if (!isOpen || !file) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 flex items-center justify-center z-50 p-4"
+      style={{ 
+        background: 'rgba(255, 255, 255, 0.9)',
+        backdropFilter: 'blur(10px)'
+      }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-gray-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center mb-6">
+          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-4">
+            <Trash2 className="w-6 h-6 text-red-600" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Hapus File</h2>
+            <p className="text-gray-500 text-sm">Konfirmasi penghapusan file</p>
+          </div>
+        </div>
+
+        <div className="mb-6">
+          <p className="text-gray-700 mb-4">
+            Apakah Anda yakin ingin menghapus file berikut?
+          </p>
+          
+          <div className="p-4 bg-gray-50 rounded-lg border">
+            <div className="flex items-center">
+              <FileText className="w-5 h-5 text-gray-400 mr-2" />
+              <div>
+                <p className="font-medium text-gray-900">{file.originalname}</p>
+                <p className="text-sm text-gray-500">
+                  {file.filetype?.toUpperCase()} • {Math.round(file.filesize / 1024)} KB
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-start">
+              <AlertTriangle className="w-4 h-4 text-red-600 mr-2 mt-0.5" />
+              <div className="text-sm">
+                <p className="text-red-800 font-medium mb-1">Peringatan</p>
+                <p className="text-red-700">
+                  File akan dihapus secara permanen dan tidak dapat dipulihkan.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex space-x-3">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="flex-1 px-4 py-3 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+          >
+            Batal
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+          >
+            {loading ? (
+              <>
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  className="w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"
+                />
+                Menghapus...
+              </>
+            ) : (
+              <>
+                <Trash2 className="w-4 h-4 mr-2" />
+                Hapus File
+              </>
+            )}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+// Toast Notification Component
+const Toast = ({ message, type = 'success', isVisible, onClose }) => {
+  useEffect(() => {
+    if (isVisible) {
+      const timer = setTimeout(() => {
+        onClose();
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [isVisible, onClose]);
+
+  if (!isVisible) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -50, x: '-50%' }}
+      animate={{ opacity: 1, y: 0, x: '-50%' }}
+      exit={{ opacity: 0, y: -50, x: '-50%' }}
+      className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded-lg shadow-lg ${
+        type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+      }`}
+    >
+      <div className="flex items-center">
+        {type === 'success' ? (
+          <div className="w-5 h-5 rounded-full bg-white bg-opacity-20 flex items-center justify-center mr-3">
+            <div className="w-2 h-2 bg-white rounded-full"></div>
+          </div>
+        ) : (
+          <AlertTriangle className="w-5 h-5 mr-3" />
+        )}
+        <span className="font-medium">{message}</span>
+      </div>
+    </motion.div>
+  );
+};
+
+// Main QuestionPreview Component
 const QuestionPreview = ({ currentUser }) => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [questionSet, setQuestionSet] = useState(null);
   const [files, setFiles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('questions'); // questions, answers, testCases
-  const [combinedPdfUrl, setCombinedPdfUrl] = useState(null); // Move this hook here
+  const [activeTab, setActiveTab] = useState('questions');
+  const [combinedPdfUrl, setCombinedPdfUrl] = useState(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [fileToDelete, setFileToDelete] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [tabUploadModal, setTabUploadModal] = useState({ isOpen: false, category: '', questionSetId: null });
+  const [replaceUploadModal, setReplaceUploadModal] = useState({ isOpen: false, file: null, category: '', questionSetId: null });
+  const [currentAnswerPage, setCurrentAnswerPage] = useState(1);
+  const [itemsPerPage] = useState(1); // 1 jawaban per halaman
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => {
+    const user = AuthService?.getCurrentUser ? AuthService.getCurrentUser() : null;
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token') || user?.accessToken;
+    
+    setIsAuthenticated(!!token);
+    
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const isExpired = payload.exp < Date.now() / 1000;
+        if (isExpired) {
+          localStorage.removeItem('token');
+          sessionStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setIsAuthenticated(false);
+          showToast('Sesi Anda telah berakhir. Silakan login ulang.', 'error');
+        }
+      } catch (e) {
+        console.error('Invalid token:', e);
+        localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
+        setIsAuthenticated(false);
+      }
+    }
+
     fetchQuestionSetDetails();
+    fetchHistory();
   }, [id]);
 
-  // Move this useEffect here, before any conditional returns
+  const fetchHistory = async () => {
+    if (!id) return;
+    
+    try {
+      setHistoryLoading(true);
+      const response = await axios.get(`${API_URL}/question-packages/history/${id}`);
+      setHistory(response.data || []);
+    } catch (error) {
+      console.error("Error fetching history:", error);
+      setHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (questionSet && questionSet.id) {
       setCombinedPdfUrl(`${API_URL}/files/combine-preview/${questionSet.id}`);
     }
   }, [questionSet]);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ isVisible: true, message, type });
+  };
+
+  const hideToast = () => {
+    setToast({ ...toast, isVisible: false });
+  };
 
   const fetchQuestionSetDetails = async () => {
     try {
@@ -166,39 +1097,134 @@ const QuestionPreview = ({ currentUser }) => {
       const response = await axios.get(`${API_URL}/questionsets/${id}`);
       setQuestionSet(response.data);
       
-      // Kelompokkan file berdasarkan kategori
+      const activeFiles = response.data.files.filter(file => 
+        file.is_deleted !== true && file.isDeleted !== true
+      );
+      
       const filesByCategory = {};
-      response.data.files.forEach(file => {
-        if (!filesByCategory[file.filecategory]) {
-          filesByCategory[file.filecategory] = [];
+      activeFiles.forEach(file => {
+        let category = file.filecategory;
+        
+        if (category === 'soal') category = 'questions';
+        if (category === 'kunci') category = 'answers';
+        if (category === 'test') category = 'testCases';
+        
+        if (!filesByCategory[category]) {
+          filesByCategory[category] = [];
         }
-        filesByCategory[file.filecategory].push(file);
+        filesByCategory[category].push(file);
       });
       
+      console.log('📁 Filtered files by category:', filesByCategory);
       setFiles(filesByCategory);
+      // Reset pagination when files change
+      setCurrentAnswerPage(1);
       setIsLoading(false);
     } catch (error) {
       console.error("Error fetching question set details:", error);
       setIsLoading(false);
+      showToast('Gagal memuat data soal', 'error');
     }
   };
 
-  const handleDownload = (fileId) => {
-    window.open(`${API_URL}/files/download/${fileId}`, '_blank');
+  const handleModalClose = (updateSuccess = false) => {
+    setIsEditModalOpen(false);
+    if (updateSuccess) {
+      fetchQuestionSetDetails(); 
+    }
+  };
+
+  const handleDownload = async (fileId) => {
+    try {
+      window.open(`${API_URL}/files/download/${fileId}`, '_blank');
+      await fetchQuestionSetDetails();
+    } catch (error) {
+      console.error('Error tracking download:', error);
+      window.open(`${API_URL}/files/download/${fileId}`, '_blank');
+    }
+  };
+
+  const handleDeleteClick = (file) => {
+    setFileToDelete(file);
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!fileToDelete) return;
+
+    setDeleteLoading(true);
+    try {
+      const response = await axios.delete(`${API_URL}/files/${fileToDelete.id}`);
+      
+      if (response.status === 200) {
+        showToast(`File "${fileToDelete.originalname}" berhasil dihapus`, 'success');
+        fetchQuestionSetDetails();
+        setDeleteModalOpen(false);
+        setFileToDelete(null);
+      }
+    } catch (error) {
+      console.error('Error deleting file:', error);
+      
+      if (error.response?.status === 404) {
+        showToast('File tidak ditemukan', 'error');
+      } else if (error.response?.status === 403) {
+        showToast('Anda tidak memiliki izin untuk menghapus file ini', 'error');
+      } else {
+        showToast('Gagal menghapus file. Silakan coba lagi.', 'error');
+      }
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleFileUploaded = (newFile) => {
+    showToast(`File "${newFile.originalname}" berhasil diupload`, 'success');
+    fetchQuestionSetDetails();
   };
 
   const handleBack = () => {
     navigate(-1);
   };
 
-  // Fungsi untuk menampilkan preview file berdasarkan tipe
+  // ✅ Check if file is code/text for preview
+  const isCodeOrTextFile = (filename) => {
+    const ext = filename.substring(filename.lastIndexOf('.')).toLowerCase();
+    const codeExtensions = [
+      '.js', '.jsx', '.ts', '.tsx', '.py', '.java',
+      '.c', '.cpp', '.cc', '.cxx', '.h', '.hpp',
+      '.cs', '.php', '.rb', '.go', '.rs', '.kt',
+      '.swift', '.dart', '.scala', '.r', '.m',
+      '.sh', '.bash', '.sql', '.html', '.css',
+      '.json', '.xml', '.yaml', '.yml', '.txt', '.md'
+    ];
+    return codeExtensions.includes(ext);
+  };
+
+  // ✅ Render file preview with code support (PRIORITIZING CODE PREVIEW)
   const renderFilePreview = (file) => {
-    const fileExtension = file.filetype.toLowerCase();
-    
-    if (fileExtension === 'pdf') {
-      return <PDFViewer fileId={file.id} />;
-    } else if (fileExtension === 'docx' || fileExtension === 'doc') {
-      // DOCX tidak dapat di-preview langsung di browser
+    const ext = file.originalname.substring(file.originalname.lastIndexOf('.')).toLowerCase();
+
+    // Code/Text Preview with Syntax Highlighting (PRIORITIZED FIRST)
+    if (isCodeOrTextFile(file.originalname)) {
+      return <CodePreview file={file} />;
+    }
+
+    // PDF Preview
+    if (ext === '.pdf') {
+      return (
+        <div className="w-full h-[600px] border border-gray-300 rounded-lg overflow-hidden">
+          <iframe 
+            src={`${API_URL}/files/blob/${file.id}`}
+            className="w-full h-full"
+            title="PDF Viewer"
+            allow="fullscreen"
+          />
+        </div>
+      );
+    }
+
+    // DOCX/DOC Preview (Download only)
+    if (ext === '.docx' || ext === '.doc') {
       return (
         <div className="flex flex-col items-center justify-center p-10 border border-gray-300 rounded-lg">
           <File size={64} className="text-blue-500 mb-4" />
@@ -212,56 +1238,81 @@ const QuestionPreview = ({ currentUser }) => {
           </button>
         </div>
       );
-    } else if (fileExtension === 'txt') {
-      // Untuk file TXT, kita bisa fetch kontennya dan tampilkan
-      return (
-        <div className="w-full min-h-[300px] p-4 border border-gray-300 rounded-lg bg-gray-50 font-mono whitespace-pre-wrap">
-          <TxtFileViewer fileId={file.id} />
-        </div>
-      );
-    } else {
-      // Untuk tipe file lainnya
-      return (
-        <div className="flex flex-col items-center justify-center p-10 border border-gray-300 rounded-lg">
-          <FileText size={64} className="text-gray-500 mb-4" />
-          <p className="text-lg font-medium mb-2">{file.originalname}</p>
-          <p className="text-gray-500 mb-4">Tipe file tidak didukung untuk preview</p>
-          <button
-            onClick={() => handleDownload(file.id)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Download File
-          </button>
-        </div>
-      );
     }
+
+    // Unsupported file type
+    return (
+      <div className="flex flex-col items-center justify-center p-10 border border-gray-300 rounded-lg">
+        <FileText size={64} className="text-gray-500 mb-4" />
+        <p className="text-lg font-medium mb-2">{file.originalname}</p>
+        <p className="text-gray-500 mb-4">Tipe file tidak didukung untuk preview</p>
+        <button
+          onClick={() => handleDownload(file.id)}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          Download File
+        </button>
+      </div>
+    );
   };
 
-  // Komponen untuk menampilkan isi file TXT
-  const TxtFileViewer = ({ fileId }) => {
-    const [content, setContent] = useState('');
-    const [loading, setLoading] = useState(true);
+  const renderFileActionButtons = (file) => {
+    if (file.is_deleted || file.isDeleted) {
+      return null;
+    }
 
-    useEffect(() => {
-      const fetchTxtContent = async () => {
-        try {
-          const response = await axios.get(`${API_URL}/files/download/${fileId}`, {
-            responseType: 'text'
-          });
-          setContent(response.data);
-        } catch (error) {
-          console.error("Error fetching TXT content:", error);
-          setContent('Error loading file content');
-        } finally {
-          setLoading(false);
-        }
-      };
+    const getFileCategory = (fileCategory) => {
+      if (fileCategory === 'soal' || fileCategory === 'questions') return 'soal';
+      if (fileCategory === 'kunci' || fileCategory === 'answers') return 'kunci';
+      if (fileCategory === 'test' || fileCategory === 'testCases') return 'test';
+      return fileCategory;
+    };
 
-      fetchTxtContent();
-    }, [fileId]);
-
-    if (loading) return <p>Loading content...</p>;
-    return <div>{content}</div>;
+    return (
+      <div className="flex items-center space-x-2">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => handleDownload(file.id)}
+          className="flex items-center text-blue-600 hover:text-blue-800 transition-colors px-3 py-2 rounded-lg hover:bg-blue-50"
+          title="Download file"
+        >
+          <Download className="w-5 h-5 mr-2" />
+          <span className="font-medium">Download</span>
+        </motion.button>
+        {isAuthenticated && (
+          <>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                setReplaceUploadModal({
+                  isOpen: true,
+                  file: file,
+                  category: getFileCategory(file.filecategory),
+                  questionSetId: questionSet.id
+                });
+              }}
+              className="flex items-center text-green-600 hover:text-green-800 transition-colors px-3 py-2 rounded-lg hover:bg-green-50"
+              title="Upload ulang file untuk menimpa file ini"
+            >
+              <Upload className="w-5 h-5 mr-2" />
+              <span className="font-medium">Upload Ulang</span>
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => handleDeleteClick(file)}
+              className="flex items-center text-red-600 hover:text-red-800 transition-colors px-3 py-2 rounded-lg hover:bg-red-50"
+              title="Hapus file"
+            >
+              <Trash2 className="w-5 h-5 mr-2" />
+              <span className="font-medium">Delete</span>
+            </motion.button>
+          </>
+        )}
+      </div>
+    );
   };
 
   if (isLoading) {
@@ -285,14 +1336,12 @@ const QuestionPreview = ({ currentUser }) => {
       </div>
     );
   }
-  
-  // Modifikasi bagian render untuk menampilkan PDF gabungan
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header currentUser={currentUser} />
       
       <div className="container mx-auto px-4 py-8">
-        {/* Header dan navigasi kembali */}
         <div className="mb-6">
           <button
             onClick={handleBack}
@@ -303,9 +1352,38 @@ const QuestionPreview = ({ currentUser }) => {
           </button>
         </div>
         
-        {/* Judul dan informasi soal */}
+        {!isAuthenticated && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-start">
+              <AlertTriangle className="w-5 h-5 text-red-600 mr-3 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="text-red-800 font-semibold mb-2">Authentication Required</h3>
+                <p className="text-red-700 mb-3">
+                  Anda belum login atau sesi Anda telah berakhir. Silakan login terlebih dahulu untuk dapat mengelola file.
+                </p>
+                <button 
+                  onClick={() => navigate('/login')}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                >
+                  Login Sekarang
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">{questionSet.title}</h1>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
+            <h1 className="text-2xl font-bold text-gray-900">{questionSet.title}</h1>
+            {isAuthenticated && (
+              <button
+                onClick={() => setIsEditModalOpen(true)}
+                className="mt-4 md:mt-0 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                Edit Soal
+              </button>
+            )}
+          </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div className="flex items-center text-gray-700">
@@ -336,36 +1414,56 @@ const QuestionPreview = ({ currentUser }) => {
               <p className="text-gray-700">{questionSet.description}</p>
             </div>
           )}
+          
+          {isEditModalOpen && (
+            <EditModal 
+              isOpen={isEditModalOpen}
+              onClose={handleModalClose}
+              questionSet={questionSet}
+              currentUser={currentUser} 
+            />
+          )}
         </div>
         
-        {/* PDF Gabungan */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Soal dan Test Cases */}
-          <div className="bg-white rounded-xl shadow-md overflow-hidden">
-            <div className="p-4 border-b border-gray-200">
+          <div className="bg-white rounded-xl shadow-md overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-gray-200 flex-shrink-0">
               <h3 className="text-lg font-medium text-gray-900">Soal dan Test Cases</h3>
             </div>
-            <div className="p-4">
+            <div className="p-4 flex-1 flex flex-col min-h-0">
               {questionSet && questionSet.id ? (
-                <CombinedPDFViewer questionSetId={questionSet.id} type="questions" />
+                <div className="flex-1 flex flex-col min-h-0">
+                  <CombinedPDFViewer 
+                    questionSetId={questionSet.id} 
+                    type="questions" 
+                    isAuthenticated={isAuthenticated}
+                    onFileUploaded={handleFileUploaded}
+                  />
+                </div>
               ) : (
-                <div className="flex items-center justify-center p-10">
+                <div className="flex items-center justify-center p-10 flex-1">
                   <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Kunci Jawaban */}
-          <div className="bg-white rounded-xl shadow-md overflow-hidden">
-            <div className="p-4 border-b border-gray-200">
+          <div className="bg-white rounded-xl shadow-md overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-gray-200 flex-shrink-0">
               <h3 className="text-lg font-medium text-gray-900">Kunci Jawaban</h3>
             </div>
-            <div className="p-4">
+            <div className="p-4 flex-1 flex flex-col min-h-0">
               {questionSet && questionSet.id ? (
-                <CombinedPDFViewer questionSetId={questionSet.id} type="answers" />
+                <div className="flex-1 flex flex-col min-h-0">
+                  <CombinedPDFViewer 
+                    questionSetId={questionSet.id} 
+                    type="answers" 
+                    isAuthenticated={isAuthenticated}
+                    onFileUploaded={handleFileUploaded}
+                  />
+                </div>
               ) : (
-                <div className="flex items-center justify-center p-10">
+                <div className="flex items-center justify-center p-10 flex-1">
                   <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
                 </div>
               )}
@@ -373,55 +1471,243 @@ const QuestionPreview = ({ currentUser }) => {
           </div>
         </div>
         
-        {/* Tab untuk navigasi antar kategori file */}
-        <div className="flex border-b border-gray-200 mb-6">
-          <button
-            className={`px-4 py-2 font-medium ${activeTab === 'questions' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-            onClick={() => setActiveTab('questions')}
-          >
-            Soal
-          </button>
-          <button
-            className={`px-4 py-2 font-medium ${activeTab === 'answers' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-            onClick={() => setActiveTab('answers')}
-          >
-            Jawaban
-          </button>
-          <button
-            className={`px-4 py-2 font-medium ${activeTab === 'testCases' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-            onClick={() => setActiveTab('testCases')}
-          >
-            Test Cases
-          </button>
+        <div className="flex justify-between items-center border-b border-gray-200 mb-6">
+          <div className="flex">
+            <button
+              className={`px-4 py-2 font-medium ${activeTab === 'questions' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+              onClick={() => setActiveTab('questions')}
+            >
+              Soal ({files.questions ? files.questions.length : 0})
+            </button>
+            <button
+              className={`px-4 py-2 font-medium ${activeTab === 'answers' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+              onClick={() => {
+                setActiveTab('answers');
+                setCurrentAnswerPage(1); // Reset to first page when switching to answers tab
+              }}
+            >
+              Jawaban ({files.answers ? files.answers.length : 0})
+            </button>
+            <button
+              className={`px-4 py-2 font-medium ${activeTab === 'testCases' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+              onClick={() => setActiveTab('testCases')}
+            >
+              Test Cases ({files.testCases ? files.testCases.length : 0})
+            </button>
+          </div>
         </div>
         
-        {/* Konten file berdasarkan tab aktif */}
         <div className="space-y-6">
           {files[activeTab] && files[activeTab].length > 0 ? (
-            files[activeTab].map((file, index) => (
-              <div key={file.id} className="bg-white rounded-xl shadow-md overflow-hidden">
-                <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-                  <h3 className="text-lg font-medium text-gray-900">{file.originalname}</h3>
-                  <button
-                    onClick={() => handleDownload(file.id)}
-                    className="flex items-center text-blue-600 hover:text-blue-800 transition-colors"
-                  >
-                    <Download size={18} className="mr-1" />
-                    Download
-                  </button>
-                </div>
-                <div className="p-4">
-                  {renderFilePreview(file)}
-                </div>
-              </div>
-            ))
+            (() => {
+              // For answers tab, implement pagination (1 per page)
+              let filesToDisplay = files[activeTab];
+              let totalPages = 1;
+              let currentPage = 1;
+              
+              if (activeTab === 'answers') {
+                totalPages = Math.ceil(files[activeTab].length / itemsPerPage);
+                currentPage = currentAnswerPage;
+                const startIndex = (currentPage - 1) * itemsPerPage;
+                const endIndex = startIndex + itemsPerPage;
+                filesToDisplay = files[activeTab].slice(startIndex, endIndex);
+              }
+              
+              return (
+                <>
+                  {/* File counter for answers pagination */}
+                  {activeTab === 'answers' && files[activeTab].length > 1 && (
+                    <div className="flex items-center justify-between mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center">
+                        <FileText className="w-5 h-5 text-blue-600 mr-2" />
+                        <span className="text-sm font-medium text-blue-900">
+                          File {currentPage} dari {files[activeTab].length}
+                        </span>
+                      </div>
+                      <span className="text-xs text-blue-600 bg-white px-3 py-1 rounded-full">
+                        {files[activeTab].length} file tersedia
+                      </span>
+                    </div>
+                  )}
+                  
+                  {filesToDisplay.map((file, index) => (
+                    <motion.div 
+                      key={`file-${file.id}-${activeTab}`}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="bg-white rounded-xl shadow-md overflow-hidden"
+                    >
+                      <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3">
+                            <h3 className="text-lg font-medium text-gray-900">{file.originalname}</h3>
+                            {isCodeOrTextFile(file.originalname) && (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-700">
+                                <Code className="w-3 h-3 mr-1" />
+                                {getLanguageDisplayName(file.originalname.substring(file.originalname.lastIndexOf('.')))}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-4 mt-1">
+                            <p className="text-sm text-gray-500">
+                              {file.filetype.toUpperCase()} • {Math.round(file.filesize / 1024)} KB
+                            </p>
+                            {file.download_count !== undefined && (
+                              <div className="flex items-center text-sm text-gray-500">
+                                <Download className="w-4 h-4 mr-1" />
+                                <span>{file.download_count} downloads</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        {renderFileActionButtons(file)}
+                      </div>
+                      <div className="p-4">
+                        {renderFilePreview(file)}
+                      </div>
+                    </motion.div>
+                  ))}
+                  
+                  {/* Pagination for answers */}
+                  {activeTab === 'answers' && totalPages > 1 && (
+                    <Pagination 
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      onPageChange={setCurrentAnswerPage}
+                    />
+                  )}
+                </>
+              );
+            })()
           ) : (
             <div className="bg-white rounded-xl shadow-md p-6 text-center">
-              <p className="text-gray-500">Tidak ada file {activeTab === 'questions' ? 'soal' : activeTab === 'answers' ? 'jawaban' : 'test cases'} yang tersedia</p>
+              <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500 mb-6">Tidak ada file {activeTab === 'questions' ? 'soal' : activeTab === 'answers' ? 'jawaban' : 'test cases'} yang tersedia</p>
+              
+              {isAuthenticated && (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    const category = activeTab === 'questions' ? 'soal' : 
+                                   activeTab === 'answers' ? 'kunci' : 'test';
+                    setTabUploadModal({ 
+                      isOpen: true, 
+                      category: category, 
+                      questionSetId: questionSet.id 
+                    });
+                  }}
+                  className="flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md mx-auto"
+                >
+                  <Upload className="w-5 h-5 mr-2" />
+                  Upload {activeTab === 'questions' ? 'Soal' : activeTab === 'answers' ? 'Kunci Jawaban' : 'Test Cases'}
+                </motion.button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* History Section */}
+        <div className="bg-white rounded-xl shadow-md p-6 mt-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">History Paket Soal</h2>
+          {historyLoading ? (
+            <div className="flex items-center justify-center p-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+          ) : history.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Judul Paket</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Mata Kuliah</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Tanggal Ditambahkan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map((item, index) => (
+                    <motion.tr
+                      key={item.id || index}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {item.title || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {item.courseName || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {item.createdAt ? new Date(item.createdAt).toLocaleString('id-ID', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        }) : '-'}
+                      </td>
+                    </motion.tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-500">Belum ada history paket soal untuk soal ini</p>
             </div>
           )}
         </div>
       </div>
+      
+      <DeleteConfirmationModal
+        isOpen={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setFileToDelete(null);
+        }}
+        file={fileToDelete}
+        onConfirm={handleConfirmDelete}
+        loading={deleteLoading}
+      />
+      
+      <UploadFileModal
+        isOpen={tabUploadModal.isOpen}
+        onClose={() => setTabUploadModal({ isOpen: false, category: '', questionSetId: null })}
+        questionSetId={tabUploadModal.questionSetId}
+        fileCategory={tabUploadModal.category}
+        onFileUploaded={(file) => {
+          handleFileUploaded(file);
+          setTabUploadModal({ isOpen: false, category: '', questionSetId: null });
+        }}
+      />
+      
+      <UploadFileModal
+        isOpen={replaceUploadModal.isOpen}
+        onClose={() => setReplaceUploadModal({ isOpen: false, file: null, category: '', questionSetId: null })}
+        questionSetId={replaceUploadModal.questionSetId}
+        fileCategory={replaceUploadModal.category}
+        replaceFileId={replaceUploadModal.file?.id || null}
+        onFileUploaded={(file) => {
+          showToast(`File "${file.originalname}" berhasil diupload ulang dan menimpa file sebelumnya`, 'success');
+          fetchQuestionSetDetails();
+          // Refresh preview jika file yang di-replace sedang di-preview
+          if (replaceUploadModal.file && files[activeTab]?.some(f => f.id === replaceUploadModal.file.id)) {
+            // File akan otomatis ter-refresh karena fetchQuestionSetDetails sudah dipanggil
+          }
+          setReplaceUploadModal({ isOpen: false, file: null, category: '', questionSetId: null });
+        }}
+      />
+      
+      <Toast 
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={hideToast}
+      />
       
       <Footer />
     </div>

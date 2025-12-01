@@ -160,42 +160,42 @@ const TaggingAdmin = ({ currentUser }) => {
     tag.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 const Header = () => (
-  <header className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-40">
-    <div className="max-w-7xl mx-auto px-6 py-4">
-      <div className="grid grid-cols-3 items-center">
-        <div className="flex items-center space-x-3">
+  <header className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-40 shadow-sm">
+    <div className="w-full mx-auto px-8 lg:px-12 xl:px-16 py-5">
+      <div className="flex items-center justify-between gap-8">
+        <div className="flex items-center space-x-4 flex-shrink-0">
           <img
             src="/src/assets/LogoIF.jpg"
             alt="Logo Informatika UNPAR"
-            className="h-10 w-auto"
+            className="h-12 w-auto"
           />
         </div>
         
-        <nav className="flex justify-center space-x-8">
-          <Link to="/admin/dosen" className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-2 py-1">
+        <nav className="flex justify-center items-center space-x-6 lg:space-x-8 flex-1">
+          <Link to="/admin/dosen" className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2">
             Dosen
           </Link>
-          <Link to="/admin/mata-kuliah" className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-2 py-1">
+          <Link to="/admin/mata-kuliah" className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2">
             Mata Kuliah
           </Link>
-          <Link to="/admin/tagging" className="text-blue-600 font-semibold relative px-2 py-1">
-            Tagging
-             <div className="absolute -bottom-4 left-0 right-0 h-0.5 bg-blue-600 rounded-full"></div>
+          <Link to="/admin/tagging" className="text-blue-600 font-semibold relative px-3 py-2 transition-colors hover:text-blue-700">
+            Materi
+            <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-blue-600 rounded-full"></div>
           </Link>
-          <Link to="/admin/course-tagging" className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-2 py-1">
-            Tagging Mata Kuliah
+          <Link to="/admin/course-tagging" className="text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 whitespace-nowrap">
+            Relasi Matakuliah - Materi
           </Link>
         </nav>
           
-        <div className="flex items-center justify-end space-x-4">
-          <span className="text-gray-700 font-medium">{currentUser?.username || 'Admin'}</span>
-          <div className="flex items-center space-x-2">
-            <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+        <div className="flex items-center justify-end space-x-4 flex-shrink-0">
+          <span className="text-gray-700 font-medium hidden sm:block">{currentUser?.username || 'Admin'}</span>
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-sm">
               <User className="w-5 h-5 text-white" />
             </div>
             <button
               onClick={handleLogout}
-              className="p-2 text-gray-500 hover:text-gray-700 transition-colors rounded-lg hover:bg-gray-100"
+              className="p-2.5 text-gray-500 hover:text-gray-700 transition-colors rounded-lg hover:bg-gray-100"
               title="Logout"
             >
               <LogOut className="w-5 h-5" />
@@ -410,10 +410,30 @@ const Header = () => (
                               </div>
                             </td>
                             <td className="px-6 py-4 text-slate-600">
-                              {tag.created_at ? new Date(tag.created_at).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                              {(() => {
+                                const dateValue = tag.created_at || tag.createdAt || tag.created;
+                                if (!dateValue) return '-';
+                                try {
+                                  const date = new Date(dateValue);
+                                  if (isNaN(date.getTime())) return '-';
+                                  return date.toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                                } catch (e) {
+                                  return '-';
+                                }
+                              })()}
                             </td>
                             <td className="px-6 py-4 text-slate-600">
-                              {tag.updated_at ? new Date(tag.updated_at).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                              {(() => {
+                                const dateValue = tag.updated_at || tag.updatedAt || tag.updated;
+                                if (!dateValue) return '-';
+                                try {
+                                  const date = new Date(dateValue);
+                                  if (isNaN(date.getTime())) return '-';
+                                  return date.toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                                } catch (e) {
+                                  return '-';
+                                }
+                              })()}
                             </td>
                             <td className="px-6 py-4">
                               <div className="flex justify-center space-x-2">

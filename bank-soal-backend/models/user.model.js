@@ -38,6 +38,20 @@ module.exports = (sequelize, Sequelize) => {
     isActive: { // Changed to isActive for consistency with camelCase in JS
       type: Sequelize.BOOLEAN,
       defaultValue: true
+    },
+    
+    // ========================================
+    // PASSWORD RESET FIELDS (NEW)
+    // ========================================
+    resetPasswordToken: {
+      type: Sequelize.STRING,
+      allowNull: true,
+      comment: 'Hashed token for password reset'
+    },
+    resetPasswordExpires: {
+      type: Sequelize.DATE,
+      allowNull: true,
+      comment: 'Expiration time for reset token (1 hour from creation)'
     }
   }, {
     underscored: true, // This will map fullName to full_name and isActive to is_active in DB

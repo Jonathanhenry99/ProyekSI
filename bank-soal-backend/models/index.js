@@ -31,6 +31,9 @@ db.question = require("./question.model.js")(sequelize, Sequelize);
 db.questionSet = require("./questionSet.model.js")(sequelize, Sequelize);
 db.questionHistory = require("./questionHistory.model.js")(sequelize, Sequelize);
 db.file = require("./file.model.js")(sequelize, Sequelize);
+db.question_packages = require("./questionPackage.model.js")(sequelize, Sequelize);
+db.question_package_items = require("./questionPackageItem.model.js")(sequelize, Sequelize);
+// db.question_set_items = require("./question_set_item.model.js")(sequelize, Sequelize);
 
 // Define relationships
 
@@ -62,17 +65,54 @@ db.materialTag.belongsToMany(db.question, {
   otherKey: "questionId"
 });
 
-// QuestionSet and Question (Many-to-Many with order)
-db.questionSet.belongsToMany(db.question, {
-  through: "question_set_items",
-  foreignKey: "questionSetId",
-  otherKey: "questionId"
+// // QuestionSet and Question (Many-to-Many with order)
+// db.questionSet.belongsToMany(db.question, {
+//   through: "question_set_items",
+//   foreignKey: "questionSetId",
+//   otherKey: "questionId"
+// });
+// db.question.belongsToMany(db.questionSet, {
+//   through: "question_set_items",
+//   foreignKey: "questionId",
+//   otherKey: "questionSetId"
+// });
+
+// Relasi utama antara QuestionPackage dan CourseTag / User
+db.question_packages.belongsTo(db.courseTag, {
+  foreignKey: "course_id",
+  as: "course"
 });
-db.question.belongsToMany(db.questionSet, {
-  through: "question_set_items",
-  foreignKey: "questionId",
-  otherKey: "questionSetId"
+
+db.question_packages.belongsTo(db.user, {
+  foreignKey: "created_by",
+  as: "creator"
 });
+
+//Paket soal memiliki banyak item
+db.question_packages.hasMany(db.question_package_items, {
+  foreignKey: "question_package_id",
+  as: "items" // alias konsisten
+});
+
+//Item paket soal mengacu ke QuestionSet (soal)
+db.question_package_items.belongsTo(db.questionSet, {
+  foreignKey: "question_id",
+  as: "question"
+});
+
+//Item paket soal mengacu ke QuestionPackage
+db.question_package_items.belongsTo(db.question_packages, {
+  foreignKey: "question_package_id",
+  as: "package"
+});
+
+//QuestionSet bisa berada di banyak paket soal
+db.questionSet.hasMany(db.question_package_items, {
+  foreignKey: "question_id",
+  as: "packageItems"
+});
+
+
 
 // User and QuestionSet (One-to-Many)
 db.user.hasMany(db.questionSet, { as: "questionSets", foreignKey: "createdBy" });
@@ -89,5 +129,6 @@ db.questionHistory.belongsTo(db.questionSet, { foreignKey: "questionSetId" });
 // File relationships
 db.questionSet.hasMany(db.file, { as: "files", foreignKey: "question_set_id" });
 db.file.belongsTo(db.questionSet, { foreignKey: "question_set_id" });
+
 
 module.exports = db;
