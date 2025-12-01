@@ -5,8 +5,10 @@ import LogoIF from "../assets/LogoIF.jpg";
 
 import {
     Upload, File, Search, Trash2, Edit, Download, Plus,
-    Move, ChevronDown, ChevronUp, Check, Database, FileText, Clock, User, BookOpen, Calendar
+    Move, ChevronDown, ChevronUp, Check, Database, FileText, Clock, User, BookOpen, Calendar,
+    Info, CheckCircle2, XCircle, AlertTriangle, X
 } from 'lucide-react';
+import { AnimatePresence } from "framer-motion";
 
 const normalizeTopics = (topics) => {
     if (!topics) return [];
@@ -266,6 +268,28 @@ const FormCreatorPage = ({ currentUser }) => {
     
     const [selectedDifficulty, setSelectedDifficulty] = useState("");
 
+    // State untuk overlay notification
+    const [notification, setNotification] = useState({
+        show: false,
+        message: '',
+        type: 'info' // 'success', 'error', 'warning', 'info'
+    });
+
+    // Helper function to show notification overlay
+    const showNotification = (message, type = 'info') => {
+        setNotification({
+            show: true,
+            message: message,
+            type: type
+        });
+        
+        // Auto hide after 5 seconds for success/info, 7 seconds for error/warning
+        const duration = (type === 'error' || type === 'warning') ? 7000 : 5000;
+        setTimeout(() => {
+            setNotification(prev => ({ ...prev, show: false }));
+        }, duration);
+    };
+
     // Fetch dropdown data
     useEffect(() => {
         const fetchDropdownData = async () => {
@@ -442,7 +466,7 @@ const FormCreatorPage = ({ currentUser }) => {
             .join(',');
 
         if (!questionSetIds) {
-            alert("Harap tambahkan setidaknya satu soal untuk mengaktifkan download ZIP.");
+            showNotification("Harap tambahkan setidaknya satu soal untuk mengaktifkan download ZIP.", 'warning');
             return;
         }
 
@@ -470,11 +494,11 @@ const FormCreatorPage = ({ currentUser }) => {
 
     const handleSaveQuestionPackage = async () => {
         const token = localStorage.getItem("token");
-        if (!token) return alert("Token tidak ditemukan, silakan login ulang");
+        if (!token) return showNotification("Token tidak ditemukan, silakan login ulang", 'error');
     
-        if (!formTitle.trim()) return alert("⚠️ Judul paket soal tidak boleh kosong!");
-        if (!formSubject) return alert("⚠️ Silakan pilih mata kuliah terlebih dahulu!");
-        if (selectedQuestions.length === 0) return alert("⚠️ Minimal pilih 1 soal untuk membuat paket soal!");
+        if (!formTitle.trim()) return showNotification("⚠️ Judul paket soal tidak boleh kosong!", 'warning');
+        if (!formSubject) return showNotification("⚠️ Silakan pilih mata kuliah terlebih dahulu!", 'warning');
+        if (selectedQuestions.length === 0) return showNotification("⚠️ Minimal pilih 1 soal untuk membuat paket soal!", 'warning');
     
         try {
             const payload = {
@@ -498,7 +522,7 @@ const FormCreatorPage = ({ currentUser }) => {
                 throw new Error(errorData.message || "Gagal menyimpan paket soal");
             }
     
-            alert("✅ Paket soal berhasil disimpan!");
+            showNotification("✅ Paket soal berhasil disimpan!", 'success');
             setFormTitle("");
             setFormDescription("");
             setFormSubject("");
@@ -506,7 +530,7 @@ const FormCreatorPage = ({ currentUser }) => {
         
         } catch (err) {
             console.error("Error saving question package:", err);
-            alert(`❌ Error: ${err.message}`);
+            showNotification(`❌ Error: ${err.message}`, 'error');
         }
     };
 
@@ -989,6 +1013,67 @@ const FormCreatorPage = ({ currentUser }) => {
                     }}
                 />
             )}
+
+            {/* Notification Overlay */}
+            <AnimatePresence>
+                {notification.show && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -50, scale: 0.9 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -50, scale: 0.9 }}
+                        transition={{ duration: 0.3, ease: "easeOut" }}
+                        className="fixed top-4 right-4 z-[100] max-w-md"
+                    >
+                        <motion.div
+                            className={`rounded-lg shadow-2xl border-2 p-4 backdrop-blur-sm ${
+                                notification.type === 'success'
+                                    ? 'bg-green-50 border-green-200 text-green-900'
+                                    : notification.type === 'error'
+                                    ? 'bg-red-50 border-red-200 text-red-900'
+                                    : notification.type === 'warning'
+                                    ? 'bg-yellow-50 border-yellow-200 text-yellow-900'
+                                    : 'bg-blue-50 border-blue-200 text-blue-900'
+                            }`}
+                        >
+                            <div className="flex items-start gap-3">
+                                <div className="flex-shrink-0 mt-0.5">
+                                    {notification.type === 'success' && (
+                                        <CheckCircle2 className="w-6 h-6 text-green-600" />
+                                    )}
+                                    {notification.type === 'error' && (
+                                        <XCircle className="w-6 h-6 text-red-600" />
+                                    )}
+                                    {notification.type === 'warning' && (
+                                        <AlertTriangle className="w-6 h-6 text-yellow-600" />
+                                    )}
+                                    {notification.type === 'info' && (
+                                        <Info className="w-6 h-6 text-blue-600" />
+                                    )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium whitespace-pre-line break-words">
+                                        {notification.message}
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setNotification(prev => ({ ...prev, show: false }))}
+                                    className={`flex-shrink-0 p-1 rounded-full hover:bg-opacity-20 transition-colors ${
+                                        notification.type === 'success'
+                                            ? 'text-green-600 hover:bg-green-200'
+                                            : notification.type === 'error'
+                                            ? 'text-red-600 hover:bg-red-200'
+                                            : notification.type === 'warning'
+                                            ? 'text-yellow-600 hover:bg-yellow-200'
+                                            : 'text-blue-600 hover:bg-blue-200'
+                                    }`}
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

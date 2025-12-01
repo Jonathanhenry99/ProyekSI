@@ -1,13 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, CheckCircle, ChevronDown, FileText, BarChart2, Plus, Book, Check, Trash2, AlertTriangle } from 'lucide-react';
+import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, CheckCircle, ChevronDown, FileText, BarChart2, Plus, Book, Check, Trash2, AlertTriangle, Info, CheckCircle2, XCircle } from 'lucide-react';
 import Footer from '../components/Footer';
 import Header from '../components/Header';
 import { Link } from 'react-router-dom';
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import JSZip from 'jszip';
-import { saveAs } from 'file-saver';
 
 const API_URL = "http://localhost:8080/api";
 
@@ -48,6 +46,13 @@ const QuestionSetsPage = ({ currentUser }) => {
   const [deleteModal, setDeleteModal] = useState({ show: false, packageId: null, packageTitle: '' });
   const [deleting, setDeleting] = useState(false);
 
+  // State untuk overlay notification
+  const [notification, setNotification] = useState({
+    show: false,
+    message: '',
+    type: 'info' // 'success', 'error', 'warning', 'info'
+  });
+
   // Helper function to get auth token
   const getAuthToken = () => {
     let token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -69,6 +74,21 @@ const QuestionSetsPage = ({ currentUser }) => {
     }
     
     return token;
+  };
+
+  // Helper function to show notification overlay
+  const showNotification = (message, type = 'info') => {
+    setNotification({
+      show: true,
+      message: message,
+      type: type
+    });
+    
+    // Auto hide after 5 seconds for success/info, 7 seconds for error/warning
+    const duration = (type === 'error' || type === 'warning') ? 7000 : 5000;
+    setTimeout(() => {
+      setNotification(prev => ({ ...prev, show: false }));
+    }, duration);
   };
 
   // Fungsi untuk membuka modal konfirmasi delete
@@ -108,11 +128,11 @@ const QuestionSetsPage = ({ currentUser }) => {
       closeDeleteModal();
       
       // Tampilkan notifikasi sukses
-      alert('Paket soal berhasil dihapus!');
+      showNotification('Paket soal berhasil dihapus!', 'success');
 
     } catch (err) {
       console.error("❌ Error deleting package:", err);
-      alert(err.message || 'Gagal menghapus paket soal. Silakan coba lagi.');
+      showNotification(err.message || 'Gagal menghapus paket soal. Silakan coba lagi.', 'error');
     } finally {
       setDeleting(false);
     }
@@ -126,19 +146,11 @@ const QuestionSetsPage = ({ currentUser }) => {
     );
   };
 
-  // Function untuk download paket soal sebagai ZIP
+  // Function untuk download paket soal sebagai ZIP - menggunakan logika sama seperti Create.jsx
   const handleDownloadPackage = async (packageId, packageTitle) => {
     if (downloadingItems.has(packageId)) {
       return; // Prevent multiple downloads
     }
-
-    const token = getAuthToken();
-    const authHeaders = token
-      ? {
-          "x-access-token": token,
-          Authorization: `Bearer ${token}`
-        }
-      : {};
 
     try {
       setDownloadingItems(prev => new Set(prev).add(packageId));
@@ -150,237 +162,94 @@ const QuestionSetsPage = ({ currentUser }) => {
       const packageData = response.data;
       
       if (!packageData.items || packageData.items.length === 0) {
-        alert('Paket soal kosong atau tidak memiliki soal');
+        showNotification('Paket soal kosong atau tidak memiliki soal', 'warning');
+        setDownloadingItems(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(packageId);
+          return newSet;
+        });
         return;
       }
       
       console.log(`📁 Found ${packageData.items.length} question sets to process`);
       
-      // Create a new ZIP instance
-      const zip = new JSZip();
+      // Collect all question set IDs from the package
+      const questionSetIds = packageData.items
+        .map(item => item.question?.id || item.question_id)
+        .filter(id => id)
+        .join(',');
       
-      // Create main folder for the package
-      const packageFolder = zip.folder(packageTitle.replace(/[<>:"/\\|?*]/g, '_'));
-      
-      let totalDownloadedFiles = 0;
-      const downloadPromises = [];
-      
-      // Process each question set in the package
-      for (const item of packageData.items) {
-        const questionSet = item.question;
-        if (!questionSet) continue;
-        
-        // Create folder for this question set
-        const questionSetName = questionSet.title.replace(/[<>:"/\\|?*]/g, '_');
-        const questionSetFolder = packageFolder.folder(questionSetName);
-        
-        // Create subfolders
-        const soalFolder = questionSetFolder.folder("01_Soal");
-        const jawabanFolder = questionSetFolder.folder("02_Kunci_Jawaban");
-        const testCaseFolder = questionSetFolder.folder("03_Test_Cases");
-        
-        // Get question set details with files
-        const downloadPromise = axios.get(`${API_URL}/questionsets/${questionSet.id}?download=true`)
-          .then(async (qsResponse) => {
-            const qsData = qsResponse.data;
-            
-            if (qsData.files && qsData.files.length > 0) {
-              const fileDownloadPromises = qsData.files.map(async (file) => {
-                let targetFolder = null;
-                let folderName = '';
-                
-                // Determine which folder based on file category
-                switch (file.filecategory) {
-                  case 'soal':
-                  case 'questions':
-                    targetFolder = soalFolder;
-                    folderName = 'Soal';
-                    break;
-                  case 'kunci':
-                  case 'answers':
-                    targetFolder = jawabanFolder;
-                    folderName = 'Kunci Jawaban';
-                    break;
-                  case 'test':
-                  case 'testCases':
-                    targetFolder = testCaseFolder;
-                    folderName = 'Test Cases';
-                    break;
-                  default:
-                    return;
-                }
-                
-                try {
-                  const fileResponse = await axios.get(`${API_URL}/files/download/${file.id}`, {
-                    responseType: 'blob',
-                    timeout: 30000
-                  });
-                  
-                  // Get file extension
-                  let fileExtension = '';
-                  let safeFileName = '';
-                  
-                  if (file.filename && file.filename.includes('.')) {
-                    safeFileName = file.filename;
-                  } else {
-                    const contentType = fileResponse.headers['content-type'] || fileResponse.headers['Content-Type'];
-                    
-                    if (contentType) {
-                      if (contentType.includes('pdf')) fileExtension = '.pdf';
-                      else if (contentType.includes('word') || contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) fileExtension = '.docx';
-                      else if (contentType.includes('text')) fileExtension = '.txt';
-                      else fileExtension = '.pdf'; // default
-                    } else {
-                      fileExtension = '.pdf';
-                    }
-                    
-                    safeFileName = `${folderName}_${file.id}${fileExtension}`;
-                  }
-                  
-                  // Clean filename
-                  safeFileName = safeFileName
-                    .replace(/[<>:"/\\|?*]/g, '_')
-                    .replace(/\s+/g, '_')
-                    .replace(/_+/g, '_');
-                  
-                  targetFolder.file(safeFileName, fileResponse.data);
-                  totalDownloadedFiles++;
-                  
-                  console.log(`✅ Added ${safeFileName} to ${questionSetName}/${folderName}`);
-                } catch (error) {
-                  console.error(`❌ Failed to download file ${file.id}:`, error);
-                }
-              });
-              
-              await Promise.allSettled(fileDownloadPromises);
-            }
-            
-            // Add README for this question set
-            const readmeContent = `
-INFORMASI SOAL
-==============
-
-Judul: ${questionSet.title}
-Mata Kuliah: ${questionSet.subject}
-Tingkat Kesulitan: ${questionSet.level}
-Dosen: ${questionSet.lecturer}
-Tahun: ${questionSet.year}
-Topik: ${questionSet.topics || 'Tidak ada topik'}
-Deskripsi: ${questionSet.description || 'Tidak ada deskripsi'}
-
----
-Bagian dari Paket: ${packageTitle}
-Diunduh pada: ${new Date().toLocaleString('id-ID')}
-            `.trim();
-            
-            questionSetFolder.file("README.txt", readmeContent);
-          })
-          .catch(error => {
-            console.error(`❌ Failed to process question set ${questionSet.id}:`, error);
-          });
-        
-        downloadPromises.push(downloadPromise);
-      }
-      
-      // Wait for all downloads to complete
-      await Promise.allSettled(downloadPromises);
-      
-      if (totalDownloadedFiles === 0) {
-        alert('Tidak ada file yang berhasil diunduh dari paket soal ini');
+      if (!questionSetIds) {
+        showNotification('Tidak ada question set ID yang valid untuk diunduh', 'error');
+        setDownloadingItems(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(packageId);
+          return newSet;
+        });
         return;
       }
       
-      // Add main README for the package
-      const mainReadmeContent = `
-PAKET SOAL - ${packageTitle.toUpperCase()}
-${'='.repeat(packageTitle.length + 13)}
-
-INFORMASI PAKET:
-- Judul: ${packageData.title}
-- Deskripsi: ${packageData.description || 'Tidak ada deskripsi'}
-- Mata Kuliah: ${packageData.course?.name || 'Tidak ditentukan'}
-- Pembuat: ${packageData.creator?.full_name || 'Tidak diketahui'}
-- Jumlah Soal: ${packageData.items.length} set soal
-- Tanggal Dibuat: ${new Date(packageData.created_at).toLocaleString('id-ID')}
-
-STRUKTUR FOLDER:
-Setiap set soal memiliki struktur folder:
-- 01_Soal/ : File soal utama
-- 02_Kunci_Jawaban/ : File kunci jawaban
-- 03_Test_Cases/ : File test cases
-- README.txt : Informasi detail soal
-
-INFORMASI DOWNLOAD:
-- Total File Diunduh: ${totalDownloadedFiles} file
-- Tanggal Download: ${new Date().toLocaleString('id-ID')}
-- User: ${currentUser?.username || 'Unknown'}
-
----
-Diunduh dari Bank Soal Informatika
-Universitas Katolik Parahyangan
-© ${new Date().getFullYear()}
-      `.trim();
+      // Clean package title untuk digunakan sebagai formTitle
+      const cleanFormTitle = packageTitle.trim() === "" 
+        ? "Paket_Tanpa_Judul" 
+        : packageTitle.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_');
       
-      packageFolder.file("README_PAKET.txt", mainReadmeContent);
+      // Use the same endpoint as Create.jsx
+      const url = `${API_URL}/files/download-bundle?ids=${questionSetIds}&formTitle=${cleanFormTitle}`;
       
-      // Generate ZIP file
-      console.log('🔄 Generating package ZIP file...');
-      const zipBlob = await zip.generateAsync({
-        type: "blob",
-        compression: "DEFLATE",
-        compressionOptions: {
-          level: 6
-        }
-      });
+      // Trigger download using window.location.href (same as Create.jsx)
+      window.location.href = url;
       
-      // Create safe filename for ZIP
-      const safeFileName = packageTitle
-        .replace(/[^a-zA-Z0-9\s-_]/g, '')
-        .replace(/\s+/g, '_')
-        .substring(0, 50);
+      // Show notification
+      showNotification('Download Bundle ZIP Paket Soal dimulai...', 'info');
       
-      const zipFileName = `Paket_${safeFileName}_${new Date().toISOString().split('T')[0]}.zip`;
-      
-      // Save ZIP file
-      saveAs(zipBlob, zipFileName);
-      
-      console.log(`✅ Package ZIP file "${zipFileName}" download started successfully`);
-      
-      // Show success message
-      alert(`Berhasil mengunduh paket soal "${packageTitle}"!\n\nTotal: ${totalDownloadedFiles} file dalam ${packageData.items.length} set soal`);
-      
-      let updatedDownloadCount = null;
+      // Increment download count
+      const token = getAuthToken();
       if (token) {
         try {
           const incrementResponse = await axios.post(
             `${API_URL}/question-packages/${packageId}/increment-download`,
             {},
-            { headers: authHeaders }
+            { 
+              headers: {
+                "x-access-token": token,
+                Authorization: `Bearer ${token}`
+              }
+            }
           );
-          updatedDownloadCount = incrementResponse.data?.downloads ?? null;
+          
+          const updatedDownloadCount = incrementResponse.data?.downloads ?? null;
+          
+          setPackages(prev =>
+            prev.map(pkg =>
+              pkg.id === packageId
+                ? {
+                    ...pkg,
+                    downloads:
+                      updatedDownloadCount !== null
+                        ? updatedDownloadCount
+                        : (pkg.downloads || 0) + 1
+                  }
+                : pkg
+            )
+          );
         } catch (persistError) {
           console.error("⚠️ Failed to persist package download count:", persistError);
         }
       }
-
-      setPackages(prev =>
-        prev.map(pkg =>
-          pkg.id === packageId
-            ? {
-                ...pkg,
-                downloads:
-                  updatedDownloadCount !== null
-                    ? updatedDownloadCount
-                    : (pkg.downloads || 0) + 1
-              }
-            : pkg
-        )
-      );
+      
+      // Remove from downloading items after a delay
+      setTimeout(() => {
+        setDownloadingItems(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(packageId);
+          return newSet;
+        });
+      }, 2000);
       
     } catch (error) {
       console.error("❌ Error downloading package:", error);
-      alert(`Gagal mengunduh paket soal: ${error.message}`);
-    } finally {
+      showNotification(`Gagal mengunduh paket soal: ${error.message}`, 'error');
       setDownloadingItems(prev => {
         const newSet = new Set(prev);
         newSet.delete(packageId);
@@ -469,53 +338,111 @@ Universitas Katolik Parahyangan
     }
   };
 
-  // Filter function untuk paket soal (QuestionPackage)
-  const filterData = () => {
-    return packages.filter(pkg => {
+  // Filter function untuk paket soal (QuestionPackage) - menggunakan useMemo untuk optimasi
+  const filteredData = useMemo(() => {
+    // Pastikan packages adalah array
+    if (!Array.isArray(packages)) {
+      console.log('⚠️ packages is not an array:', packages);
+      return [];
+    }
+
+    if (packages.length === 0) {
+      console.log('⚠️ packages array is empty');
+      return [];
+    }
+
+    // Normalize searchQuery - pastikan selalu string
+    const normalizedSearchQuery = (searchQuery || '').trim();
+    
+    // Normalize filter arrays
+    const hasSelectedLevel = Array.isArray(selectedLevel) && selectedLevel.length > 0;
+    const hasSelectedCourseTags = Array.isArray(selectedCourseTags) && selectedCourseTags.length > 0;
+    const hasSelectedMaterialTags = Array.isArray(selectedMaterialTags) && selectedMaterialTags.length > 0;
+    const hasDateRange = dateRange && (dateRange.start !== '' || dateRange.end !== '');
+
+    // Jika searchQuery kosong dan tidak ada filter lain, return semua packages
+    const hasActiveFilters = 
+      normalizedSearchQuery !== '' ||
+      hasSelectedLevel ||
+      hasSelectedCourseTags ||
+      hasSelectedMaterialTags ||
+      hasDateRange;
+
+    if (!hasActiveFilters) {
+      console.log('✅ No active filters, returning all packages:', packages.length);
+      return packages;
+    }
+
+    console.log('🔍 Applying filters:', {
+      searchQuery: normalizedSearchQuery,
+      hasSelectedLevel,
+      hasSelectedCourseTags,
+      hasSelectedMaterialTags,
+      hasDateRange,
+      totalPackages: packages.length
+    });
+
+    const filtered = packages.filter(pkg => {
+      if (!pkg) return false;
+
       // Filter by search query (judul atau deskripsi)
       const matchesSearch =
-        searchQuery === '' ||
-        pkg.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        pkg.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        pkg.course?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        pkg.items?.some(item =>
-          item.question?.title?.toLowerCase().includes(searchQuery.toLowerCase())
-        );
+        normalizedSearchQuery === '' ||
+        (pkg.title && pkg.title.toLowerCase().includes(normalizedSearchQuery.toLowerCase())) ||
+        (pkg.description && pkg.description.toLowerCase().includes(normalizedSearchQuery.toLowerCase())) ||
+        (pkg.course?.name && pkg.course.name.toLowerCase().includes(normalizedSearchQuery.toLowerCase())) ||
+        (pkg.items && Array.isArray(pkg.items) && pkg.items.some(item =>
+          item?.question?.title && item.question.title.toLowerCase().includes(normalizedSearchQuery.toLowerCase())
+        ));
 
       // Filter by level (gunakan level dari soal di dalam paket)
       const matchesLevel =
-        selectedLevel.length === 0 ||
-        pkg.items?.some(item =>
-          selectedLevel.includes(item.question?.level)
-        );
+        !hasSelectedLevel ||
+        (pkg.items && Array.isArray(pkg.items) && pkg.items.some(item =>
+          selectedLevel.includes(item?.question?.level)
+        ));
 
       // Filter by course tags (mata kuliah)
       const matchesCourseTags =
-        selectedCourseTags.length === 0 ||
-        selectedCourseTags.some(tag =>
-          pkg.course?.name?.toLowerCase().includes(tag.toLowerCase())
-        );
+        !hasSelectedCourseTags ||
+        (pkg.course?.name && selectedCourseTags.some(tag =>
+          pkg.course.name.toLowerCase().includes(tag.toLowerCase())
+        ));
 
       // Filter by material tags (topik dari deskripsi soal)
       const matchesMaterialTags =
-        selectedMaterialTags.length === 0 ||
-        pkg.items?.some(item =>
+        !hasSelectedMaterialTags ||
+        (pkg.items && Array.isArray(pkg.items) && pkg.items.some(item =>
           selectedMaterialTags.some(tag =>
-            item.question?.description?.toLowerCase().includes(tag.toLowerCase())
+            item?.question?.description && item.question.description.toLowerCase().includes(tag.toLowerCase())
           )
-        );
+        ));
 
       // Filter by date
-      const itemDate = new Date(pkg.created_at);
-      const matchesDate =
-        (dateRange.start === '' || new Date(dateRange.start) <= itemDate) &&
-        (dateRange.end === '' || new Date(dateRange.end) >= itemDate);
+      let matchesDate = true;
+      if (hasDateRange) {
+        try {
+          const itemDate = new Date(pkg.created_at);
+          matchesDate =
+            (dateRange.start === '' || new Date(dateRange.start) <= itemDate) &&
+            (dateRange.end === '' || new Date(dateRange.end) >= itemDate);
+        } catch (e) {
+          console.error('Error parsing date:', e);
+          matchesDate = true; // Jika error, tampilkan item tersebut
+        }
+      }
 
       return matchesSearch && matchesLevel && matchesCourseTags && matchesMaterialTags && matchesDate;
     });
-  };
 
-  const filteredData = filterData();
+    console.log('✅ Filter result:', {
+      totalPackages: packages.length,
+      filteredCount: filtered.length,
+      searchQuery: normalizedSearchQuery
+    });
+
+    return filtered;
+  }, [packages, searchQuery, selectedLevel, selectedCourseTags, selectedMaterialTags, dateRange]);
   const navigate = useNavigate();
 
   // Tambahkan fungsi ini di dalam Komponen Anda (misalnya: di dalam ListPage)
@@ -634,7 +561,7 @@ const getLevelColor = (level) => {
       console.log('✅ Question packages loaded:', data.length);
     } catch (err) {
       console.error('❌ Error fetching packages:', err);
-      alert(err.message);
+      showNotification(err.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -788,15 +715,17 @@ const getLevelColor = (level) => {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="px-6 py-3 bg-blue-600 text-white rounded-xl flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors shadow-sm"
-              onClick={() => filterData()}
-            >
-              <Search className="w-5 h-5" />
-              Cari
-            </motion.button>
+            {searchQuery && (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors shadow-sm"
+                onClick={() => setSearchQuery('')}
+              >
+                <X className="w-5 h-5" />
+                Hapus
+              </motion.button>
+            )}
           </div>
           
           {/* Dropdown Filters dengan dropdown-container class */}
@@ -1074,8 +1003,62 @@ const getLevelColor = (level) => {
         </motion.div>
 
         {/* Results Section - UPDATED dengan tombol delete */}
-        <AnimatePresence mode="wait">
-          {viewMode === 'grid' ? (
+        {loading ? (
+          <div className="flex justify-center items-center py-16">
+            <motion.div
+              animate={{
+                scale: [1, 1.2, 1],
+                rotate: [0, 180, 360]
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+              className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full"
+            />
+          </div>
+        ) : !filteredData || filteredData.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center py-16"
+          >
+            <div className="max-w-md mx-auto">
+              <div className="w-20 h-20 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                <Search className="w-10 h-10 text-gray-400" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                {searchQuery.trim() !== '' || selectedLevel.length > 0 || selectedCourseTags.length > 0 || selectedMaterialTags.length > 0 || dateRange.start || dateRange.end
+                  ? 'Tidak ada paket soal yang sesuai'
+                  : 'Belum ada paket soal'}
+              </h3>
+              <p className="text-gray-600 mb-4">
+                {searchQuery.trim() !== '' || selectedLevel.length > 0 || selectedCourseTags.length > 0 || selectedMaterialTags.length > 0 || dateRange.start || dateRange.end
+                  ? 'Coba ubah kata kunci pencarian atau filter yang Anda gunakan.'
+                  : 'Paket soal akan muncul di sini setelah dibuat.'}
+              </p>
+              {(searchQuery.trim() !== '' || selectedLevel.length > 0 || selectedCourseTags.length > 0 || selectedMaterialTags.length > 0 || dateRange.start || dateRange.end) && (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedLevel([]);
+                    setSelectedCourseTags([]);
+                    setSelectedMaterialTags([]);
+                    setDateRange({ start: '', end: '' });
+                  }}
+                >
+                  Hapus Semua Filter
+                </motion.button>
+              )}
+            </div>
+          </motion.div>
+        ) : (
+          <AnimatePresence mode="wait" key={`results-${viewMode}-${filteredData.length}-${searchQuery || 'empty'}`}>
+            {viewMode === 'grid' ? (
             <motion.div
               variants={containerVariants}
               initial="hidden"
@@ -1243,7 +1226,8 @@ const getLevelColor = (level) => {
                                 <motion.tr
                                     key={item.id}
                                     variants={itemVariants}
-                                    className="hover:bg-gray-50"
+                                    className="hover:bg-gray-50 cursor-pointer"
+                                    onClick={() => navigate(`/question-packages/${item.id}`)}
                                 >
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                         {namaFile}
@@ -1273,7 +1257,8 @@ const getLevelColor = (level) => {
                                                         ? 'bg-gray-400 cursor-not-allowed' 
                                                         : 'bg-blue-600 hover:bg-blue-700'
                                                 }`}
-                                                onClick={() => {
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
                                                     if (!isDownloading) {
                                                         // Menggunakan handler download Card View
                                                         handleDownloadPackage(item.id, item.title);
@@ -1302,7 +1287,10 @@ const getLevelColor = (level) => {
                                                     whileHover={{ scale: 1.05 }}
                                                     whileTap={{ scale: 0.95 }}
                                                     className="inline-flex items-center px-3 py-1 rounded-lg text-sm text-white bg-red-600 hover:bg-red-700"
-                                                    onClick={(e) => openDeleteModal(e, item.id, item.title)} // Menggunakan handler delete Card View
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        openDeleteModal(e, item.id, item.title);
+                                                    }}
                                                 >
                                                     <Trash2 className="w-3 h-3 mr-1" />
                                                     Hapus
@@ -1316,8 +1304,9 @@ const getLevelColor = (level) => {
                     </tbody>
                 </table>
             </motion.div>
-          )}
-        </AnimatePresence>
+            )}
+          </AnimatePresence>
+        )}
         
         {/* Floating Create Button */}
         <Link to="/create">
@@ -1390,6 +1379,68 @@ const getLevelColor = (level) => {
       </motion.div>
     </div>
 )}
+
+      {/* Notification Overlay */}
+      <AnimatePresence>
+        {notification.show && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -50, scale: 0.9 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="fixed top-4 right-4 z-[100] max-w-md"
+          >
+            <motion.div
+              className={`rounded-lg shadow-2xl border-2 p-4 backdrop-blur-sm ${
+                notification.type === 'success'
+                  ? 'bg-green-50 border-green-200 text-green-900'
+                  : notification.type === 'error'
+                  ? 'bg-red-50 border-red-200 text-red-900'
+                  : notification.type === 'warning'
+                  ? 'bg-yellow-50 border-yellow-200 text-yellow-900'
+                  : 'bg-blue-50 border-blue-200 text-blue-900'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 mt-0.5">
+                  {notification.type === 'success' && (
+                    <CheckCircle2 className="w-6 h-6 text-green-600" />
+                  )}
+                  {notification.type === 'error' && (
+                    <XCircle className="w-6 h-6 text-red-600" />
+                  )}
+                  {notification.type === 'warning' && (
+                    <AlertTriangle className="w-6 h-6 text-yellow-600" />
+                  )}
+                  {notification.type === 'info' && (
+                    <Info className="w-6 h-6 text-blue-600" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium whitespace-pre-line break-words">
+                    {notification.message}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setNotification(prev => ({ ...prev, show: false }))}
+                  className={`flex-shrink-0 p-1 rounded-full hover:bg-opacity-20 transition-colors ${
+                    notification.type === 'success'
+                      ? 'text-green-600 hover:bg-green-200'
+                      : notification.type === 'error'
+                      ? 'text-red-600 hover:bg-red-200'
+                      : notification.type === 'warning'
+                      ? 'text-yellow-600 hover:bg-yellow-200'
+                      : 'text-blue-600 hover:bg-blue-200'
+                  }`}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <Footer />
     </div>
   );

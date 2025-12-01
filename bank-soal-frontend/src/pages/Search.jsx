@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, CheckCircle, ChevronDown, FileText, BarChart2, Plus, Check, BookOpen, Trash2, AlertTriangle, Archive, RefreshCw, Trash } from 'lucide-react';
+import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, CheckCircle, ChevronDown, FileText, BarChart2, Plus, Check, BookOpen, Trash2, AlertTriangle, Archive, RefreshCw, Trash, Info, CheckCircle2, XCircle } from 'lucide-react';
 import Footer from '../components/Footer';
 import Header from '../components/Header';
 import RecycleBinModal from '../components/RecycleBinModal.jsx';
@@ -19,6 +19,7 @@ const SearchPage = ({ currentUser }) => {
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [viewMode, setViewMode] = useState('grid');
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [questionSets, setQuestionSets] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
@@ -52,10 +53,24 @@ const SearchPage = ({ currentUser }) => {
   // State untuk download progress
   const [downloadingItems, setDownloadingItems] = useState(new Set());
 
+  // State untuk overlay notification
+  const [notification, setNotification] = useState({
+    show: false,
+    message: '',
+    type: 'info' // 'success', 'error', 'warning', 'info'
+  });
+
+  // Helper function untuk cek apakah value adalah numeric ID
+  const isNumericId = (value) => {
+    if (!value) return false;
+    const str = String(value).trim();
+    // Cek apakah string adalah pure number (bisa parseInt)
+    return !isNaN(str) && !isNaN(parseFloat(str)) && isFinite(str) && str.length > 0;
+  };
+
   // Helper function untuk mendapatkan nama mata kuliah berdasarkan ID
   const getSubjectNameById = (subjectId) => {
     if (!subjectId || !courseOptions.length) {
-      console.warn(`⚠️ getSubjectNameById: No subjectId (${subjectId}) or no courseOptions (${courseOptions.length})`);
       return subjectId;
     }
     
@@ -66,12 +81,23 @@ const SearchPage = ({ currentUser }) => {
     });
     
     if (course) {
-      console.log(`🔍 getSubjectNameById: Found course ${course.id} -> "${course.name}" for subjectId ${subjectId}`);
       return course.name;
     } else {
-      console.warn(`⚠️ getSubjectNameById: Course not found for subjectId ${subjectId}. Available: ${courseOptions.map(c => `${c.id}`).join(', ')}`);
       return subjectId;
     }
+  };
+
+  // Helper function untuk mendapatkan nama mata kuliah (handles both ID and name)
+  const getSubjectName = (subject) => {
+    if (!subject) return subject;
+    
+    // Jika sudah berupa nama (bukan numeric ID), kembalikan langsung
+    if (!isNumericId(subject)) {
+      return subject;
+    }
+    
+    // Jika numeric ID, resolve ke nama
+    return getSubjectNameById(subject);
   };
 
   // Helper function to get auth token
@@ -97,6 +123,86 @@ const SearchPage = ({ currentUser }) => {
     return token;
   };
 
+  // Helper function to show notification overlay
+  const showNotification = (message, type = 'info') => {
+    setNotification({
+      show: true,
+      message: message,
+      type: type
+    });
+    
+    // Auto hide after 5 seconds for success/info, 7 seconds for error/warning
+    const duration = (type === 'error' || type === 'warning') ? 7000 : 5000;
+    setTimeout(() => {
+      setNotification(prev => ({ ...prev, show: false }));
+    }, duration);
+  };
+
+  // Helper function to check if file extension is a programming language
+  const isProgrammingLanguageFile = (extension) => {
+    if (!extension) return false;
+    
+    const ext = extension.toLowerCase().trim();
+    if (!ext.startsWith('.')) {
+      return false;
+    }
+    
+    // List of programming language file extensions
+    const programmingExtensions = [
+      '.js', '.jsx', '.ts', '.tsx',           // JavaScript/TypeScript
+      '.java',                                 // Java
+      '.py',                                   // Python
+      '.cpp', '.c', '.h', '.hpp', '.cc', '.cxx', // C/C++
+      '.cs',                                   // C#
+      '.php',                                  // PHP
+      '.rb',                                   // Ruby
+      '.go',                                   // Go
+      '.rs',                                   // Rust
+      '.swift',                                // Swift
+      '.kt', '.kts',                           // Kotlin
+      '.scala',                                // Scala
+      '.r',                                    // R
+      '.m',                                    // Objective-C/Matlab
+      '.pl', '.pm',                            // Perl
+      '.sh', '.bash', '.zsh', '.fish',         // Shell scripts
+      '.sql',                                  // SQL
+      '.html', '.htm', '.css',                 // Web files
+      '.xml', '.json', '.yaml', '.yml',        // Data formats
+      '.md', '.markdown',                      // Markdown
+      '.vue', '.svelte',                       // Frontend frameworks
+      '.dart',                                 // Dart
+      '.lua',                                  // Lua
+      '.clj', '.cljs',                         // Clojure
+      '.hs',                                   // Haskell
+      '.elm',                                  // Elm
+      '.ex', '.exs',                           // Elixir
+      '.erl', '.hrl',                          // Erlang
+      '.ml', '.mli',                           // OCaml
+      '.fs', '.fsi', '.fsx',                   // F#
+      '.vb', '.vbnet',                         // VB.NET
+      '.pas', '.pp',                           // Pascal
+      '.asm', '.s',                            // Assembly
+      '.makefile', '.mk',                      // Makefile
+      '.cmake',                                // CMake
+      '.gradle',                               // Gradle
+      '.maven', '.pom',                        // Maven
+      '.dockerfile',                           // Dockerfile
+      '.tf',                                   // Terraform
+      '.groovy',                               // Groovy
+      '.jsp', '.jspx',                         // JSP
+      '.asp', '.aspx',                         // ASP.NET
+      '.ps1', '.psm1',                         // PowerShell
+      '.bat', '.cmd',                          // Batch files
+      '.vbs',                                  // VBScript
+      '.coffee',                               // CoffeeScript
+      '.less', '.sass', '.scss',               // CSS preprocessors
+      '.styl',                                 // Stylus
+      '.jade', '.pug',                         // Template engines
+    ];
+    
+    return programmingExtensions.includes(ext);
+  };
+
   // UPDATED: Fungsi untuk download ZIP dengan semua file
   const handleDownload = async (id, fileName) => {
     if (downloadingItems.has(id)) {
@@ -113,7 +219,7 @@ const SearchPage = ({ currentUser }) => {
       const questionSet = response.data;
       
       if (!questionSet.files || questionSet.files.length === 0) {
-        alert('Tidak ada file yang tersedia untuk diunduh');
+        showNotification('Tidak ada file yang tersedia untuk diunduh', 'warning');
         return;
       }
       
@@ -175,57 +281,139 @@ const SearchPage = ({ currentUser }) => {
           // Get file extension from original filename or content-type
           let fileExtension = '';
           let safeFileName = '';
+          let isProgrammingFile = false;
           
-          // First try to get extension from original filename
-          if (file.filename && file.filename.includes('.')) {
+          // Priority 1: Try to get extension from originalname (nama file asli saat upload)
+          const originalName = file.originalname || file.filename || '';
+          if (originalName && originalName.includes('.')) {
+            const lastDot = originalName.lastIndexOf('.');
+            fileExtension = originalName.substring(lastDot).toLowerCase();
+            safeFileName = originalName;
+            
+            // Check if it's a programming language file
+            isProgrammingFile = isProgrammingLanguageFile(fileExtension);
+            
+            if (isProgrammingFile) {
+              console.log(`🔧 Detected programming language file: ${originalName} (${fileExtension})`);
+            } else {
+              console.log(`📄 Using original filename: ${originalName} (${fileExtension})`);
+            }
+          } 
+          // Priority 2: Try filename if originalname doesn't have extension
+          else if (file.filename && file.filename.includes('.')) {
             const lastDot = file.filename.lastIndexOf('.');
-            fileExtension = file.filename.substring(lastDot);
+            fileExtension = file.filename.substring(lastDot).toLowerCase();
             safeFileName = file.filename;
-          } else {
-            // Fallback: determine extension from content-type
+            
+            // Check if it's a programming language file
+            isProgrammingFile = isProgrammingLanguageFile(fileExtension);
+            
+            if (isProgrammingFile) {
+              console.log(`🔧 Detected programming language file from filename: ${file.filename} (${fileExtension})`);
+            }
+          } 
+          // Priority 3: Determine extension from content-type
+          else {
             const contentType = fileResponse.headers['content-type'] || fileResponse.headers['Content-Type'];
             console.log(`File ${file.id} content-type:`, contentType);
             
             if (contentType) {
-              if (contentType.includes('pdf') || contentType.includes('application/pdf')) {
+              // Check for programming language content types first
+              if (contentType.includes('javascript') || contentType.includes('application/javascript') || contentType.includes('text/javascript')) {
+                fileExtension = '.js';
+                isProgrammingFile = true;
+              } else if (contentType.includes('json') || contentType.includes('application/json')) {
+                fileExtension = '.json';
+                isProgrammingFile = true;
+              } else if (contentType.includes('xml') || contentType.includes('application/xml') || contentType.includes('text/xml')) {
+                fileExtension = '.xml';
+                isProgrammingFile = true;
+              } else if (contentType.includes('python') || contentType.includes('text/x-python')) {
+                fileExtension = '.py';
+                isProgrammingFile = true;
+              } else if (contentType.includes('java') || contentType.includes('text/x-java')) {
+                fileExtension = '.java';
+                isProgrammingFile = true;
+              } else if (contentType.includes('pdf') || contentType.includes('application/pdf')) {
                 fileExtension = '.pdf';
               } else if (contentType.includes('word') || contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
                 fileExtension = '.docx';
               } else if (contentType.includes('msword') || contentType.includes('application/msword')) {
                 fileExtension = '.doc';
               } else if (contentType.includes('text') || contentType.includes('text/plain')) {
+                // For text/plain, we can't determine exact type, so use .txt
                 fileExtension = '.txt';
               } else {
-                // Default fallback based on file category
-                switch (file.filecategory) {
-                  case 'soal':
-                  case 'questions':
-                    fileExtension = '.pdf'; // Assume PDF for question files
-                    break;
-                  case 'kunci':
-                  case 'answers':
-                    fileExtension = '.pdf'; // Assume PDF for answer files
-                    break;
-                  case 'test':
-                  case 'testCases':
-                    fileExtension = '.txt'; // Assume TXT for test cases
-                    break;
-                  default:
-                    fileExtension = '.pdf'; // Default to PDF
+                // If content-type is unknown, try to infer from filetype field if available
+                if (file.filetype) {
+                  const filetypeLower = file.filetype.toLowerCase();
+                  if (filetypeLower.includes('pdf')) {
+                    fileExtension = '.pdf';
+                  } else if (filetypeLower.includes('word') || filetypeLower.includes('docx')) {
+                    fileExtension = '.docx';
+                  } else if (filetypeLower.includes('doc')) {
+                    fileExtension = '.doc';
+                  } else if (filetypeLower.includes('text') || filetypeLower.includes('txt')) {
+                    fileExtension = '.txt';
+                  } else {
+                    // Last resort: use generic extension based on content-type pattern
+                    // But DON'T assume PDF for answers or TXT for test cases
+                    // Only use PDF if content-type suggests it
+                    fileExtension = '.bin'; // Generic binary file
+                    console.warn(`⚠️ Unknown file type for file ${file.id}, using .bin extension`);
+                  }
+                } else {
+                  // No filetype info, use generic extension
+                  fileExtension = '.bin';
+                  console.warn(`⚠️ No file type information for file ${file.id}, using .bin extension`);
                 }
               }
             } else {
-              // No content-type, use default based on category
-              fileExtension = '.pdf';
+              // No content-type, try filetype field
+              if (file.filetype) {
+                const filetypeLower = file.filetype.toLowerCase();
+                if (filetypeLower.includes('pdf')) {
+                  fileExtension = '.pdf';
+                } else if (filetypeLower.includes('word') || filetypeLower.includes('docx')) {
+                  fileExtension = '.docx';
+                } else if (filetypeLower.includes('doc')) {
+                  fileExtension = '.doc';
+                } else if (filetypeLower.includes('text') || filetypeLower.includes('txt')) {
+                  fileExtension = '.txt';
+                } else {
+                  fileExtension = '.bin';
+                  console.warn(`⚠️ Unknown filetype "${file.filetype}" for file ${file.id}, using .bin extension`);
+                }
+              } else {
+                // Last resort: use .bin as generic extension
+                fileExtension = '.bin';
+                console.warn(`⚠️ No file information available for file ${file.id}, using .bin extension`);
+              }
             }
             
             // Create safe filename if original doesn't exist
             safeFileName = `${folderName}_${file.id}${fileExtension}`;
           }
           
-          // Ensure filename has proper extension
-          if (!safeFileName.includes('.')) {
-            safeFileName += fileExtension;
+          // CRITICAL: Always preserve the detected extension, especially for programming files
+          // Never convert programming language files to PDF
+          if (isProgrammingFile) {
+            console.log(`✅ Preserving programming language file extension: ${fileExtension}`);
+            // Ensure the filename has the correct extension
+            if (safeFileName && !safeFileName.toLowerCase().endsWith(fileExtension.toLowerCase())) {
+              // Remove any existing extension and add the correct one
+              const lastDot = safeFileName.lastIndexOf('.');
+              if (lastDot > 0) {
+                safeFileName = safeFileName.substring(0, lastDot) + fileExtension;
+              } else {
+                safeFileName = safeFileName + fileExtension;
+              }
+            }
+          } else {
+            // For non-programming files, ensure filename has proper extension
+            if (!safeFileName.includes('.')) {
+              safeFileName += fileExtension;
+            }
           }
           
           // Clean filename for ZIP compatibility
@@ -255,56 +443,16 @@ const SearchPage = ({ currentUser }) => {
       await Promise.allSettled(downloadPromises);
       
       if (!hasFiles) {
-        alert('Gagal mengunduh file. Tidak ada file yang berhasil diproses.');
+        showNotification('Gagal mengunduh file. Tidak ada file yang berhasil diproses.', 'error');
         return;
       }
-      
-      // Create comprehensive README file
-      const readmeContent = `
-PAKET SOAL - BANK SOAL INFORMATIKA
-==================================
-
-INFORMASI UMUM:
-- Judul: ${questionSet.title || fileName}
-- Mata Kuliah: ${getSubjectNameById(questionSet.subject)}
-- Tingkat Kesulitan: ${questionSet.level}
-- Dosen: ${questionSet.lecturer}
-- Tahun: ${questionSet.year}
-- Tanggal Unduh: ${new Date().toLocaleString('id-ID')}
-
-STRUKTUR FOLDER:
-- 01_Soal/ : Berisi file soal utama (${downloadedFiles.soal} file)
-- 02_Kunci_Jawaban/ : Berisi file kunci jawaban (${downloadedFiles.jawaban} file)
-- 03_Test_Cases/ : Berisi file test cases (${downloadedFiles.testcase} file)
-
-DETAIL TAMBAHAN:
-- Topik: ${questionSet.topics || 'Tidak ada topik yang ditentukan'}
-- Deskripsi: ${questionSet.description || 'Tidak ada deskripsi tambahan'}
-- Total File: ${downloadedFiles.soal + downloadedFiles.jawaban + downloadedFiles.testcase} file
-
-INFORMASI DOWNLOAD:
-- ID Question Set: ${id}
-- Waktu Download: ${new Date().toISOString()}
-- User: ${currentUser?.username || 'Unknown'}
-
-CATATAN:
-Jika ada folder yang kosong, berarti file untuk kategori tersebut
-tidak tersedia atau gagal diunduh dari server.
-
----
-Diunduh dari Bank Soal Informatika
-Universitas Katolik Parahyangan
-© ${new Date().getFullYear()}
-      `.trim();
-      
-      zip.file("README.txt", readmeContent);
       
       // Add summary file in JSON format for programmatic access
       const summaryData = {
         questionSet: {
           id: id,
           title: questionSet.title || fileName,
-          subject: getSubjectNameById(questionSet.subject),
+          subject: getSubjectName(questionSet.subject),
           level: questionSet.level,
           lecturer: questionSet.lecturer,
           year: questionSet.year,
@@ -352,19 +500,19 @@ Universitas Katolik Parahyangan
         `- Test Cases: ${downloadedFiles.testcase} file\n\n` +
         `Total: ${downloadedFiles.soal + downloadedFiles.jawaban + downloadedFiles.testcase} file dalam format ZIP`;
       
-      alert(successMessage);
+      showNotification(successMessage, 'success');
       
     } catch (error) {
       console.error("❌ Error downloading files:", error);
       
       if (error.response?.status === 404) {
-        alert('File soal tidak ditemukan atau telah dihapus');
+        showNotification('File soal tidak ditemukan atau telah dihapus', 'error');
       } else if (error.response?.status === 403) {
-        alert('Anda tidak memiliki izin untuk mengunduh file ini');
+        showNotification('Anda tidak memiliki izin untuk mengunduh file ini', 'error');
       } else if (error.code === 'ECONNABORTED') {
-        alert('Download timeout. Silakan coba lagi atau periksa koneksi internet.');
+        showNotification('Download timeout. Silakan coba lagi atau periksa koneksi internet.', 'warning');
       } else {
-        alert(`Gagal mengunduh file: ${error.message}`);
+        showNotification(`Gagal mengunduh file: ${error.message}`, 'error');
       }
     } finally {
       setDownloadingItems(prev => {
@@ -381,7 +529,7 @@ Universitas Katolik Parahyangan
     try {
       const token = getAuthToken();
       if (!token) {
-        alert('Token autentikasi tidak ditemukan. Silakan login kembali.');
+        showNotification('Token autentikasi tidak ditemukan. Silakan login kembali.', 'error');
         return;
       }
 
@@ -405,7 +553,7 @@ Universitas Katolik Parahyangan
         setQuestionSets(prev => prev.filter(item => item.id !== id));
         setFilteredData(prev => prev.filter(item => item.id !== id));
         
-        alert('Soal berhasil dipindahkan ke Recycle Bin');
+        showNotification('Soal berhasil dipindahkan ke Recycle Bin', 'success');
         setShowDeleteModal(false);
         setItemToDelete(null);
       } else {
@@ -416,13 +564,13 @@ Universitas Katolik Parahyangan
       console.error("❌ Error deleting question set:", error);
       
       if (error.response?.status === 401) {
-        alert('Sesi telah berakhir. Silakan login kembali.');
+        showNotification('Sesi telah berakhir. Silakan login kembali.', 'error');
       } else if (error.response?.status === 403) {
-        alert('Anda tidak memiliki izin untuk menghapus soal ini.');
+        showNotification('Anda tidak memiliki izin untuk menghapus soal ini.', 'error');
       } else if (error.response?.status === 404) {
-        alert('⚠️ Endpoint soft delete belum tersedia di backend.\n\nPastikan backend sudah diupdate dengan:\n1. Route: PATCH /api/questionsets/:id/soft-delete\n2. Database column: is_deleted, deleted_at, deleted_by');
+        showNotification('⚠️ Endpoint soft delete belum tersedia di backend.\n\nPastikan backend sudah diupdate dengan:\n1. Route: PATCH /api/questionsets/:id/soft-delete\n2. Database column: is_deleted, deleted_at, deleted_by', 'warning');
       } else {
-        alert(`Gagal menghapus soal: ${error.response?.data?.message || error.message}`);
+        showNotification(`Gagal menghapus soal: ${error.response?.data?.message || error.message}`, 'error');
       }
     } finally {
       setIsDeleting(false);
@@ -490,7 +638,6 @@ Universitas Katolik Parahyangan
   };
 
   const fetchDropdownData = async () => {
-    setDropdownLoading(true);
     setDropdownError(null);
     
     try {
@@ -526,13 +673,10 @@ Universitas Katolik Parahyangan
         'Sorting', 'Searching', 'SQL', 'NoSQL', 'HTML', 'CSS',
         'JavaScript', 'React', 'Node.js', 'PHP', 'Python', 'Java'
       ]);
-    } finally {
-      setDropdownLoading(false);
     }
   };
 
   const fetchQuestionSets = async (courses = []) => {
-    setIsLoading(true);
     try {
       const response = await axios.get(`${API_URL}/questionsets`);
       
@@ -549,14 +693,6 @@ Universitas Katolik Parahyangan
         // Simpan subject ID asli
         const subjectId = item.subject;
         let subjectName = item.subject;
-        
-        // Helper function untuk cek apakah value adalah numeric ID
-        const isNumericId = (value) => {
-          if (!value) return false;
-          const str = String(value).trim();
-          // Cek apakah string adalah pure number (bisa parseInt)
-          return !isNaN(str) && !isNaN(parseFloat(str)) && isFinite(str) && str.length > 0;
-        };
         
         // Priority 1: Gunakan courseName atau subjectName dari backend JIKA bukan numeric ID
         const backendName = item.courseName || item.subjectName;
@@ -617,8 +753,6 @@ Universitas Katolik Parahyangan
       setFilteredData(transformedData);
     } catch (error) {
       console.error("❌ Error fetching question sets:", error);
-    } finally {
-      setIsLoading(false);
     }
   };
   
@@ -627,43 +761,54 @@ Universitas Katolik Parahyangan
   };
 
   // Filter and search functions
-  const filterData = () => {
-    setIsLoading(true);
+  const filterData = useCallback(() => {
+    // Tidak perlu set loading untuk filter/search karena sudah client-side
+    // Pastikan questionSets tidak kosong
+    if (!questionSets || questionSets.length === 0) {
+      setFilteredData([]);
+      return [];
+    }
     
+    // Mulai dengan semua data dari questionSets
     let filtered = [...questionSets];
     
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+    // Filter berdasarkan search query (jika ada dan tidak kosong)
+    if (searchQuery && searchQuery.trim().length > 0) {
+      const query = searchQuery.toLowerCase().trim();
       filtered = filtered.filter(item => {
-        const subjectName = getSubjectNameById(item.subject).toLowerCase();
+        const subjectName = getSubjectName(item.subject).toLowerCase();
         return (
           item.fileName.toLowerCase().includes(query) ||
           subjectName.includes(query) ||
-          item.lecturer.toLowerCase().includes(query) ||
+          (item.lecturer && item.lecturer.toLowerCase().includes(query)) ||
           (item.topics && item.topics.some(topic => topic.toLowerCase().includes(query)))
         );
       });
     }
     
+    // Filter berdasarkan tingkat kesulitan (jika ada)
     if (selectedLevel.length > 0) {
       filtered = filtered.filter(item => selectedLevel.includes(item.level));
     }
     
+    // Filter berdasarkan course tags (jika ada)
     if (selectedCourseTags.length > 0) {
       filtered = filtered.filter(item => {
-        const subjectName = getSubjectNameById(item.subject).toLowerCase();
+        const subjectName = getSubjectName(item.subject).toLowerCase();
         return selectedCourseTags.some(tag => subjectName.includes(tag.toLowerCase()));
       });
     }
     
+    // Filter berdasarkan material tags (jika ada)
     if (selectedMaterialTags.length > 0) {
       filtered = filtered.filter(item => {
         return selectedMaterialTags.some(tag =>
-          item.topics.some(topic => topic.toLowerCase().includes(tag.toLowerCase()))
+          item.topics && item.topics.some(topic => topic.toLowerCase().includes(tag.toLowerCase()))
         );
       });
     }
     
+    // Filter berdasarkan date range (jika ada)
     if (dateRange.start && dateRange.end) {
       const startDate = new Date(dateRange.start);
       const endDate = new Date(dateRange.end);
@@ -674,10 +819,11 @@ Universitas Katolik Parahyangan
       });
     }
     
+    // Pastikan filteredData selalu di-update, bahkan jika hasilnya kosong
+    console.log(`🔍 Filter applied: ${filtered.length} results from ${questionSets.length} total items`);
     setFilteredData(filtered);
-    setIsLoading(false);
     return filtered;
-  };
+  }, [questionSets, searchQuery, selectedLevel, selectedCourseTags, selectedMaterialTags, dateRange, courseOptions]);
 
   // Filter dropdown data
   const filteredLevels = difficultyLevels.filter(level =>
@@ -739,13 +885,22 @@ Universitas Katolik Parahyangan
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
-      transition: { staggerChildren: 0.1 }
+      transition: { 
+        staggerChildren: 0.1,
+        delayChildren: 0
+      }
     }
   };
 
   const itemVariants = {
     hidden: { y: 20, opacity: 0 },
-    visible: { y: 0, opacity: 1 }
+    visible: { 
+      y: 0, 
+      opacity: 1,
+      transition: {
+        duration: 0.3
+      }
+    }
   };
 
   const dropdownVariants = {
@@ -776,9 +931,7 @@ Universitas Katolik Parahyangan
         }}
         className="ml-4 text-lg font-medium text-blue-600"
       >
-        {dropdownLoading && courseOptions.length === 0 ? 'Memuat Data Mata Kuliah...' :
-         dropdownLoading ? 'Memuat Filter Data...' : 
-         'Memuat Data...'}
+        Memuat Data...
       </motion.p>
     </div>
   );
@@ -819,7 +972,9 @@ Universitas Katolik Parahyangan
     return (
       <motion.div
         key={item.id}
-        variants={itemVariants}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
         className={`bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow cursor-pointer ${viewMode === 'grid' ? 'h-full' : ''}`}
         onClick={() => handleCardClick(item.id)}
       >
@@ -949,6 +1104,7 @@ Universitas Katolik Parahyangan
     const initialize = async () => {
       console.log("🔄 Initializing SearchPage data...");
       const startTime = performance.now();
+      setIsInitialLoading(true);
   
       try {
         // Step 1: Load courses
@@ -973,6 +1129,11 @@ Universitas Katolik Parahyangan
         console.log(`✨ Initialization complete in ${(endTime - startTime).toFixed(0)} ms`);
       } catch (err) {
         console.error("❌ Initialization failed:", err);
+      } finally {
+        // Set initial loading to false setelah semua data ter-load
+        if (isMounted) {
+          setIsInitialLoading(false);
+        }
       }
     };
   
@@ -991,13 +1152,6 @@ Universitas Katolik Parahyangan
     if (courseOptions.length > 0) {
       setQuestionSets(prevQuestionSets => {
         if (prevQuestionSets.length === 0) return prevQuestionSets;
-        
-        // Helper function untuk cek apakah value adalah numeric ID
-        const isNumericId = (value) => {
-          if (!value) return false;
-          const str = String(value).trim();
-          return !isNaN(str) && !isNaN(parseFloat(str)) && isFinite(str) && str.length > 0;
-        };
         
         // Cek apakah ada item yang masih menggunakan ID (numeric) sebagai subject
         const needsRetransform = prevQuestionSets.some(item => {
@@ -1039,14 +1193,18 @@ Universitas Katolik Parahyangan
   }, [courseOptions]);
 
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (questionSets.length >= 0 && !dropdownLoading && courseOptions.length >= 0) {
+    // Hanya filter jika sudah tidak dalam initial loading dan questionSets sudah ter-load
+    if (!isInitialLoading && questionSets.length > 0) {
+      const timeoutId = setTimeout(() => {
         filterData();
-      }
-    }, 300);
+      }, 300);
 
-    return () => clearTimeout(timeoutId);
-  }, [searchQuery, selectedLevel, selectedCourseTags, selectedMaterialTags, dateRange, questionSets, dropdownLoading, courseOptions]);
+      return () => clearTimeout(timeoutId);
+    } else if (!isInitialLoading && questionSets.length === 0) {
+      // Jika tidak ada data, set filteredData ke array kosong
+      setFilteredData([]);
+    }
+  }, [filterData, isInitialLoading, questionSets.length, searchQuery, selectedLevel, selectedCourseTags, selectedMaterialTags, dateRange]);
 
   // Handle outside clicks for dropdowns
   useEffect(() => {
@@ -1071,7 +1229,7 @@ Universitas Katolik Parahyangan
 
       <DropdownStatusIndicator />
 
-      {isLoading || dropdownLoading || courseOptions.length === 0 ? (
+      {isInitialLoading ? (
         <LoadingAnimation />
       ) : (
         <div className="w-full px-4 md:px-8 py-8 md:py-12">
@@ -1434,18 +1592,17 @@ Universitas Katolik Parahyangan
           </motion.div>
 
           {/* Results Section */}
-          <AnimatePresence mode="wait">
-            {viewMode === 'grid' ? (
-              <motion.div
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto"
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
-                key="grid-view"
-              >
-                {filteredData.map((item) => renderCard(item))}
-              </motion.div>
-            ) : (
+          {viewMode === 'grid' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
+              {filteredData && filteredData.length > 0 ? (
+                filteredData.map((item) => renderCard(item))
+              ) : (
+                <div className="col-span-full text-center py-16">
+                  <p className="text-lg text-gray-600">Tidak ada hasil yang ditemukan. Silakan coba pencarian lain.</p>
+                </div>
+              )}
+            </div>
+          ) : (
               <motion.div
                 className="overflow-x-auto max-w-7xl mx-auto bg-white rounded-xl shadow-lg"
                 variants={containerVariants}
@@ -1487,83 +1644,95 @@ Universitas Katolik Parahyangan
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredData.map((item) => {
-                      const isDownloading = downloadingItems.has(item.id);
-                      return (
-                        <motion.tr
-                          key={item.id}
-                          variants={itemVariants}
-                          className="hover:bg-gray-50"
-                        >
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {item.fileName}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700" title={`Subject ID: ${item.subjectId}`}>
-                            {item.subject}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-3 py-1 rounded-full text-xs ${getLevelColor(item.level)}`}>
-                              {item.level}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                            {item.lecturer}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                            {formatDate(item.lastUpdated)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center">
-                            <div className="flex items-center justify-center gap-2">
-                              <motion.button
-                                whileHover={{ scale: isDownloading ? 1 : 1.05 }}
-                                whileTap={{ scale: isDownloading ? 1 : 0.95 }}
-                                className={`inline-flex items-center px-3 py-1 rounded-lg text-sm text-white transition-colors ${
-                                  isDownloading 
-                                    ? 'bg-gray-400 cursor-not-allowed' 
-                                    : 'bg-blue-600 hover:bg-blue-700'
-                                }`}
-                                onClick={() => {
-                                  if (!isDownloading) {
-                                    handleDownload(item.id, item.fileName);
-                                  }
-                                }}
-                                disabled={isDownloading}
-                              >
-                                {isDownloading ? (
-                                  <>
-                                    <motion.div
-                                      animate={{ rotate: 360 }}
-                                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                                      className="w-3 h-3 border-2 border-white border-t-transparent rounded-full mr-1"
-                                    />
-                                    Unduh...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Download className="w-3 h-3 mr-1" />
-                                    Unduh ZIP
-                                  </>
-                                )}
-                              </motion.button>
-                              <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                className="inline-flex items-center px-3 py-1 rounded-lg text-sm text-white bg-red-600 hover:bg-red-700"
-                                onClick={() => confirmDelete(item)}
-                              >
-                                <Trash2 className="w-3 h-3 mr-1" />
-                                Hapus
-                              </motion.button>
-                            </div>
-                          </td>
-                        </motion.tr>
-                      );
-                    })}
+                    {filteredData && filteredData.length > 0 ? (
+                      filteredData.map((item) => {
+                        const isDownloading = downloadingItems.has(item.id);
+                        return (
+                          <motion.tr
+                            key={item.id}
+                            variants={itemVariants}
+                            className="hover:bg-gray-50 cursor-pointer"
+                            onClick={() => handleCardClick(item.id)}
+                          >
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {item.fileName}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700" title={`Subject ID: ${item.subjectId}`}>
+                              {item.subject}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-3 py-1 rounded-full text-xs ${getLevelColor(item.level)}`}>
+                                {item.level}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                              {item.lecturer}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                              {formatDate(item.lastUpdated)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center">
+                              <div className="flex items-center justify-center gap-2">
+                                <motion.button
+                                  whileHover={{ scale: isDownloading ? 1 : 1.05 }}
+                                  whileTap={{ scale: isDownloading ? 1 : 0.95 }}
+                                  className={`inline-flex items-center px-3 py-1 rounded-lg text-sm text-white transition-colors ${
+                                    isDownloading 
+                                      ? 'bg-gray-400 cursor-not-allowed' 
+                                      : 'bg-blue-600 hover:bg-blue-700'
+                                  }`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (!isDownloading) {
+                                      handleDownload(item.id, item.fileName);
+                                    }
+                                  }}
+                                  disabled={isDownloading}
+                                >
+                                  {isDownloading ? (
+                                    <>
+                                      <motion.div
+                                        animate={{ rotate: 360 }}
+                                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                        className="w-3 h-3 border-2 border-white border-t-transparent rounded-full mr-1"
+                                      />
+                                      Unduh...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Download className="w-3 h-3 mr-1" />
+                                      Unduh ZIP
+                                    </>
+                                  )}
+                                </motion.button>
+                                <motion.button
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                  className="inline-flex items-center px-3 py-1 rounded-lg text-sm text-white bg-red-600 hover:bg-red-700"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    confirmDelete(item);
+                                  }}
+                                >
+                                  <Trash2 className="w-3 h-3 mr-1" />
+                                  Hapus
+                                </motion.button>
+                              </div>
+                            </td>
+                          </motion.tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                          Tidak ada hasil yang ditemukan. Silakan coba pencarian lain.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </motion.div>
             )}
-          </AnimatePresence>
 
           <Link to="/upload">
             <motion.button
@@ -1791,6 +1960,67 @@ Universitas Katolik Parahyangan
           <Filter className="w-5 h-5" />
         </motion.button>
       </motion.div>
+
+      {/* Notification Overlay */}
+      <AnimatePresence>
+        {notification.show && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -50, scale: 0.9 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="fixed top-4 right-4 z-[100] max-w-md"
+          >
+            <motion.div
+              className={`rounded-lg shadow-2xl border-2 p-4 backdrop-blur-sm ${
+                notification.type === 'success'
+                  ? 'bg-green-50 border-green-200 text-green-900'
+                  : notification.type === 'error'
+                  ? 'bg-red-50 border-red-200 text-red-900'
+                  : notification.type === 'warning'
+                  ? 'bg-yellow-50 border-yellow-200 text-yellow-900'
+                  : 'bg-blue-50 border-blue-200 text-blue-900'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 mt-0.5">
+                  {notification.type === 'success' && (
+                    <CheckCircle2 className="w-6 h-6 text-green-600" />
+                  )}
+                  {notification.type === 'error' && (
+                    <XCircle className="w-6 h-6 text-red-600" />
+                  )}
+                  {notification.type === 'warning' && (
+                    <AlertTriangle className="w-6 h-6 text-yellow-600" />
+                  )}
+                  {notification.type === 'info' && (
+                    <Info className="w-6 h-6 text-blue-600" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium whitespace-pre-line break-words">
+                    {notification.message}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setNotification(prev => ({ ...prev, show: false }))}
+                  className={`flex-shrink-0 p-1 rounded-full hover:bg-opacity-20 transition-colors ${
+                    notification.type === 'success'
+                      ? 'text-green-600 hover:bg-green-200'
+                      : notification.type === 'error'
+                      ? 'text-red-600 hover:bg-red-200'
+                      : notification.type === 'warning'
+                      ? 'text-yellow-600 hover:bg-yellow-200'
+                      : 'text-blue-600 hover:bg-blue-200'
+                  }`}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <Footer />
     </div>

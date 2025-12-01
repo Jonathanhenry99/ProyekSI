@@ -13,8 +13,12 @@ import {
   XCircle,
   Trash2,
   Calendar,
-  Download
-} from "lucide-react"; 
+  Download,
+  Info,
+  CheckCircle2,
+  X
+} from "lucide-react";
+import { AnimatePresence } from "framer-motion"; 
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 
@@ -29,6 +33,13 @@ const QuestionSetsPreview = ({ currentUser }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [deleteModal, setDeleteModal] = useState({ show: false });
   const [deleting, setDeleting] = useState(false);
+  
+  // State untuk overlay notification
+  const [notification, setNotification] = useState({
+    show: false,
+    message: '',
+    type: 'info' // 'success', 'error', 'warning', 'info'
+  });
 
   // Cek login
   useEffect(() => {
@@ -90,6 +101,21 @@ const QuestionSetsPreview = ({ currentUser }) => {
     setDeleteModal({ show: false });
   };
 
+  // Helper function to show notification overlay
+  const showNotification = (message, type = 'info') => {
+    setNotification({
+      show: true,
+      message: message,
+      type: type
+    });
+    
+    // Auto hide after 5 seconds for success/info, 7 seconds for error/warning
+    const duration = (type === 'error' || type === 'warning') ? 7000 : 5000;
+    setTimeout(() => {
+      setNotification(prev => ({ ...prev, show: false }));
+    }, duration);
+  };
+
   // Fungsi untuk delete paket soal
   const handleDeletePackage = async () => {
     setDeleting(true);
@@ -118,7 +144,7 @@ const QuestionSetsPreview = ({ currentUser }) => {
 
     } catch (err) {
       console.error("❌ Error deleting package:", err);
-      alert(err.message || 'Gagal menghapus paket soal. Silakan coba lagi.');
+      showNotification(err.message || 'Gagal menghapus paket soal. Silakan coba lagi.', 'error');
       closeDeleteModal();
     } finally {
       setDeleting(false);
@@ -453,6 +479,67 @@ const QuestionSetsPreview = ({ currentUser }) => {
           </motion.div>
         </div>
       )}
+
+      {/* Notification Overlay */}
+      <AnimatePresence>
+        {notification.show && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -50, scale: 0.9 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="fixed top-4 right-4 z-[100] max-w-md"
+          >
+            <motion.div
+              className={`rounded-lg shadow-2xl border-2 p-4 backdrop-blur-sm ${
+                notification.type === 'success'
+                  ? 'bg-green-50 border-green-200 text-green-900'
+                  : notification.type === 'error'
+                  ? 'bg-red-50 border-red-200 text-red-900'
+                  : notification.type === 'warning'
+                  ? 'bg-yellow-50 border-yellow-200 text-yellow-900'
+                  : 'bg-blue-50 border-blue-200 text-blue-900'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 mt-0.5">
+                  {notification.type === 'success' && (
+                    <CheckCircle2 className="w-6 h-6 text-green-600" />
+                  )}
+                  {notification.type === 'error' && (
+                    <XCircle className="w-6 h-6 text-red-600" />
+                  )}
+                  {notification.type === 'warning' && (
+                    <AlertTriangle className="w-6 h-6 text-yellow-600" />
+                  )}
+                  {notification.type === 'info' && (
+                    <Info className="w-6 h-6 text-blue-600" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium whitespace-pre-line break-words">
+                    {notification.message}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setNotification(prev => ({ ...prev, show: false }))}
+                  className={`flex-shrink-0 p-1 rounded-full hover:bg-opacity-20 transition-colors ${
+                    notification.type === 'success'
+                      ? 'text-green-600 hover:bg-green-200'
+                      : notification.type === 'error'
+                      ? 'text-red-600 hover:bg-red-200'
+                      : notification.type === 'warning'
+                      ? 'text-yellow-600 hover:bg-yellow-200'
+                      : 'text-blue-600 hover:bg-blue-200'
+                  }`}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <Footer />
     </div>

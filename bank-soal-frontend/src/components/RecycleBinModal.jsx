@@ -10,7 +10,11 @@ import {
   Trash2, 
   Clock, 
   Check,
-  Search
+  Search,
+  Info,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -31,6 +35,13 @@ const RecycleBinModal = ({
   const [sortBy, setSortBy] = useState('deletedAt');
   const [sortOrder, setSortOrder] = useState('desc');
   const [hasFetched, setHasFetched] = useState(false); // Track if data has been fetched
+  
+  // State untuk overlay notification
+  const [notification, setNotification] = useState({
+    show: false,
+    message: '',
+    type: 'info' // 'success', 'error', 'warning', 'info'
+  });
 
   // Helper function to get auth token
   const getAuthToken = useCallback(() => {
@@ -66,6 +77,21 @@ const RecycleBinModal = ({
     return course ? course.name : subjectId;
   }, [courseOptions]);
 
+  // Helper function to show notification overlay
+  const showNotification = useCallback((message, type = 'info') => {
+    setNotification({
+      show: true,
+      message: message,
+      type: type
+    });
+    
+    // Auto hide after 5 seconds for success/info, 7 seconds for error/warning
+    const duration = (type === 'error' || type === 'warning') ? 7000 : 5000;
+    setTimeout(() => {
+      setNotification(prev => ({ ...prev, show: false }));
+    }, duration);
+  }, []);
+
   // Optimized data fetching dengan abort controller
   const fetchRecycleBinData = useCallback(async (forceRefresh = false) => {
     if (isLoadingRecycleBin) return;
@@ -79,7 +105,7 @@ const RecycleBinModal = ({
     try {
       const token = getAuthToken();
       if (!token) {
-        alert('Token autentikasi tidak ditemukan. Silakan login kembali.');
+        showNotification('Token autentikasi tidak ditemukan. Silakan login kembali.', 'error');
         return;
       }
 
@@ -137,23 +163,23 @@ const RecycleBinModal = ({
       
       switch (status) {
         case 401:
-          alert('Sesi telah berakhir. Silakan login kembali.');
+          showNotification('Sesi telah berakhir. Silakan login kembali.', 'error');
           break;
         case 403:
-          alert('Anda tidak memiliki izin untuk mengakses recycle bin.');
+          showNotification('Anda tidak memiliki izin untuk mengakses recycle bin.', 'error');
           break;
         case 404:
-          alert('⚠️ Fitur Recycle Bin belum tersedia di backend.');
+          showNotification('⚠️ Fitur Recycle Bin belum tersedia di backend.', 'warning');
           break;
         case 500:
           if (message.includes('column') || message.includes('does not exist')) {
-            alert('⚠️ Database belum dikonfigurasi untuk soft delete.');
+            showNotification('⚠️ Database belum dikonfigurasi untuk soft delete.', 'warning');
           } else {
-            alert(`❌ Server Error: ${message}`);
+            showNotification(`❌ Server Error: ${message}`, 'error');
           }
           break;
         default:
-          alert(`Gagal memuat recycle bin: ${message}`);
+          showNotification(`Gagal memuat recycle bin: ${message}`, 'error');
       }
       
       setRecycleBinData([]);
@@ -173,7 +199,7 @@ const RecycleBinModal = ({
     try {
       const token = getAuthToken();
       if (!token) {
-        alert('Token autentikasi tidak ditemukan. Silakan login kembali.');
+        showNotification('Token autentikasi tidak ditemukan. Silakan login kembali.', 'error');
         return;
       }
 
@@ -213,7 +239,7 @@ const RecycleBinModal = ({
         // Notify parent
         onItemRestored?.(id);
         
-        alert('Soal berhasil dipulihkan');
+        showNotification('Soal berhasil dipulihkan', 'success');
       } else {
         throw new Error('Restore operation failed');
       }
@@ -223,16 +249,16 @@ const RecycleBinModal = ({
       const status = error.response?.status;
       switch (status) {
         case 401:
-          alert('Sesi telah berakhir. Silakan login kembali.');
+          showNotification('Sesi telah berakhir. Silakan login kembali.', 'error');
           break;
         case 403:
-          alert('Anda tidak memiliki izin untuk memulihkan soal ini.');
+          showNotification('Anda tidak memiliki izin untuk memulihkan soal ini.', 'error');
           break;
         case 404:
-          alert('Fitur restore belum tersedia atau soal tidak ditemukan.');
+          showNotification('Fitur restore belum tersedia atau soal tidak ditemukan.', 'warning');
           break;
         default:
-          alert('Gagal memulihkan soal. Silakan coba lagi.');
+          showNotification('Gagal memulihkan soal. Silakan coba lagi.', 'error');
       }
     } finally {
       setIsRestoring(false);
@@ -248,7 +274,7 @@ const RecycleBinModal = ({
     try {
       const token = getAuthToken();
       if (!token) {
-        alert('Token autentikasi tidak ditemukan. Silakan login kembali.');
+        showNotification('Token autentikasi tidak ditemukan. Silakan login kembali.', 'error');
         return;
       }
 
@@ -268,7 +294,7 @@ const RecycleBinModal = ({
         
         onItemPermanentlyDeleted?.(id);
         
-        alert('Soal berhasil dihapus secara permanen');
+        showNotification('Soal berhasil dihapus secara permanen', 'success');
       } else {
         throw new Error('Permanent delete failed');
       }
@@ -276,9 +302,9 @@ const RecycleBinModal = ({
       console.error("❌ Error permanently deleting question set:", error);
       if (error.response?.status === 404) {
         setRecycleBinData(prev => prev.filter(item => item.id !== id));
-        alert('Soal sudah terhapus.');
+        showNotification('Soal sudah terhapus.', 'info');
       } else {
-        alert('Gagal menghapus soal secara permanen. Silakan coba lagi.');
+        showNotification('Gagal menghapus soal secara permanen. Silakan coba lagi.', 'error');
       }
     }
   }, [getAuthToken, onItemPermanentlyDeleted]);
@@ -590,6 +616,67 @@ const RecycleBinModal = ({
           )}
         </motion.div>
       </motion.div>
+
+      {/* Notification Overlay */}
+      <AnimatePresence>
+        {notification.show && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -50, scale: 0.9 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="fixed top-4 right-4 z-[200] max-w-md"
+          >
+            <motion.div
+              className={`rounded-lg shadow-2xl border-2 p-4 backdrop-blur-sm ${
+                notification.type === 'success'
+                  ? 'bg-green-50 border-green-200 text-green-900'
+                  : notification.type === 'error'
+                  ? 'bg-red-50 border-red-200 text-red-900'
+                  : notification.type === 'warning'
+                  ? 'bg-yellow-50 border-yellow-200 text-yellow-900'
+                  : 'bg-blue-50 border-blue-200 text-blue-900'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 mt-0.5">
+                  {notification.type === 'success' && (
+                    <CheckCircle2 className="w-6 h-6 text-green-600" />
+                  )}
+                  {notification.type === 'error' && (
+                    <XCircle className="w-6 h-6 text-red-600" />
+                  )}
+                  {notification.type === 'warning' && (
+                    <AlertTriangle className="w-6 h-6 text-yellow-600" />
+                  )}
+                  {notification.type === 'info' && (
+                    <Info className="w-6 h-6 text-blue-600" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium whitespace-pre-line break-words">
+                    {notification.message}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setNotification(prev => ({ ...prev, show: false }))}
+                  className={`flex-shrink-0 p-1 rounded-full hover:bg-opacity-20 transition-colors ${
+                    notification.type === 'success'
+                      ? 'text-green-600 hover:bg-green-200'
+                      : notification.type === 'error'
+                      ? 'text-red-600 hover:bg-red-200'
+                      : notification.type === 'warning'
+                      ? 'text-yellow-600 hover:bg-yellow-200'
+                      : 'text-blue-600 hover:bg-blue-200'
+                  }`}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </AnimatePresence>
   );
 };
