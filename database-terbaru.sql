@@ -81,19 +81,22 @@ CREATE TABLE files (
     originalname VARCHAR(255) NOT NULL,
     filename VARCHAR(255) NOT NULL,
     filepath VARCHAR(255) NOT NULL,
-    filetype VARCHAR(50) NOT NULL CHECK (filetype IN ('PDF', 'DOCX', 'TXT')),
+    -- ✅ Constraint filetype yang lebih fleksibel - mendukung semua ekstensi yang digunakan
+    -- Questions: PDF, DOCX, DOC
+    -- Answers: Semua bahasa pemrograman (JS, JSX, TS, TSX, PY, JAVA, C, CPP, CC, CXX, H, HPP, CS, PHP, RB, GO, RS, KT, KTS, SWIFT, DART, SCALA, R, M, SH, BASH, SQL, HTML, HTM, CSS, SCSS, SASS, JSON, XML, YAML, YML, TXT)
+    -- TestCases: TXT, ZIP, RAR
+    filetype VARCHAR(50) NOT NULL CHECK (filetype IN (
+        'PDF', 'DOCX', 'DOC',  -- Questions
+        'JS', 'JSX', 'TS', 'TSX', 'PY', 'JAVA', 'C', 'CPP', 'CC', 'CXX', 'H', 'HPP', 'CS', 'PHP', 'RB', 'GO', 'RS', 'KT', 'KTS', 'SWIFT', 'DART', 'SCALA', 'R', 'M', 'SH', 'BASH', 'SQL', 'HTML', 'HTM', 'CSS', 'SCSS', 'SASS', 'JSON', 'XML', 'YAML', 'YML', 'TXT',  -- Answers
+        'ZIP', 'RAR'  -- TestCases
+    )),
     filesize INTEGER NOT NULL,
-    filecategory VARCHAR(50) NOT NULL CHECK (filecategory IN ('questions', 'answers', 'testCases')),
+    -- ✅ Constraint filecategory yang lebih fleksibel - mendukung nilai normal dan legacy
+    filecategory VARCHAR(50) NOT NULL CHECK (filecategory IN ('questions', 'answers', 'testCases', 'soal', 'kunci', 'test')),
     question_set_id INTEGER REFERENCES question_sets(id) ON DELETE CASCADE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
--- Questions tabl
-
-
-
-
 
 
 
@@ -106,6 +109,42 @@ CREATE TABLE question_history (
     action_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     file_id INTEGER REFERENCES files(id) ON DELETE SET NULL
 );
+
+
+-- ========================================
+-- FIX FILES TABLE CONSTRAINTS
+-- ========================================
+-- File ini memperbaiki constraint yang terlalu ketat di tabel files
+-- Jalankan file ini setelah import database schema untuk menghindari error saat upload file
+
+-- 1. Hapus constraint lama yang terlalu ketat
+ALTER TABLE files DROP CONSTRAINT IF EXISTS files_filetype_check;
+ALTER TABLE files DROP CONSTRAINT IF EXISTS files_filecategory_check;
+
+-- 2. Buat constraint baru yang lebih fleksibel untuk filetype
+-- Mendukung semua ekstensi file yang digunakan di aplikasi
+-- Questions: PDF, DOCX, DOC
+-- Answers: Semua bahasa pemrograman (JS, JSX, TS, TSX, PY, JAVA, C, CPP, CC, CXX, H, HPP, CS, PHP, RB, GO, RS, KT, KTS, SWIFT, DART, SCALA, R, M, SH, BASH, SQL, HTML, HTM, CSS, SCSS, SASS, JSON, XML, YAML, YML, TXT)
+-- TestCases: TXT, ZIP, RAR
+ALTER TABLE files ADD CONSTRAINT files_filetype_check 
+    CHECK (filetype IN (
+        'PDF', 'DOCX', 'DOC',  -- Questions
+        'JS', 'JSX', 'TS', 'TSX', 'PY', 'JAVA', 'C', 'CPP', 'CC', 'CXX', 'H', 'HPP', 'CS', 'PHP', 'RB', 'GO', 'RS', 'KT', 'KTS', 'SWIFT', 'DART', 'SCALA', 'R', 'M', 'SH', 'BASH', 'SQL', 'HTML', 'HTM', 'CSS', 'SCSS', 'SASS', 'JSON', 'XML', 'YAML', 'YML', 'TXT',  -- Answers
+        'ZIP', 'RAR'  -- TestCases
+    ));
+
+-- 3. Buat constraint baru yang lebih fleksibel untuk filecategory
+-- Mendukung nilai normal dan legacy (akan dinormalisasi di controller)
+ALTER TABLE files ADD CONSTRAINT files_filecategory_check 
+    CHECK (filecategory IN ('questions', 'answers', 'testCases', 'soal', 'kunci', 'test'));
+
+-- ========================================
+-- CATATAN:
+-- ========================================
+-- - Constraint filetype sekarang mendukung semua ekstensi yang digunakan di aplikasi
+-- - Constraint filecategory mendukung nilai normal dan legacy (akan dinormalisasi di controller)
+-- - Jika masih ada error, pastikan semua nilai di tabel files sesuai dengan constraint baru
+
 
 -- ========================================
 -- INDEXES FOR PERFORMANCE
@@ -241,89 +280,3 @@ INSERT INTO question_sets (title, description, subject, year, level, lecturer, t
 -- COURSE-MATERIAL ASSIGNMENTS
 -- ========================================
 
--- Algoritma dan Pemrograman assignments
-INSERT INTO course_material_assignments (course_tag_id, material_tag_id)
-SELECT 
-    (SELECT id FROM course_tags WHERE name = 'Algoritma dan Pemrograman'),
-    id
-FROM material_tags 
-WHERE name IN ('Array', 'Linked List', 'Stack', 'Queue', 'Sorting', 'Searching', 'Recursion')
-ON CONFLICT DO NOTHING;
-
--- Struktur Data assignments
-INSERT INTO course_material_assignments (course_tag_id, material_tag_id)
-SELECT 
-    (SELECT id FROM course_tags WHERE name = 'Struktur Data'),
-    id
-FROM material_tags 
-WHERE name IN ('Array', 'Linked List', 'Stack', 'Queue', 'Tree', 'Graph', 'Sorting', 'Searching', 'Dynamic Programming')
-ON CONFLICT DO NOTHING;
-
--- Basis Data assignments
-INSERT INTO course_material_assignments (course_tag_id, material_tag_id)
-SELECT 
-    (SELECT id FROM course_tags WHERE name = 'Basis Data'),
-    id
-FROM material_tags 
-WHERE name IN ('SQL', 'NoSQL', 'Normalization')
-ON CONFLICT DO NOTHING;
-
--- Pemrograman Web assignments
-INSERT INTO course_material_assignments (course_tag_id, material_tag_id)
-SELECT 
-    (SELECT id FROM course_tags WHERE name = 'Pemrograman Web'),
-    id
-FROM material_tags 
-WHERE name IN ('HTML', 'CSS', 'JavaScript', 'React', 'Node.js')
-ON CONFLICT DO NOTHING;
-
--- Pemrograman Mobile assignments
-INSERT INTO course_material_assignments (course_tag_id, material_tag_id)
-SELECT 
-    (SELECT id FROM course_tags WHERE name = 'Pemrograman Mobile'),
-    id
-FROM material_tags 
-WHERE name IN ('Flutter', 'Android', 'JavaScript', 'React')
-ON CONFLICT DO NOTHING;
-
--- Kecerdasan Buatan assignments
-INSERT INTO course_material_assignments (course_tag_id, material_tag_id)
-SELECT 
-    (SELECT id FROM course_tags WHERE name = 'Kecerdasan Buatan'),
-    id
-FROM material_tags 
-WHERE name IN ('Machine Learning', 'Neural Networks', 'Tree', 'Graph', 'Dynamic Programming')
-ON CONFLICT DO NOTHING;
-
--- ========================================
--- VERIFICATION QUERIES
--- ========================================
-
--- Verify course-material assignments
--- Uncomment to run verification
-/*
-SELECT 
-    ct.name as course_name,
-    mt.name as material_name,
-    cma.created_at
-FROM course_material_assignments cma
-JOIN course_tags ct ON cma.course_tag_id = ct.id
-JOIN material_tags mt ON cma.material_tag_id = mt.id
-ORDER BY ct.name, mt.name;
-
--- Count statistics
-SELECT 
-    'Total Users' as metric, COUNT(*) as count FROM users
-UNION ALL
-SELECT 
-    'Total Course Tags' as metric, COUNT(*) as count FROM course_tags
-UNION ALL
-SELECT 
-    'Total Material Tags' as metric, COUNT(*) as count FROM material_tags
-UNION ALL
-SELECT 
-    'Total Assignments' as metric, COUNT(*) as count FROM course_material_assignments
-UNION ALL
-SELECT 
-    'Total Question Sets' as metric, COUNT(*) as count FROM question_sets;
-*/
