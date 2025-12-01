@@ -8,6 +8,9 @@ exports.createCourseTag = async (req, res) => {
       name: req.body.name
     });
     
+    // Reload untuk mendapatkan timestamps
+    await courseTag.reload();
+    
     res.status(201).send(courseTag);
   } catch (error) {
     res.status(500).send({ message: error.message });
@@ -17,7 +20,9 @@ exports.createCourseTag = async (req, res) => {
 // Mendapatkan semua tag mata kuliah
 exports.getAllCourseTags = async (req, res) => {
   try {
-    const courseTags = await CourseTag.findAll();
+    const courseTags = await CourseTag.findAll({
+      attributes: ['id', 'name', 'created_at', 'updated_at']
+    });
     res.status(200).send(courseTags);
   } catch (error) {
     res.status(500).send({ message: error.message });
@@ -38,7 +43,10 @@ exports.updateCourseTag = async (req, res) => {
     courseTag.name = req.body.name;
     await courseTag.save();
     
-    res.send({ message: "Tag berhasil diperbarui!" });
+    // Reload untuk mendapatkan updated_at yang terbaru
+    await courseTag.reload();
+    
+    res.send(courseTag);
   } catch (error) {
     res.status(500).send({ message: error.message });
   }

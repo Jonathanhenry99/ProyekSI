@@ -4,11 +4,74 @@ const QuestionSet = db.questionSet;
 const fs = require("fs");
 const path = require("path");
 const { PDFDocument } = require('pdf-lib');
-const docxToPdf = require('docx-pdf');
-const util = require('util');
-const docxToPdfPromise = util.promisify(docxToPdf);
+const mammoth = require('mammoth');
+const puppeteer = require('puppeteer');
 const { Op } = require("sequelize");
 const archiver = require('archiver');
+
+// Helper function to convert DOCX to PDF using mammoth + puppeteer
+async function convertDocxToPdf(docxPath, outputPdfPath) {
+  try {
+    // Convert DOCX to HTML using mammoth
+    const result = await mammoth.convertToHtml({ path: docxPath });
+    const html = result.value;
+    
+    // Create a temporary HTML file
+    const tempHtmlPath = docxPath.replace('.docx', '_temp.html');
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 40px;
+              line-height: 1.6;
+            }
+            p {
+              margin: 10px 0;
+            }
+          </style>
+        </head>
+        <body>
+          ${html}
+        </body>
+      </html>
+    `;
+    fs.writeFileSync(tempHtmlPath, htmlContent, 'utf8');
+    
+    // Convert HTML to PDF using puppeteer
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    const page = await browser.newPage();
+    await page.goto(`file://${tempHtmlPath}`, { waitUntil: 'networkidle2' });
+    await page.pdf({
+      path: outputPdfPath,
+      format: 'A4',
+      printBackground: true,
+      margin: {
+        top: '20mm',
+        right: '15mm',
+        bottom: '20mm',
+        left: '15mm'
+      }
+    });
+    await browser.close();
+    
+    // Clean up temporary HTML file
+    if (fs.existsSync(tempHtmlPath)) {
+      fs.unlinkSync(tempHtmlPath);
+    }
+    
+    return outputPdfPath;
+  } catch (error) {
+    console.error('Error converting DOCX to PDF:', error);
+    throw error;
+  }
+}
 
 // ========================================
 // BASIC FILE OPERATIONS
@@ -424,7 +487,7 @@ exports.combineFilesForPreview = async (req, res) => {
           pdfBytes = fs.readFileSync(file.filepath);
         } else if (file.filetype.toLowerCase() === 'docx') {
           const tempPdfPath = file.filepath.replace('.docx', '_temp.pdf');
-          await docxToPdfPromise(file.filepath, tempPdfPath);
+          await convertDocxToPdf(file.filepath, tempPdfPath);
           pdfBytes = fs.readFileSync(tempPdfPath);
           fs.unlinkSync(tempPdfPath);
         } else if (file.filetype.toLowerCase() === 'txt') {
@@ -528,7 +591,7 @@ exports.combineFilesForDownload = async (req, res) => {
           pdfBytes = fs.readFileSync(filePath);
         } else if (file.filetype.toLowerCase() === 'docx') {
           const tempPdfPath = filePath.replace('.docx', '_temp.pdf');
-          await docxToPdfPromise(filePath, tempPdfPath);
+          await convertDocxToPdf(filePath, tempPdfPath);
           pdfBytes = fs.readFileSync(tempPdfPath);
           fs.unlinkSync(tempPdfPath);
         } else if (file.filetype.toLowerCase() === 'txt') {
@@ -640,7 +703,7 @@ exports.downloadZipBundle = async (req, res) => {
                     pdfBytes = fs.readFileSync(filePath);
                 } else if (file.filetype.toLowerCase() === 'docx') {
                     const tempPdfPath = path.join(path.dirname(filePath), `${file.filename}_temp.pdf`);
-                    await docxToPdfPromise(filePath, tempPdfPath);
+                    await convertDocxToPdf(filePath, tempPdfPath);
                     pdfBytes = fs.readFileSync(tempPdfPath);
                     fs.unlinkSync(tempPdfPath); 
                 } else if (file.filetype.toLowerCase() === 'txt') {

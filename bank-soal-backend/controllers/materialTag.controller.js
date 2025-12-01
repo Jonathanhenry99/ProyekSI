@@ -8,6 +8,9 @@ exports.createMaterialTag = async (req, res) => {
       name: req.body.name
     });
     
+    // Reload untuk mendapatkan timestamps
+    await materialTag.reload();
+    
     res.status(201).send(materialTag);
   } catch (error) {
     res.status(500).send({ message: error.message });
@@ -17,7 +20,9 @@ exports.createMaterialTag = async (req, res) => {
 // Mendapatkan semua material tag
 exports.getAllMaterialTag = async (req, res) => {
   try {
-    const materialTag = await MaterialTag.findAll();
+    const materialTag = await MaterialTag.findAll({
+      attributes: ['id', 'name', 'created_at', 'updated_at']
+    });
     res.status(200).send(materialTag);
   } catch (error) {
     res.status(500).send({ message: error.message });
@@ -38,7 +43,10 @@ exports.updateMaterialTag = async (req, res) => {
     materialTag.name = req.body.name;
     await materialTag.save();
     
-    res.send({ message: "Tag berhasil diperbarui!" });
+    // Reload untuk mendapatkan updated_at yang terbaru
+    await materialTag.reload();
+    
+    res.send(materialTag);
   } catch (error) {
     res.status(500).send({ message: error.message });
   }
