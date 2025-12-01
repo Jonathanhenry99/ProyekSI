@@ -76,9 +76,18 @@ CREATE TABLE files (
     originalname VARCHAR(255) NOT NULL,
     filename VARCHAR(255) NOT NULL,
     filepath VARCHAR(255) NOT NULL,
-    filetype VARCHAR(50) NOT NULL CHECK (filetype IN ('PDF', 'DOCX', 'TXT')),
+    -- ✅ Constraint filetype yang lebih fleksibel - mendukung semua ekstensi yang digunakan
+    -- Questions: PDF, DOCX, DOC
+    -- Answers: Semua bahasa pemrograman (JS, JSX, TS, TSX, PY, JAVA, C, CPP, CC, CXX, H, HPP, CS, PHP, RB, GO, RS, KT, KTS, SWIFT, DART, SCALA, R, M, SH, BASH, SQL, HTML, HTM, CSS, SCSS, SASS, JSON, XML, YAML, YML, TXT)
+    -- TestCases: TXT, ZIP, RAR
+    filetype VARCHAR(50) NOT NULL CHECK (filetype IN (
+        'PDF', 'DOCX', 'DOC',  -- Questions
+        'JS', 'JSX', 'TS', 'TSX', 'PY', 'JAVA', 'C', 'CPP', 'CC', 'CXX', 'H', 'HPP', 'CS', 'PHP', 'RB', 'GO', 'RS', 'KT', 'KTS', 'SWIFT', 'DART', 'SCALA', 'R', 'M', 'SH', 'BASH', 'SQL', 'HTML', 'HTM', 'CSS', 'SCSS', 'SASS', 'JSON', 'XML', 'YAML', 'YML', 'TXT',  -- Answers
+        'ZIP', 'RAR'  -- TestCases
+    )),
     filesize INTEGER NOT NULL,
-    filecategory VARCHAR(50) NOT NULL CHECK (filecategory IN ('questions', 'answers', 'testCases')),
+    -- ✅ Constraint filecategory yang lebih fleksibel - mendukung nilai normal dan legacy
+    filecategory VARCHAR(50) NOT NULL CHECK (filecategory IN ('questions', 'answers', 'testCases', 'soal', 'kunci', 'test')),
     question_set_id INTEGER REFERENCES question_sets(id) ON DELETE CASCADE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
