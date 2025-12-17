@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from "framer-motion";
-import { ArrowLeft, Download, FileText, File, BookOpen, Trash2, AlertTriangle, Upload, RotateCcw, X, CheckCircle, Code, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Download, FileText, File, BookOpen, Trash2, AlertTriangle, Upload, RotateCcw, X, CheckCircle, Code, ChevronLeft, ChevronRight, MessageCircle, Send, Edit } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import Header from '../components/Header';
@@ -1032,12 +1032,19 @@ const QuestionPreview = ({ currentUser }) => {
   const [itemsPerPage] = useState(1); // 1 jawaban per halaman
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [newComment, setNewComment] = useState('');
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
+  const [currentUserState, setCurrentUserState] = useState(null);
 
   useEffect(() => {
     const user = AuthService?.getCurrentUser ? AuthService.getCurrentUser() : null;
     const token = localStorage.getItem('token') || sessionStorage.getItem('token') || user?.accessToken;
     
     setIsAuthenticated(!!token);
+    setCurrentUserState(user || currentUser);
     
     if (token) {
       try {
@@ -1060,6 +1067,7 @@ const QuestionPreview = ({ currentUser }) => {
 
     fetchQuestionSetDetails();
     fetchHistory();
+    fetchComments();
   }, [id]);
 
   const fetchHistory = async () => {
@@ -1075,6 +1083,82 @@ const QuestionPreview = ({ currentUser }) => {
     } finally {
       setHistoryLoading(false);
     }
+  };
+
+  const fetchComments = async () => {
+    if (!id) return;
+    
+    try {
+      setCommentsLoading(true);
+      const response = await axios.get(`${API_URL}/comments/question-set/${id}`);
+      setComments(response.data.data || []);
+    } catch (error) {
+      console.error("Error fetching comments:", error);
+      setComments([]);
+    } finally {
+      setCommentsLoading(false);
+    }
+  };
+
+  const handleSubmitComment = async () => {
+    if (!newComment.trim() || !isAuthenticated) return;
+
+    try {
+      const response = await axios.post(`${API_URL}/comments`, {
+        content: newComment.trim(),
+        question_set_id: parseInt(id)
+      });
+      
+      setComments([response.data.data, ...comments]);
+      setNewComment('');
+      showToast('Komentar berhasil ditambahkan', 'success');
+    } catch (error) {
+      console.error("Error submitting comment:", error);
+      showToast(error.response?.data?.message || 'Gagal menambahkan komentar', 'error');
+    }
+  };
+
+  const handleUpdateComment = async (commentId) => {
+    if (!editingCommentText.trim()) return;
+
+    try {
+      const response = await axios.put(`${API_URL}/comments/${commentId}`, {
+        content: editingCommentText.trim()
+      });
+      
+      setComments(comments.map(comment => 
+        comment.id === commentId ? response.data.data : comment
+      ));
+      setEditingCommentId(null);
+      setEditingCommentText('');
+      showToast('Komentar berhasil diperbarui', 'success');
+    } catch (error) {
+      console.error("Error updating comment:", error);
+      showToast(error.response?.data?.message || 'Gagal memperbarui komentar', 'error');
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus komentar ini?')) return;
+
+    try {
+      await axios.delete(`${API_URL}/comments/${commentId}`);
+      setComments(comments.filter(comment => comment.id !== commentId));
+      showToast('Komentar berhasil dihapus', 'success');
+    } catch (error) {
+      console.error("Error deleting comment:", error);
+      showToast(error.response?.data?.message || 'Gagal menghapus komentar', 'error');
+    }
+  };
+
+  const startEditingComment = (comment) => {
+    setEditingCommentId(comment.id);
+    setEditingCommentText(comment.content);
+  };
+
+  const cancelEditing = () => {
+    setEditingCommentId(null);
+    setEditingCommentText('');
   };
 
   useEffect(() => {
@@ -1658,6 +1742,149 @@ const QuestionPreview = ({ currentUser }) => {
             <div className="text-center py-8">
               <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
               <p className="text-gray-500">Belum ada history paket soal untuk soal ini</p>
+            </div>
+          )}
+        </div>
+
+        {/* Comments Section */}
+        <div className="bg-white rounded-xl shadow-md p-6 mt-6">
+          <div className="flex items-center mb-4">
+            <MessageCircle className="w-6 h-6 text-blue-600 mr-2" />
+            <h2 className="text-xl font-bold text-gray-900">Komentar</h2>
+            <span className="ml-3 px-2 py-1 bg-blue-100 text-blue-700 text-sm rounded-full">
+              {comments.length}
+            </span>
+          </div>
+
+          {/* Add Comment Form */}
+          {isAuthenticated ? (
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <textarea
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Tulis komentar Anda di sini..."
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                rows="3"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && e.ctrlKey) {
+                    handleSubmitComment();
+                  }
+                }}
+              />
+              <div className="flex items-center justify-between mt-3">
+                <p className="text-xs text-gray-500">Tekan Ctrl + Enter untuk mengirim</p>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleSubmitComment}
+                  disabled={!newComment.trim()}
+                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  Kirim Komentar
+                </motion.button>
+              </div>
+            </div>
+          ) : (
+            <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-yellow-800 text-sm">
+                Silakan <button onClick={() => navigate('/login')} className="text-blue-600 hover:underline font-medium">login</button> untuk menambahkan komentar.
+              </p>
+            </div>
+          )}
+
+          {/* Comments List */}
+          {commentsLoading ? (
+            <div className="flex items-center justify-center p-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+          ) : comments.length > 0 ? (
+            <div className="space-y-4">
+              {comments.map((comment, index) => (
+                <motion.div
+                  key={comment.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  {editingCommentId === comment.id ? (
+                    <div>
+                      <textarea
+                        value={editingCommentText}
+                        onChange={(e) => setEditingCommentText(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none mb-3"
+                        rows="3"
+                      />
+                      <div className="flex items-center justify-end space-x-2">
+                        <button
+                          onClick={cancelEditing}
+                          className="px-3 py-1 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+                        >
+                          Batal
+                        </button>
+                        <button
+                          onClick={() => handleUpdateComment(comment.id)}
+                          disabled={!editingCommentText.trim()}
+                          className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 text-sm"
+                        >
+                          Simpan
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                            <span className="text-blue-600 font-semibold text-sm">
+                              {comment.author?.fullName?.charAt(0)?.toUpperCase() || comment.author?.username?.charAt(0)?.toUpperCase() || 'U'}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900">
+                              {comment.author?.fullName || comment.author?.username || 'Anonymous'}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {comment.created_at ? new Date(comment.created_at).toLocaleString('id-ID', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              }) : ''}
+                            </p>
+                          </div>
+                        </div>
+                        {isAuthenticated && (comment.author?.id === currentUserState?.id || currentUserState?.role === 'ROLE_ADMIN') && (
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => startEditingComment(comment)}
+                              className="p-1 text-gray-500 hover:text-blue-600 transition-colors"
+                              title="Edit komentar"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteComment(comment.id)}
+                              className="p-1 text-gray-500 hover:text-red-600 transition-colors"
+                              title="Hapus komentar"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-gray-700 whitespace-pre-wrap">{comment.content}</p>
+                    </>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <MessageCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-500">Belum ada komentar. Jadilah yang pertama berkomentar!</p>
             </div>
           )}
         </div>

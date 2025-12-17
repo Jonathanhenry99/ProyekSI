@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, CheckCircle, ChevronDown, FileText, BarChart2, Plus, Check, BookOpen, Trash2, AlertTriangle, Archive, RefreshCw, Trash, Info, CheckCircle2, XCircle } from 'lucide-react';
+import { Search, Filter, Download, User, Clock, Tag, Calendar, ArrowUpDown, X, CheckCircle, ChevronDown, FileText, BarChart2, Plus, Check, BookOpen, Trash2, AlertTriangle, Archive, RefreshCw, Trash, Info, CheckCircle2, XCircle, MessageCircle } from 'lucide-react';
 import Footer from '../components/Footer';
 import Header from '../components/Header';
 import RecycleBinModal from '../components/RecycleBinModal.jsx';
@@ -59,6 +59,9 @@ const SearchPage = ({ currentUser }) => {
     message: '',
     type: 'info' // 'success', 'error', 'warning', 'info'
   });
+
+  // State untuk menyimpan jumlah komentar per question set
+  const [commentCounts, setCommentCounts] = useState({});
 
   // Helper function untuk cek apakah value adalah numeric ID
   const isNumericId = (value) => {
@@ -676,6 +679,30 @@ const SearchPage = ({ currentUser }) => {
     }
   };
 
+  // Fungsi untuk fetch jumlah komentar per question set (menggunakan batch endpoint)
+  const fetchCommentCounts = useCallback(async (questionSetIds) => {
+    if (!questionSetIds || questionSetIds.length === 0) return;
+    
+    try {
+      // Gunakan batch endpoint untuk fetch semua jumlah komentar sekaligus
+      const response = await axios.post(`${API_URL}/comments/counts`, {
+        question_set_ids: questionSetIds
+      });
+      
+      if (response.data.success && response.data.data) {
+        setCommentCounts(prev => ({ ...prev, ...response.data.data }));
+      }
+    } catch (error) {
+      console.error("Error fetching comment counts:", error);
+      // Fallback: set semua ke 0 jika error
+      const fallbackCounts = {};
+      questionSetIds.forEach(id => {
+        fallbackCounts[id] = 0;
+      });
+      setCommentCounts(prev => ({ ...prev, ...fallbackCounts }));
+    }
+  }, []);
+
   const fetchQuestionSets = async (courses = []) => {
     try {
       const response = await axios.get(`${API_URL}/questionsets`);
@@ -751,6 +778,16 @@ const SearchPage = ({ currentUser }) => {
       
       setQuestionSets(transformedData);
       setFilteredData(transformedData);
+      
+      // Fetch jumlah komentar untuk semua question set secara paralel (tidak blocking)
+      // Ini akan langsung muncul karena menggunakan batch endpoint yang lebih cepat
+      const questionSetIds = transformedData.map(item => item.id);
+      if (questionSetIds.length > 0) {
+        // Fetch komentar secara paralel tanpa menunggu - menggunakan batch endpoint
+        fetchCommentCounts(questionSetIds).catch(err => 
+          console.error("⚠️ Error fetching comment counts:", err)
+        );
+      }
     } catch (error) {
       console.error("❌ Error fetching question sets:", error);
     }
@@ -955,6 +992,7 @@ const SearchPage = ({ currentUser }) => {
     const hasAnswerKey = item.hasAnswerKey ?? false;
     const hasTestCase = item.hasTestCase ?? false;
     const isDownloading = downloadingItems.has(item.id);
+    const commentCount = commentCounts[item.id] || 0;
 
     const completeness = (hasAnswerKey ? 1 : 0) + (hasTestCase ? 1 : 0);
     const completenessPercent = (completeness / 2) * 100;
@@ -982,6 +1020,12 @@ const SearchPage = ({ currentUser }) => {
           <div className="flex justify-between items-start mb-4">
             <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">{item.fileName}</h3>
             <div className="flex items-center gap-2">
+              {commentCount > 0 && (
+                <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-600 rounded-full text-xs">
+                  <MessageCircle className="w-3 h-3" />
+                  <span className="font-medium">{commentCount}</span>
+                </div>
+              )}
               <span className={`px-2 py-1 text-xs rounded-full ${getLevelColor(item.level)}`}>
                 {item.level}
               </span>
@@ -1056,9 +1100,17 @@ const SearchPage = ({ currentUser }) => {
           )}
 
           <div className="flex justify-between items-center mt-4">
-            <div className="flex items-center text-sm text-gray-500">
-              <Download className="w-4 h-4 mr-1" />
-              <span>{item.downloads} unduhan</span>
+            <div className="flex items-center gap-3 text-sm text-gray-500">
+              <div className="flex items-center">
+                <Download className="w-4 h-4 mr-1" />
+                <span>{item.downloads} unduhan</span>
+              </div>
+              {commentCount > 0 && (
+                <div className="flex items-center text-blue-600">
+                  <MessageCircle className="w-4 h-4 mr-1" />
+                  <span className="font-medium">{commentCount} komentar</span>
+                </div>
+              )}
             </div>
             <motion.button
               whileHover={{ scale: isDownloading ? 1 : 1.05 }}
@@ -1118,6 +1170,7 @@ const SearchPage = ({ currentUser }) => {
         await fetchQuestionSets(courses);
         if (!isMounted) return;
         console.log("✅ Question sets loaded");
+        // Note: Comment counts akan di-fetch secara paralel di dalam fetchQuestionSets menggunakan batch endpoint yang cepat
   
         // Step 3: Load dropdown data in parallel (non-blocking)
         console.log("⏳ Fetching dropdown data (parallel)...");
@@ -1205,6 +1258,19 @@ const SearchPage = ({ currentUser }) => {
       setFilteredData([]);
     }
   }, [filterData, isInitialLoading, questionSets.length, searchQuery, selectedLevel, selectedCourseTags, selectedMaterialTags, dateRange]);
+
+  // Update comment counts ketika filteredData berubah
+  useEffect(() => {
+    if (filteredData.length > 0) {
+      const questionSetIds = filteredData.map(item => item.id);
+      // Hanya fetch jika ada ID yang belum ada di commentCounts
+      const missingIds = questionSetIds.filter(id => !(id in commentCounts));
+      if (missingIds.length > 0) {
+        fetchCommentCounts(missingIds);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredData.map(item => item.id).join(',')]);
 
   // Handle outside clicks for dropdowns
   useEffect(() => {
