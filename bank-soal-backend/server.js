@@ -28,6 +28,7 @@ const materialRoutes = require('./routes/materialTag.routes');
 const dropdownRoutes = require('./routes/dropdown.routes');
 const courseMaterialRoutes = require('./routes/courseMaterial.routes');
 const questionPackageRoutes = require('./routes/questionPackage.routes');
+const commentRoutes = require('./routes/comment.routes');
 
 // Use routes
 courseMaterialRoutes(app);
@@ -40,6 +41,7 @@ dosenRoutes(app);
 materialRoutes(app);
 dropdownRoutes(app);
 questionPackageRoutes(app);
+app.use('/api/comments', commentRoutes);
 
 // Database connection and server start (FIXED - only once!)
 db.sequelize.sync({ alter: true })
