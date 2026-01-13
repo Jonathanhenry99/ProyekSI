@@ -3,12 +3,15 @@
 -- ========================================
 
 -- Drop existing tables if they exist (in reverse order of dependencies) yang kepake cuman ini
+DROP TABLE IF EXISTS question_package_items CASCADE;
+DROP TABLE IF EXISTS question_packages CASCADE;
+DROP TABLE IF EXISTS comments CASCADE;
 DROP TABLE IF EXISTS question_history CASCADE;
 DROP TABLE IF EXISTS files CASCADE;
 DROP TABLE IF EXISTS question_set_items CASCADE;
 DROP TABLE IF EXISTS course_material_assignments CASCADE;
 DROP TABLE IF EXISTS material_tags CASCADE;
-DROP TABLE IF EXISTS course_tags CASCADE
+DROP TABLE IF EXISTS course_tags CASCADE;
 DROP TABLE IF EXISTS user_roles CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS roles CASCADE;
@@ -71,6 +74,10 @@ CREATE TABLE question_sets ( --ini untuk tabel soal individu
     downloads INTEGER DEFAULT 0,
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by INTEGER REFERENCES users(id),
+    -- Soft delete fields
+    is_deleted BOOLEAN DEFAULT FALSE NOT NULL,
+    deleted_at TIMESTAMP,
+    deleted_by INTEGER REFERENCES users(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -94,6 +101,14 @@ CREATE TABLE files (
     -- ✅ Constraint filecategory yang lebih fleksibel - mendukung nilai normal dan legacy
     filecategory VARCHAR(50) NOT NULL CHECK (filecategory IN ('questions', 'answers', 'testCases', 'soal', 'kunci', 'test')),
     question_set_id INTEGER REFERENCES question_sets(id) ON DELETE CASCADE,
+    uploaded_by INTEGER REFERENCES users(id),
+    mime_type VARCHAR(255),
+    language_type VARCHAR(100),
+    supports_preview BOOLEAN DEFAULT FALSE,
+    -- Soft delete fields
+    is_deleted BOOLEAN DEFAULT FALSE NOT NULL,
+    deleted_at TIMESTAMP,
+    deleted_by INTEGER REFERENCES users(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -108,6 +123,40 @@ CREATE TABLE question_history (
     action_type VARCHAR(50) NOT NULL CHECK (action_type IN ('view', 'download', 'edit', 'delete')),
     action_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     file_id INTEGER REFERENCES files(id) ON DELETE SET NULL
+);
+
+-- Comments table (untuk fitur komentar pada question set)
+CREATE TABLE comments (
+    id SERIAL PRIMARY KEY,
+    content TEXT NOT NULL,
+    question_set_id INTEGER NOT NULL REFERENCES question_sets(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    -- Soft delete fields
+    is_deleted BOOLEAN DEFAULT FALSE NOT NULL,
+    deleted_at TIMESTAMP,
+    deleted_by INTEGER REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Question packages table (paket soal yang berisi beberapa question sets)
+CREATE TABLE question_packages (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    course_id INTEGER NOT NULL REFERENCES course_tags(id) ON DELETE CASCADE,
+    created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    downloads INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Question package items table (junction table untuk item dalam paket soal)
+CREATE TABLE question_package_items (
+    id SERIAL PRIMARY KEY,
+    question_package_id INTEGER NOT NULL REFERENCES question_packages(id) ON DELETE CASCADE,
+    question_id INTEGER NOT NULL REFERENCES question_sets(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(question_package_id, question_id)
 );
 
 
@@ -168,10 +217,18 @@ CREATE INDEX idx_question_history_user_id ON question_history(user_id);
 CREATE INDEX idx_question_history_question_set_id ON question_history(question_set_id);
 CREATE INDEX idx_question_history_action_type ON question_history(action_type);
 
--- Questions indexes
-CREATE INDEX idx_questions_created_by ON questions(created_by);
-CREATE INDEX idx_questions_course_id ON questions(course_id);
-CREATE INDEX idx_questions_difficulty_level ON questions(difficulty_level);
+-- Comments indexes
+CREATE INDEX idx_comments_question_set_id ON comments(question_set_id);
+CREATE INDEX idx_comments_user_id ON comments(user_id);
+CREATE INDEX idx_comments_is_deleted ON comments(is_deleted);
+
+-- Question packages indexes
+CREATE INDEX idx_question_packages_course_id ON question_packages(course_id);
+CREATE INDEX idx_question_packages_created_by ON question_packages(created_by);
+
+-- Question package items indexes
+CREATE INDEX idx_question_package_items_package_id ON question_package_items(question_package_id);
+CREATE INDEX idx_question_package_items_question_id ON question_package_items(question_id);
 
 -- ========================================
 -- TRIGGERS AND FUNCTIONS
@@ -189,10 +246,6 @@ $$ LANGUAGE 'plpgsql';
 -- Triggers for updated_at columns
 CREATE TRIGGER update_users_updated_at 
     BEFORE UPDATE ON users 
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_courses_updated_at 
-    BEFORE UPDATE ON courses 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_course_tags_updated_at 
@@ -215,12 +268,8 @@ CREATE TRIGGER update_files_updated_at
     BEFORE UPDATE ON files 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_questions_updated_at 
-    BEFORE UPDATE ON questions 
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_answers_updated_at 
-    BEFORE UPDATE ON answers 
+CREATE TRIGGER update_comments_updated_at 
+    BEFORE UPDATE ON comments 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ========================================
@@ -239,7 +288,7 @@ INSERT INTO course_tags (name) VALUES
 ('Algoritma dan Pemrograman'),
 ('Dasar Pemrograman'),
 ('Desain dan Analisis Pemrograman'),
-('Algoritma dan Struktur Data'),;
+('Algoritma dan Struktur Data');
 
 -- Insert material tags
 INSERT INTO material_tags (name) VALUES 

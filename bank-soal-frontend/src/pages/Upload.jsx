@@ -89,7 +89,8 @@ const UploadPage = ({ currentUser }) => {
         '.sh', '.bash',
         '.sql',
         '.html', '.css', '.scss', '.sass', '.less',
-        '.xml', '.json', '.yaml', '.yml'
+        '.xml', '.json', '.yaml', '.yml',
+        '.pdf', '.txt', '.docx', '.doc'
       ],
       testCases: ['.zip', '.rar', '.txt']
     };
@@ -133,9 +134,12 @@ const UploadPage = ({ currentUser }) => {
       '.json': 'JSON',
       '.yaml': 'YAML',
       '.yml': 'YAML',
+      '.pdf': 'PDF',
+      '.txt': 'Text',
+      '.docx': 'Word Document',
+      '.doc': 'Word Document',
       '.zip': 'ZIP Archive',
-      '.rar': 'RAR Archive',
-      '.txt': 'Text'
+      '.rar': 'RAR Archive'
     };
     
     return {
@@ -359,7 +363,7 @@ const UploadPage = ({ currentUser }) => {
         if (type === 'questions') {
           errorMessage = `Format file ${fileExtension} tidak didukung untuk soal. Hanya PDF dan DOCX yang diizinkan.`;
         } else if (type === 'answers') {
-          errorMessage = `Format file ${fileExtension} tidak didukung untuk kunci jawaban. Hanya file bahasa pemrograman yang diizinkan (Python, Java, JavaScript, C++, dll).`;
+          errorMessage = `Format file ${fileExtension} tidak didukung untuk kunci jawaban. Hanya file bahasa pemrograman, PDF, TXT, dan DOCX yang diizinkan.`;
         } else if (type === 'testCases') {
           errorMessage = `Format file ${fileExtension} tidak didukung untuk test cases. Hanya ZIP, RAR, dan TXT yang diizinkan.`;
         }
@@ -762,7 +766,7 @@ const UploadPage = ({ currentUser }) => {
 
   // ✅ RENDER ANSWER FILES DENGAN ACCEPT STRICT
   const renderAnswerFileInputs = () => {
-    const answerAcceptTypes = '.js,.jsx,.ts,.tsx,.py,.java,.c,.cpp,.cc,.cxx,.h,.hpp,.cs,.php,.rb,.go,.rs,.kt,.swift,.dart,.scala,.r,.m,.sh,.bash,.sql,.html,.css,.scss,.sass,.less,.xml,.json,.yaml,.yml';
+    const answerAcceptTypes = '.js,.jsx,.ts,.tsx,.py,.java,.c,.cpp,.cc,.cxx,.h,.hpp,.cs,.php,.rb,.go,.rs,.kt,.swift,.dart,.scala,.r,.m,.sh,.bash,.sql,.html,.css,.scss,.sass,.less,.xml,.json,.yaml,.yml,.pdf,.txt,.docx,.doc';
     
     return (
       <div className="mb-6">
@@ -846,7 +850,7 @@ const UploadPage = ({ currentUser }) => {
                       </p>
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-500">Klik untuk memilih file bahasa pemrograman</p>
+                    <p className="text-sm text-gray-500">Klik untuk memilih file (bahasa pemrograman, PDF, TXT, atau DOCX)</p>
                   )}
                 </div>
                 
@@ -891,7 +895,7 @@ const UploadPage = ({ currentUser }) => {
         })}
         
         <p className="text-xs text-gray-500 mt-2">
-          Hanya file bahasa pemrograman yang didukung (Python, JavaScript, Java, C++, PHP, Ruby, dll.)
+          Format yang didukung: File bahasa pemrograman (Python, JavaScript, Java, C++, PHP, Ruby, dll.), PDF, TXT, dan DOCX
         </p>
       </div>
     );
@@ -1151,77 +1155,86 @@ const UploadPage = ({ currentUser }) => {
                     </span>
                   )}
                 </label>
-                <div className="bg-gray-50 rounded-xl border border-gray-300 p-3 min-h-[100px]">
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {metadata.topics.map((topic) => (
-                      <span
-                        key={topic.id}
-                        className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-3 py-1 rounded-lg text-sm font-medium"
-                      >
-                        <Tag className="w-3 h-3" />
-                        {topic.name}
-                        <button
-                          type="button"
-                          onClick={() => handleTopicChange(topic.id, topic.name)}
-                          className="text-blue-600 hover:text-blue-800 ml-1"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
+                
+                {/* Bagian Topik Terpilih - Dipisahkan */}
+                {metadata.topics.length > 0 && (
+                  <div className="bg-blue-50 rounded-xl border-2 border-blue-200 p-4 mb-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm font-semibold text-gray-700">
+                        Topik Terpilih ({metadata.topics.length})
+                      </p>
+                      <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
+                        {metadata.topics.length} dipilih
                       </span>
-                    ))}
+                    </div>
+                    <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                      {metadata.topics.map((topic) => (
+                        <span
+                          key={topic.id}
+                          className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-3 py-1.5 rounded-lg text-sm font-medium border border-blue-200"
+                        >
+                          <Tag className="w-3 h-3" />
+                          {topic.name}
+                          <button
+                            type="button"
+                            onClick={() => handleTopicChange(topic.id, topic.name)}
+                            className="text-blue-600 hover:text-blue-800 ml-1 hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+                            title="Hapus topik"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  
-                  <div className="border-t border-gray-200 pt-3">
-                    {!metadata.selectedCourseId ? (
-                      <div className="text-center py-6">
-                        <Tag className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                        <p className="text-sm text-gray-500">
-                          Pilih mata kuliah terlebih dahulu untuk menampilkan topik yang tersedia
-                        </p>
+                )}
+                
+                {/* Bagian Pilih Topik */}
+                <div className="bg-gray-50 rounded-xl border border-gray-300 p-3 min-h-[100px]">
+                  {!metadata.selectedCourseId ? (
+                    <div className="text-center py-6">
+                      <Tag className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500">
+                        Pilih mata kuliah terlebih dahulu untuk menampilkan topik yang tersedia
+                      </p>
+                    </div>
+                  ) : loadingMaterials ? (
+                    <div className="text-center py-6">
+                      <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                      <p className="text-sm text-gray-500">Memuat topik untuk {metadata.subject}...</p>
+                    </div>
+                  ) : filteredMaterialTags.length === 0 ? (
+                    <div className="text-center py-6">
+                      <AlertCircle className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500 mb-2">
+                        Belum ada topik yang tersedia untuk mata kuliah "{metadata.subject}"
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        Hubungi admin untuk menambahkan topik ke mata kuliah ini
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-xs text-gray-500 mb-3 font-medium">
+                        Pilih topik untuk mata kuliah "{metadata.subject}":
+                      </p>
+                      <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
+                        {filteredMaterialTags
+                          .filter(tag => !metadata.topics.some(topic => topic.id === tag.id))
+                          .map((tag) => (
+                            <button
+                              key={tag.id}
+                              type="button"
+                              onClick={() => handleTopicChange(tag.id, tag.name)}
+                              className="inline-flex items-center gap-1 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-300 text-gray-700 hover:text-blue-800 px-3 py-2 rounded-lg text-sm transition-all duration-200 hover:shadow-sm"
+                            >
+                              <Tag className="w-3 h-3" />
+                              {tag.name}
+                            </button>
+                          ))}
                       </div>
-                    ) : loadingMaterials ? (
-                      <div className="text-center py-6">
-                        <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                        <p className="text-sm text-gray-500">Memuat topik untuk {metadata.subject}...</p>
-                      </div>
-                    ) : filteredMaterialTags.length === 0 ? (
-                      <div className="text-center py-6">
-                        <AlertCircle className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                        <p className="text-sm text-gray-500 mb-2">
-                          Belum ada topik yang tersedia untuk mata kuliah "{metadata.subject}"
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          Hubungi admin untuk menambahkan topik ke mata kuliah ini
-                        </p>
-                      </div>
-                    ) : (
-                      <>
-                        <p className="text-xs text-gray-500 mb-3 font-medium">
-                          Pilih topik untuk mata kuliah "{metadata.subject}":
-                        </p>
-                        <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
-                          {filteredMaterialTags
-                            .filter(tag => !metadata.topics.some(topic => topic.id === tag.id))
-                            .map((tag) => (
-                              <button
-                                key={tag.id}
-                                type="button"
-                                onClick={() => handleTopicChange(tag.id, tag.name)}
-                                className="inline-flex items-center gap-1 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-300 text-gray-700 hover:text-blue-800 px-3 py-2 rounded-lg text-sm transition-all duration-200 hover:shadow-sm"
-                              >
-                                <Tag className="w-3 h-3" />
-                                {tag.name}
-                              </button>
-                            ))}
-                        </div>
-                        {metadata.topics.length > 0 && (
-                          <p className="text-xs text-green-600 mt-2 font-medium">
-                            ✓ {metadata.topics.length} topik dipilih
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -1353,8 +1366,8 @@ const UploadPage = ({ currentUser }) => {
                 </>
               ) : (
                 <>
-                  <Upload className="w-5 h-5" />
-                  Upload Soal
+                  <CheckCircle className="w-5 h-5" />
+                  Simpan
                 </>
               )}
             </motion.button>

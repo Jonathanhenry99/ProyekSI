@@ -111,7 +111,7 @@ exports.uploadFile = async (req, res) => {
     } 
     else if (fileCategory && fileCategory.startsWith('answers_')) {
       const allowedExtensions = [
-        '.txt', '.js', '.jsx', '.ts', '.tsx', '.py', '.java',
+        '.txt', '.pdf', '.docx', '.doc', '.js', '.jsx', '.ts', '.tsx', '.py', '.java',
         '.c', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.cs',
         '.php', '.rb', '.go', '.rs', '.kt', '.kts', '.swift',
         '.dart', '.scala', '.r', '.m', '.sh', '.bash', '.sql',
@@ -122,7 +122,7 @@ exports.uploadFile = async (req, res) => {
       if (!allowedExtensions.includes(ext)) {
         fs.unlinkSync(req.file.path);
         return res.status(400).send({ 
-          message: `Format file ${ext} tidak didukung untuk kunci jawaban.` 
+          message: `Format file ${ext} tidak didukung untuk kunci jawaban. Format yang didukung: file bahasa pemrograman, PDF, TXT, dan DOCX.` 
         });
       }
     }

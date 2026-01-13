@@ -31,6 +31,7 @@ db.question = require("./question.model.js")(sequelize, Sequelize);
 db.questionSet = require("./questionSet.model.js")(sequelize, Sequelize);
 db.questionHistory = require("./questionHistory.model.js")(sequelize, Sequelize);
 db.file = require("./file.model.js")(sequelize, Sequelize);
+db.comment = require("./comment.model.js")(sequelize, Sequelize);
 db.question_packages = require("./questionPackage.model.js")(sequelize, Sequelize);
 db.question_package_items = require("./questionPackageItem.model.js")(sequelize, Sequelize);
 // db.question_set_items = require("./question_set_item.model.js")(sequelize, Sequelize);
@@ -129,6 +130,13 @@ db.questionHistory.belongsTo(db.questionSet, { foreignKey: "questionSetId" });
 // File relationships
 db.questionSet.hasMany(db.file, { as: "files", foreignKey: "question_set_id" });
 db.file.belongsTo(db.questionSet, { foreignKey: "question_set_id" });
+
+// Comment relationships
+db.questionSet.hasMany(db.comment, { as: "comments", foreignKey: "question_set_id" });
+db.comment.belongsTo(db.questionSet, { foreignKey: "question_set_id" });
+
+db.user.hasMany(db.comment, { as: "comments", foreignKey: "user_id" });
+db.comment.belongsTo(db.user, { as: "author", foreignKey: "user_id" });
 
 
 module.exports = db;

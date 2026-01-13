@@ -635,33 +635,28 @@ export default function EditModal({ isOpen, onClose, questionSet = {}, currentUs
                                     Hubungi admin untuk menambah materi.
                                 </div>
                             ) : (
-                                <div className="border border-gray-300 rounded-xl p-4 max-h-48 overflow-y-auto">
-                                    <div className="space-y-2">
-                                        {availableMaterials.map((material) => (
-                                            <label key={material.id} className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={metadata.topics.includes(material.name)}
-                                                    onChange={() => handleTopicToggle(material.name)}
-                                                    disabled={isSubmitting}
-                                                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                                                />
-                                                <span className="text-gray-700">{material.name}</span>
-                                            </label>
-                                        ))}
-                                    </div>
+                                <>
+                                    {/* Bagian Topik Terpilih - Dipisahkan */}
                                     {metadata.topics.length > 0 && (
-                                        <div className="mt-3 pt-3 border-t border-gray-200">
-                                            <p className="text-sm text-gray-600 mb-2">Topik terpilih ({metadata.topics.length}):</p>
-                                            <div className="flex flex-wrap gap-2">
+                                        <div className="bg-blue-50 rounded-xl border-2 border-blue-200 p-4 mb-4">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <p className="text-sm font-semibold text-gray-700">
+                                                    Topik Terpilih ({metadata.topics.length})
+                                                </p>
+                                                <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
+                                                    {metadata.topics.length} dipilih
+                                                </span>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
                                                 {metadata.topics.map((topic, index) => (
-                                                    <span key={index} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                    <span key={index} className="inline-flex items-center px-2 py-1.5 rounded-lg text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
                                                         {topic}
                                                         <button
                                                             type="button"
                                                             onClick={() => handleTopicToggle(topic)}
                                                             disabled={isSubmitting}
-                                                            className="ml-1 w-4 h-4 rounded-full hover:bg-blue-200 flex items-center justify-center"
+                                                            className="ml-1 w-4 h-4 rounded-full hover:bg-blue-200 flex items-center justify-center transition-colors"
+                                                            title="Hapus topik"
                                                         >
                                                             <X className="w-3 h-3" />
                                                         </button>
@@ -670,7 +665,25 @@ export default function EditModal({ isOpen, onClose, questionSet = {}, currentUs
                                             </div>
                                         </div>
                                     )}
-                                </div>
+                                    
+                                    {/* Bagian Pilih Topik */}
+                                    <div className="border border-gray-300 rounded-xl p-4 max-h-48 overflow-y-auto">
+                                        <div className="space-y-2">
+                                            {availableMaterials.map((material) => (
+                                                <label key={material.id} className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={metadata.topics.includes(material.name)}
+                                                        onChange={() => handleTopicToggle(material.name)}
+                                                        disabled={isSubmitting}
+                                                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                                                    />
+                                                    <span className="text-gray-700">{material.name}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </>
                             )}
                         </div>
 

@@ -242,7 +242,7 @@ const CourseDropdown = ({ formSubject, setFormSubject, courseList, isCourseLoadi
 };
 
 const FormCreatorPage = ({ currentUser }) => {
-    const [formTitle, setFormTitle] = useState("Untitled Form");
+    const [formTitle, setFormTitle] = useState("");
     const [formDescription, setFormDescription] = useState("");
     const [selectedQuestions, setSelectedQuestions] = useState([]);
     const [searchTerm, setSearchTerm] = useState("");
@@ -762,13 +762,13 @@ const FormCreatorPage = ({ currentUser }) => {
                                 value={formTitle}
                                 onChange={(e) => setFormTitle(e.target.value)}
                                 className="w-full text-3xl font-bold mb-4 border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none pb-2 transition-colors"
-                                placeholder="Judul Form"
+                                placeholder="Masukkan Judul Paket Soal (contoh: UTS Struktur Data 2024)"
                             />
                             <textarea
                                 value={formDescription}
                                 onChange={(e) => setFormDescription(e.target.value)}
                                 className="w-full text-gray-600 border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none resize-none transition-colors"
-                                placeholder="Deskripsi form (opsional)"
+                                placeholder="Masukan Deskripsi Paket Soal (opsional)"
                                 rows="2"
                             />
 
@@ -965,9 +965,13 @@ const FormCreatorPage = ({ currentUser }) => {
                                     </div>
                                     
                                     <motion.button
-                                        className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
+                                        className={`w-full py-2 px-4 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                                            selectedQuestions.some(selected => selected.id === q.id)
+                                                ? 'bg-red-600 text-white hover:bg-red-700 cursor-not-allowed'
+                                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                                        }`}
+                                        whileHover={selectedQuestions.some(selected => selected.id === q.id) ? {} : { scale: 1.02 }}
+                                        whileTap={selectedQuestions.some(selected => selected.id === q.id) ? {} : { scale: 0.98 }}
                                         onClick={() => handleAddQuestion(q)}
                                         disabled={selectedQuestions.some(selected => selected.id === q.id)}
                                     >
@@ -979,7 +983,7 @@ const FormCreatorPage = ({ currentUser }) => {
                                         ) : (
                                             <>
                                                 <Plus className="w-4 h-4" />
-                                                Tambah ke Form
+                                                Tambah ke Paket soal
                                             </>
                                         )}
                                     </motion.button>
